@@ -10,18 +10,22 @@ Beekeeper provides secure key management and transaction signing without requiri
 git clone --recursive https://gitlab.syncad.com/hive/beekeeper.git
 cd beekeeper
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc) beekeeper
+cmake -DCMAKE_BUILD_TYPE=Release -GNinja ..
+ninja beekeeper
 ```
 
 ## Usage
 
 ```bash
-./beekeeper --webserver-http-endpoint=127.0.0.1:5001
+./programs/beekeeper/beekeeper/beekeeper --webserver-http-endpoint=127.0.0.1:5001
 ```
 
-See the [hive documentation](https://gitlab.syncad.com/hive/hive) for full usage details.
+## Dependencies
+
+- [plugins](https://gitlab.syncad.com/hive/plugins) - Shared plugin libraries
+  - [fc](https://gitlab.syncad.com/hive/fc) - Fast-compiling C++ library
+  - [appbase](https://gitlab.syncad.com/hive/appbase) - Application framework
 
 ## License
 
-See LICENSE file in the hive submodule.
+MIT License - See LICENSE file.
