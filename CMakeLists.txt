@@ -1,28 +1,25 @@
 # Beekeeper - Standalone wallet daemon for Hive blockchain
 #
-# This is a wrapper project that builds only the beekeeper component from hive.
-# The hive repository is included as a submodule.
+# This project uses hive as a submodule. To build:
+#
+#   mkdir build && cd build
+#   cmake ../hive -DCMAKE_BUILD_TYPE=Release
+#   make -j$(nproc) beekeeper
+#
+# This CMakeLists.txt is provided for IDE integration and documentation.
+# The actual build uses hive's CMakeLists.txt directly.
 #
 cmake_minimum_required(VERSION 3.16)
-project(Beekeeper VERSION 1.0.0)
+project(Beekeeper VERSION 1.0.0 DESCRIPTION "Standalone wallet daemon for Hive blockchain")
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Set hive-specific options for minimal build
-set(BUILD_HIVE_TESTNET OFF CACHE BOOL "Disable testnet build")
-set(SKIP_BY_TX_ID ON CACHE BOOL "Skip by_tx_id index")
-
-# Add hive subdirectory - it will build all required dependencies
-add_subdirectory(hive)
-
-# The beekeeper target is already defined in hive/programs/beekeeper
-# We just expose it as the main target of this project
-
-# Install beekeeper binary
-install(TARGETS beekeeper
-    RUNTIME DESTINATION bin
-)
-
-message(STATUS "Beekeeper standalone build configured")
-message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "")
+message(STATUS "=== Beekeeper Standalone Build ===")
+message(STATUS "")
+message(STATUS "To build beekeeper, run cmake on the hive subdirectory:")
+message(STATUS "")
+message(STATUS "  mkdir build && cd build")
+message(STATUS "  cmake ../hive -DCMAKE_BUILD_TYPE=Release -GNinja")
+message(STATUS "  ninja beekeeper")
+message(STATUS "")
+message(STATUS "The beekeeper binary will be at: build/programs/beekeeper/beekeeper")
+message(STATUS "")
