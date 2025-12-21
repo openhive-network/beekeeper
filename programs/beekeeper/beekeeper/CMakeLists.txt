@@ -1,7 +1,7 @@
 file(GLOB HEADERS "include/beekeeper/*.hpp")
 
-add_executable(beekeeper
-    main.cpp
+# Static library with beekeeper implementation (used by both executable and tests)
+add_library(beekeeper_lib STATIC
     beekeeper_app.cpp
     beekeeper_instance.cpp
     beekeeper_wallet_api.cpp
@@ -11,7 +11,7 @@ add_executable(beekeeper
     ${HEADERS}
 )
 
-target_link_libraries(beekeeper
+target_link_libraries(beekeeper_lib PUBLIC
     appbase
     webserver_plugin
     app_status_api_plugin
@@ -19,6 +19,13 @@ target_link_libraries(beekeeper
     beekeeper_core
     beekeeper_protocol_config
 )
+
+target_include_directories(beekeeper_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+# Executable
+add_executable(beekeeper main.cpp)
+
+target_link_libraries(beekeeper beekeeper_lib)
 
 target_include_directories(beekeeper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 

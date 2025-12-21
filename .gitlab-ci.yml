@@ -1,0 +1,90 @@
+stages:
+  - build
+  - test
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+beekeeper_native_build:
+  stage: build
+  image: registry.gitlab.syncad.com/hive/hive/ci-base-image@sha256:50bcbfe37fc031a902071ceaf586aff4554b15aa84e33b8bd84c31ad2386a26f
+  script:
+    - mkdir -p build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON ..
+    - make -j$(nproc)
+  artifacts:
+    paths:
+      - build/programs/beekeeper/beekeeper/beekeeper
+      - build/tests/unit/beekeeper_test
+    expire_in: 1 week
+  tags:
+    - public-runner-docker
+
+beekeeper_native_test:
+  stage: test
+  image: registry.gitlab.syncad.com/hive/hive/ci-base-image@sha256:50bcbfe37fc031a902071ceaf586aff4554b15aa84e33b8bd84c31ad2386a26f
+  needs:
+    - job: beekeeper_native_build
+      artifacts: true
+  script:
+    - ./build/tests/unit/beekeeper_test --log_level=test_suite
+  tags:
+    - public-runner-docker
+
+beekeeper_wasm_build:
+  stage: build
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1@sha256:79edc8ecfe7b13848466d33791daa955eb1762edc329a48c07aa700bc6cfb712
+  variables:
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+  before_script:
+    - git config --global --add safe.directory '*'
+    - . "${NVM_DIR}/nvm.sh"
+    - nvm use "${NODEJS_VERSION}"
+  script:
+    # Build WASM
+    - ./scripts/build_wasm_beekeeper.sh 1 "${CI_PROJECT_DIR}"
+    # Install npm dependencies and build TypeScript
+    - cd "${SOURCE_DIR}"
+    - pnpm install --frozen-lockfile
+    - pnpm build
+  artifacts:
+    paths:
+      - "${SOURCE_DIR}/dist"
+      - "${SOURCE_DIR}/src/build/*.wasm"
+      - "${SOURCE_DIR}/src/build/*.js"
+      - "${SOURCE_DIR}/src/build/*.d.ts"
+      - "${SOURCE_DIR}/src/build/node"
+      - "${SOURCE_DIR}/src/build/web"
+    expire_in: 1 week
+  tags:
+    - public-runner-docker
+
+beekeeper_wasm_test:
+  stage: test
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1@sha256:79edc8ecfe7b13848466d33791daa955eb1762edc329a48c07aa700bc6cfb712
+  variables:
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+  needs:
+    - job: beekeeper_wasm_build
+      artifacts: true
+  before_script:
+    - git config --global --add safe.directory '*'
+    - . "${NVM_DIR}/nvm.sh"
+    - nvm use "${NODEJS_VERSION}"
+  script:
+    - cd "${SOURCE_DIR}"
+    - pnpm install --frozen-lockfile
+    # Install playwright browser
+    - pnpm exec playwright install chromium
+    # Run tests
+    - pnpm test
+  artifacts:
+    paths:
+      - "${SOURCE_DIR}/results.xml"
+      - "${SOURCE_DIR}/results.json"
+    reports:
+      junit: "${SOURCE_DIR}/results.xml"
+    when: always
+    expire_in: 1 week
+  tags:
+    - public-runner-docker

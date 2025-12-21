@@ -75,7 +75,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://gitlab.syncad.com/hive/hive.git"
+    "url": "https://gitlab.syncad.com/hive/beekeeper.git"
   },
   "engines": {
     "node": "^20.11 || >= 21.2"

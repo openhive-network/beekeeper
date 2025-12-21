@@ -6,8 +6,9 @@ LIST(APPEND BOOST_COMPONENTS
   filesystem
   program_options
   system)
-include( ${CMAKE_CURRENT_LIST_DIR}/../../../../cmake/hive_targets.cmake )
-add_subdirectory( ${CMAKE_CURRENT_LIST_DIR}/../../../../libraries/fc build_fc_minimal )
+# Paths adjusted for beekeeper standalone repo structure
+include( ${CMAKE_CURRENT_LIST_DIR}/../../../../libraries/plugins/cmake/hive_targets.cmake )
+add_subdirectory( ${CMAKE_CURRENT_LIST_DIR}/../../../../libraries/plugins/libraries/fc build_fc_minimal )
 
 set(WASM_RUNTIME_COMPONENT_NAME "wasm_runtime_components")
 

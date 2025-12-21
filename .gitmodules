@@ -1,3 +1,6 @@
 [submodule "libraries/plugins"]
 	path = libraries/plugins
 	url = ../plugins.git
+[submodule "programs/beekeeper/beekeeper_wasm/npm-common-config"]
+	path = programs/beekeeper/beekeeper_wasm/npm-common-config
+	url = ../common-ci-configuration.git
