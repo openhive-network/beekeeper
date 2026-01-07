@@ -1,7 +1,7 @@
 # Beekeeper
 
 [![npm version](https://badge.fury.io/js/%40hiveio%2Fbeekeeper.svg)](https://badge.fury.io/js/%40hiveio%2Fbeekeeper)
-[![CI](https://gitlab.syncad.com/hive/hive/badges/master/pipeline.svg)](https://gitlab.syncad.com/hive/hive/-/pipelines)
+[![CI](https://gitlab.syncad.com/hive/beekeeper/badges/master/pipeline.svg)](https://gitlab.syncad.com/hive/beekeeper/-/pipelines)
 
 Hive Beekeeper functionality exposed to TypeScript/JavaScript environments
 
@@ -18,7 +18,7 @@ Beekeeper is written in TypeScript, so out of the box it gives you clear API spe
 
 ## 💡 Example usage
 
-As a an example you can check [`examples`](https://gitlab.syncad.com/hive/hive/-/tree/master/programs/beekeeper/examples) in this project.
+As a an example you can check [`examples`](https://gitlab.syncad.com/hive/beekeeper/-/tree/master/programs/beekeeper/examples) in this project.
 
 ### Importing and removing keys from a wallet
 
@@ -214,8 +214,8 @@ npm install @hiveio/beekeeper
 Clone the repository and install the dependencies:
 
 ```bash
-git clone https://gitlab.syncad.com/hive/hive.git --recurse-submodules
-cd hive/programs/beekeeper/beekeeper_wasm
+git clone https://gitlab.syncad.com/hive/beekeeper.git --recurse-submodules
+cd beekeeper/programs/beekeeper/beekeeper_wasm
 
 corepack enable
 pnpm install
