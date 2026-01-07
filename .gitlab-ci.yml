@@ -7,7 +7,7 @@ variables:
 
 beekeeper_native_build:
   stage: build
-  image: registry.gitlab.syncad.com/hive/hive/ci-base-image@sha256:50bcbfe37fc031a902071ceaf586aff4554b15aa84e33b8bd84c31ad2386a26f
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-2@sha256:1ca0a536d22f738dd0eee514fd84f4479243a6d92e44981d00da9f67240b5083
   script:
     - mkdir -p build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON ..
@@ -22,7 +22,7 @@ beekeeper_native_build:
 
 beekeeper_native_test:
   stage: test
-  image: registry.gitlab.syncad.com/hive/hive/ci-base-image@sha256:50bcbfe37fc031a902071ceaf586aff4554b15aa84e33b8bd84c31ad2386a26f
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-2@sha256:1ca0a536d22f738dd0eee514fd84f4479243a6d92e44981d00da9f67240b5083
   needs:
     - job: beekeeper_native_build
       artifacts: true
