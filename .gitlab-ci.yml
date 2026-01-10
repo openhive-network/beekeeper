@@ -33,7 +33,7 @@ beekeeper_native_test:
 
 beekeeper_wasm_build:
   stage: build
-  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1@sha256:79edc8ecfe7b13848466d33791daa955eb1762edc329a48c07aa700bc6cfb712
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.22-1
   variables:
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
   before_script:
@@ -61,7 +61,7 @@ beekeeper_wasm_build:
 
 beekeeper_wasm_test:
   stage: test
-  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1@sha256:79edc8ecfe7b13848466d33791daa955eb1762edc329a48c07aa700bc6cfb712
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.22-1
   variables:
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
   needs:
