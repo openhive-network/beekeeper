@@ -3,11 +3,34 @@ stages:
   - test
 
 variables:
-  GIT_SUBMODULE_STRATEGY: recursive
+  # Disable automatic submodule fetching - we handle it manually due to nested submodules
+  # (plugins contains fc/appbase with relative URLs that don't resolve correctly in CI)
+  GIT_SUBMODULE_STRATEGY: none
+  # Allow file:// protocol for nested submodules
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: "protocol.file.allow"
+  GIT_CONFIG_VALUE_0: "always"
+  # Common CI configuration reference
+  COMMON_CI_REF: "develop"
+
+# Submodule initialization using common-ci-configuration script
+# Usage: before_script: - !reference [.submodule_init, script]
+.submodule_init:
+  script:
+    - |
+      echo -e "\e[0Ksection_start:$(date +%s):init_submodules[collapsed=true]\r\e[0KInitializing submodules..."
+      curl -fsSL "${CI_SERVER_URL}/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}/scripts/fetch-submodules.sh" -o /tmp/fetch-submodules.sh
+      chmod +x /tmp/fetch-submodules.sh
+      /tmp/fetch-submodules.sh libraries/plugins programs/beekeeper/beekeeper_wasm/npm-common-config
+      # Initialize nested submodules in plugins (fc, appbase)
+      cd libraries/plugins && git submodule update --init --recursive --jobs 4 && cd ../..
+      echo -e "\e[0Ksection_end:$(date +%s):init_submodules\r\e[0K"
 
 beekeeper_native_build:
   stage: build
   image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-2@sha256:1ca0a536d22f738dd0eee514fd84f4479243a6d92e44981d00da9f67240b5083
+  before_script:
+    - !reference [.submodule_init, script]
   script:
     - mkdir -p build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON ..
@@ -37,7 +60,7 @@ beekeeper_wasm_build:
   variables:
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
   before_script:
-    - git config --global --add safe.directory '*'
+    - !reference [.submodule_init, script]
     - . "${NVM_DIR}/nvm.sh"
     - nvm use "${NODEJS_VERSION}"
   script:
