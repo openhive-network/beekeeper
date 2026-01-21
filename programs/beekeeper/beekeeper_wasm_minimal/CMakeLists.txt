@@ -5,8 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Use fc library components (reusing battle-tested implementations)
+set(FC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../libraries/plugins/libraries/fc")
+
 # Use the secp256k1 library from the fc submodule
-set(SECP256K1_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../libraries/plugins/libraries/fc/vendor/secp256k1-zkp")
+set(SECP256K1_DIR "${FC_DIR}/vendor/secp256k1-zkp")
 
 # Build secp256k1 as a static library
 # Configure for minimal WASM build - no benchmarks, no tests
@@ -45,12 +48,19 @@ target_compile_definitions(secp256k1_minimal PRIVATE
 # Enable size optimization for secp256k1
 target_compile_options(secp256k1_minimal PRIVATE -Oz -fno-exceptions)
 
+# FC crypto sources (standalone, no OpenSSL dependencies)
+# CRIPEMD160: Bitcoin Core's RIPEMD-160 implementation (battle-tested)
+set(FC_CRYPTO_SOURCES
+    "${FC_DIR}/src/crypto/cripemd160.cpp"
+)
+
 # Main WASM module
-add_executable(beekeeper_wasm_minimal wasm_api.cpp)
+add_executable(beekeeper_wasm_minimal wasm_api.cpp ${FC_CRYPTO_SOURCES})
 
 target_include_directories(beekeeper_wasm_minimal PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${SECP256K1_DIR}/include"
+    "${FC_DIR}/include"  # For fc/crypto/cripemd160.hpp
 )
 
 target_link_libraries(beekeeper_wasm_minimal PRIVATE secp256k1_minimal embind)
