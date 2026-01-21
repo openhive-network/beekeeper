@@ -1,19 +1,18 @@
 // Minimal WASM API for Hive beekeeper
-// Only depends on secp256k1 - no Boost, no OpenSSL, no FC
+// Depends on: secp256k1, minimal FC stubs (no Boost, no OpenSSL)
 
 #include <emscripten/bind.h>
 #include <secp256k1.h>
 #include <secp256k1_recovery.h>
 
 #include "base58.hpp"
+#include <fc/crypto/hex.hpp>
 
 #include <string>
 #include <vector>
 #include <array>
 #include <optional>
 #include <cstring>
-#include <sstream>
-#include <iomanip>
 
 namespace {
 
@@ -23,37 +22,6 @@ secp256k1_context* get_context() {
         SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY
     );
     return ctx;
-}
-
-// Convert bytes to hex string
-std::string bytes_to_hex(const uint8_t* data, size_t len) {
-    std::stringstream ss;
-    ss << std::hex << std::setfill('0');
-    for (size_t i = 0; i < len; ++i) {
-        ss << std::setw(2) << static_cast<int>(data[i]);
-    }
-    return ss.str();
-}
-
-// Convert hex string to bytes
-std::vector<uint8_t> hex_to_bytes(const std::string& hex) {
-    std::vector<uint8_t> bytes;
-    if (hex.length() % 2 != 0) return bytes;
-
-    bytes.reserve(hex.length() / 2);
-    for (size_t i = 0; i < hex.length(); i += 2) {
-        uint8_t byte = 0;
-        for (int j = 0; j < 2; ++j) {
-            char c = hex[i + j];
-            byte <<= 4;
-            if (c >= '0' && c <= '9') byte |= c - '0';
-            else if (c >= 'a' && c <= 'f') byte |= c - 'a' + 10;
-            else if (c >= 'A' && c <= 'F') byte |= c - 'A' + 10;
-            else return {};
-        }
-        bytes.push_back(byte);
-    }
-    return bytes;
 }
 
 // WIF (Wallet Import Format) version byte
@@ -187,7 +155,7 @@ std::string sign_digest(const std::string& wif, const std::string& digest_hex) {
         return R"({"error": "Invalid WIF format"})";
     }
 
-    auto digest = hex_to_bytes(digest_hex);
+    auto digest = fc::hex_to_bytes(digest_hex);
     if (digest.size() != 32) {
         return R"({"error": "Digest must be 32 bytes"})";
     }
@@ -212,7 +180,7 @@ std::string sign_digest(const std::string& wif, const std::string& digest_hex) {
     // Hive uses compact signature format: recovery_id + 27 + 4 (compressed)
     serialized[0] = static_cast<uint8_t>(27 + 4 + recid);
 
-    return R"({"signature": ")" + bytes_to_hex(serialized.data(), serialized.size()) + R"("})";
+    return R"({"signature": ")" + fc::to_hex(serialized.data(), serialized.size()) + R"("})";
 }
 
 /**
@@ -255,7 +223,7 @@ std::string get_shared_secret(const std::string& wif, const std::string& pubkey_
     // Here we return 32 bytes (SHA256 of x-coordinate) for JS to process further
     auto hash = minimal::SHA256::hash(shared_point.data() + 1, 32);
 
-    return R"({"shared_secret": ")" + bytes_to_hex(hash.data(), hash.size()) + R"("})";
+    return R"({"shared_secret": ")" + fc::to_hex(hash.data(), hash.size()) + R"("})";
 }
 
 /**
@@ -269,7 +237,7 @@ std::string get_private_key_bytes(const std::string& wif) {
         return R"({"error": "Invalid WIF format"})";
     }
 
-    return R"({"private_key": ")" + bytes_to_hex(privkey->data(), privkey->size()) + R"("})";
+    return R"({"private_key": ")" + fc::to_hex(privkey->data(), privkey->size()) + R"("})";
 }
 
 /**
@@ -281,15 +249,15 @@ std::string debug_base58(const std::string& input) {
                          R"(, "decoded_length": )" + std::to_string(decoded.size());
 
     if (!decoded.empty()) {
-        result += R"(, "first_byte": "0x)" + bytes_to_hex(&decoded[0], 1) + R"(")";
-        result += R"(, "all_bytes": ")" + bytes_to_hex(decoded.data(), decoded.size()) + R"(")";
+        result += R"(, "first_byte": "0x)" + fc::to_hex(&decoded[0], 1) + R"(")";
+        result += R"(, "all_bytes": ")" + fc::to_hex(decoded.data(), decoded.size()) + R"(")";
 
         // Test checksum
         if (decoded.size() >= 5) {
             size_t data_len = decoded.size() - 4;
             auto computed_checksum = minimal::double_sha256(decoded.data(), data_len);
-            result += R"(, "computed_checksum": ")" + bytes_to_hex(computed_checksum.data(), 4) + R"(")";
-            result += R"(, "stored_checksum": ")" + bytes_to_hex(decoded.data() + data_len, 4) + R"(")";
+            result += R"(, "computed_checksum": ")" + fc::to_hex(computed_checksum.data(), 4) + R"(")";
+            result += R"(, "stored_checksum": ")" + fc::to_hex(decoded.data() + data_len, 4) + R"(")";
         }
     }
 

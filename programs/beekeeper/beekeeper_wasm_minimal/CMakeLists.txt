@@ -59,6 +59,7 @@ add_executable(beekeeper_wasm_minimal wasm_api.cpp ${FC_CRYPTO_SOURCES})
 
 target_include_directories(beekeeper_wasm_minimal PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fc_include"  # Minimal FC stubs (must come before real fc)
     "${SECP256K1_DIR}/include"
     "${FC_DIR}/include"  # For fc/crypto/cripemd160.hpp
 )
