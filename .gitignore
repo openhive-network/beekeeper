@@ -1,3 +1,5 @@
 build/
 node_modules/
 dist/
+build_minimal/
+build_wasm_minimal/
