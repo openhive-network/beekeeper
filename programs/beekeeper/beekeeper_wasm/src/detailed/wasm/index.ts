@@ -107,7 +107,50 @@ export class MinimalCrypto {
 /**
  * Factory type for loading the minimal WASM module
  */
-export type MinimalWasmFactory = () => Promise<MinimalWasmModule>;
+export type MinimalWasmFactory = (options?: { locateFile?: (path: string) => string }) => Promise<MinimalWasmModule>;
+
+// Cached WASM module
+let cachedModule: MinimalWasmModule | null = null;
+
+/**
+ * Load the minimal WASM module
+ * @param wasmLocation - Optional path to the WASM file
+ */
+export async function loadMinimalWasm(wasmLocation?: string): Promise<MinimalWasmModule> {
+  if (cachedModule) {
+    return cachedModule;
+  }
+
+  // Dynamic import of the WASM module
+  // @ts-expect-error - Dynamic import of WASM module
+  const createModule: MinimalWasmFactory = (await import('../build_minimal/beekeeper_minimal.js')).default;
+
+  const moduleOptions: { locateFile?: (path: string) => string } = {};
+
+  // Always provide locateFile to handle minified Emscripten code
+  // which may not correctly resolve paths using import.meta.url
+  moduleOptions.locateFile = (path: string) => {
+    if (path.endsWith('.wasm')) {
+      if (wasmLocation) {
+        return wasmLocation;
+      }
+      // Resolve WASM path relative to this module's location
+      // The WASM file is in the same directory as the JS loader
+      return new URL('../build_minimal/beekeeper_minimal.wasm', import.meta.url).href;
+    }
+    return path;
+  };
+
+  cachedModule = await createModule(moduleOptions);
+  return cachedModule;
+}
+
+/**
+ * Clear the cached WASM module (for testing)
+ */
+export function clearWasmCache(): void {
+  cachedModule = null;
+}
 
 /**
  * Create a MinimalCrypto instance from a WASM module factory

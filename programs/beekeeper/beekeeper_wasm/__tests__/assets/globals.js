@@ -18,7 +18,8 @@ globalThis.createBeekeeperTestFor = async function createBeekeeperTestFor (env) 
 };
 
 globalThis.createBeekeeperWasmTestFor = async function createBeekeeperWasmTestFor (env) {
-  const locBeekeeperWasm = env === 'web' ? '../../dist/bundle/build/beekeeper_wasm.web' : '../../dist/bundle/build/beekeeper_wasm.node';
+  // Import the JS loader, not the .wasm file directly
+  const locBeekeeperWasm = env === 'web' ? '../../dist/bundle/build_minimal/beekeeper_minimal.js' : '../../dist/bundle/build_minimal/beekeeper_minimal.js';
 
   const wasm = await import(locBeekeeperWasm);
 

@@ -221,4 +221,154 @@ inline std::array<uint8_t, 32> double_sha256(const uint8_t* data, size_t len) {
     return SHA256::hash(first.data(), first.size());
 }
 
+// RIPEMD-160 implementation for public key checksums (Hive format)
+class RIPEMD160 {
+public:
+    static constexpr size_t DIGEST_SIZE = 20;
+
+    void update(const uint8_t* data, size_t len) {
+        for (size_t i = 0; i < len; ++i) {
+            m_data[m_blocklen++] = data[i];
+            if (m_blocklen == 64) {
+                transform();
+                m_bitlen += 512;
+                m_blocklen = 0;
+            }
+        }
+    }
+
+    std::array<uint8_t, DIGEST_SIZE> finalize() {
+        std::array<uint8_t, DIGEST_SIZE> hash;
+        pad();
+        revert(hash.data());
+        return hash;
+    }
+
+    static std::array<uint8_t, DIGEST_SIZE> hash(const uint8_t* data, size_t len) {
+        RIPEMD160 rmd;
+        rmd.update(data, len);
+        return rmd.finalize();
+    }
+
+private:
+    uint8_t m_data[64] = {};
+    uint32_t m_blocklen = 0;
+    uint64_t m_bitlen = 0;
+    uint32_t m_state[5] = { 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0 };
+
+    static uint32_t rotl(uint32_t x, uint32_t n) { return (x << n) | (x >> (32 - n)); }
+    static uint32_t f(uint32_t j, uint32_t x, uint32_t y, uint32_t z) {
+        if (j < 16) return x ^ y ^ z;
+        if (j < 32) return (x & y) | (~x & z);
+        if (j < 48) return (x | ~y) ^ z;
+        if (j < 64) return (x & z) | (y & ~z);
+        return x ^ (y | ~z);
+    }
+    static uint32_t K(uint32_t j) {
+        if (j < 16) return 0x00000000;
+        if (j < 32) return 0x5a827999;
+        if (j < 48) return 0x6ed9eba1;
+        if (j < 64) return 0x8f1bbcdc;
+        return 0xa953fd4e;
+    }
+    static uint32_t Kp(uint32_t j) {
+        if (j < 16) return 0x50a28be6;
+        if (j < 32) return 0x5c4dd124;
+        if (j < 48) return 0x6d703ef3;
+        if (j < 64) return 0x7a6d76e9;
+        return 0x00000000;
+    }
+    static constexpr uint8_t r[80] = {
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        7, 4, 13, 1, 10, 6, 15, 3, 12, 0, 9, 5, 2, 14, 11, 8,
+        3, 10, 14, 4, 9, 15, 8, 1, 2, 7, 0, 6, 13, 11, 5, 12,
+        1, 9, 11, 10, 0, 8, 12, 4, 13, 3, 7, 15, 14, 5, 6, 2,
+        4, 0, 5, 9, 7, 12, 2, 10, 14, 1, 3, 8, 11, 6, 15, 13
+    };
+    static constexpr uint8_t rp[80] = {
+        5, 14, 7, 0, 9, 2, 11, 4, 13, 6, 15, 8, 1, 10, 3, 12,
+        6, 11, 3, 7, 0, 13, 5, 10, 14, 15, 8, 12, 4, 9, 1, 2,
+        15, 5, 1, 3, 7, 14, 6, 9, 11, 8, 12, 2, 10, 0, 4, 13,
+        8, 6, 4, 1, 3, 11, 15, 0, 5, 12, 2, 13, 9, 7, 10, 14,
+        12, 15, 10, 4, 1, 5, 8, 7, 6, 2, 13, 14, 0, 3, 9, 11
+    };
+    static constexpr uint8_t s[80] = {
+        11, 14, 15, 12, 5, 8, 7, 9, 11, 13, 14, 15, 6, 7, 9, 8,
+        7, 6, 8, 13, 11, 9, 7, 15, 7, 12, 15, 9, 11, 7, 13, 12,
+        11, 13, 6, 7, 14, 9, 13, 15, 14, 8, 13, 6, 5, 12, 7, 5,
+        11, 12, 14, 15, 14, 15, 9, 8, 9, 14, 5, 6, 8, 6, 5, 12,
+        9, 15, 5, 11, 6, 8, 13, 12, 5, 12, 13, 14, 11, 8, 5, 6
+    };
+    static constexpr uint8_t sp[80] = {
+        8, 9, 9, 11, 13, 15, 15, 5, 7, 7, 8, 11, 14, 14, 12, 6,
+        9, 13, 15, 7, 12, 8, 9, 11, 7, 7, 12, 7, 6, 15, 13, 11,
+        9, 7, 15, 11, 8, 6, 6, 14, 12, 13, 5, 14, 13, 13, 7, 5,
+        15, 5, 8, 11, 14, 14, 6, 14, 6, 9, 12, 9, 12, 5, 15, 8,
+        8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11
+    };
+
+    void transform() {
+        uint32_t X[16];
+        for (int i = 0; i < 16; ++i) {
+            X[i] = m_data[i * 4] | (m_data[i * 4 + 1] << 8) |
+                   (m_data[i * 4 + 2] << 16) | (m_data[i * 4 + 3] << 24);
+        }
+
+        uint32_t A = m_state[0], B = m_state[1], C = m_state[2], D = m_state[3], E = m_state[4];
+        uint32_t Ap = m_state[0], Bp = m_state[1], Cp = m_state[2], Dp = m_state[3], Ep = m_state[4];
+
+        for (uint32_t j = 0; j < 80; ++j) {
+            uint32_t T = rotl(A + f(j, B, C, D) + X[r[j]] + K(j), s[j]) + E;
+            A = E; E = D; D = rotl(C, 10); C = B; B = T;
+
+            T = rotl(Ap + f(79 - j, Bp, Cp, Dp) + X[rp[j]] + Kp(j), sp[j]) + Ep;
+            Ap = Ep; Ep = Dp; Dp = rotl(Cp, 10); Cp = Bp; Bp = T;
+        }
+
+        uint32_t T = m_state[1] + C + Dp;
+        m_state[1] = m_state[2] + D + Ep;
+        m_state[2] = m_state[3] + E + Ap;
+        m_state[3] = m_state[4] + A + Bp;
+        m_state[4] = m_state[0] + B + Cp;
+        m_state[0] = T;
+    }
+
+    void pad() {
+        uint64_t i = m_blocklen;
+        m_data[i++] = 0x80;
+        if (m_blocklen < 56) {
+            while (i < 56) m_data[i++] = 0x00;
+        } else {
+            while (i < 64) m_data[i++] = 0x00;
+            transform();
+            std::fill(m_data, m_data + 56, 0);
+        }
+        m_bitlen += m_blocklen * 8;
+        // Little-endian length
+        for (int j = 0; j < 8; ++j) {
+            m_data[56 + j] = m_bitlen >> (j * 8);
+        }
+        transform();
+    }
+
+    void revert(uint8_t* hash) {
+        for (int i = 0; i < 5; ++i) {
+            hash[i * 4] = m_state[i] & 0xff;
+            hash[i * 4 + 1] = (m_state[i] >> 8) & 0xff;
+            hash[i * 4 + 2] = (m_state[i] >> 16) & 0xff;
+            hash[i * 4 + 3] = (m_state[i] >> 24) & 0xff;
+        }
+    }
+};
+
+constexpr uint8_t RIPEMD160::r[80];
+constexpr uint8_t RIPEMD160::rp[80];
+constexpr uint8_t RIPEMD160::s[80];
+constexpr uint8_t RIPEMD160::sp[80];
+
+// RIPEMD160 hash helper
+inline std::array<uint8_t, 20> ripemd160(const uint8_t* data, size_t len) {
+    return RIPEMD160::hash(data, len);
+}
+
 } // namespace minimal

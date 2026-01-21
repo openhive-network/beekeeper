@@ -108,8 +108,8 @@ std::optional<std::array<uint8_t, 33>> get_public_key(const uint8_t* privkey) {
 
 // Format public key with STM prefix (or custom prefix)
 std::string format_public_key(const std::array<uint8_t, 33>& pubkey, const std::string& prefix) {
-    // Calculate RIPEMD160 checksum (simplified: use last 4 bytes of double SHA256)
-    auto checksum = minimal::double_sha256(pubkey.data(), pubkey.size());
+    // Calculate RIPEMD160 checksum (Hive public key format)
+    auto checksum = minimal::ripemd160(pubkey.data(), pubkey.size());
 
     // Combine pubkey + checksum (4 bytes)
     std::vector<uint8_t> with_checksum(pubkey.begin(), pubkey.end());
@@ -127,8 +127,8 @@ std::optional<std::array<uint8_t, 33>> parse_public_key(const std::string& pubke
     auto decoded = minimal::from_base58(pubkey_str.substr(prefix.length()));
     if (decoded.size() != 37) return std::nullopt; // 33 + 4 checksum
 
-    // Verify checksum
-    auto checksum = minimal::double_sha256(decoded.data(), 33);
+    // Verify RIPEMD160 checksum (Hive public key format)
+    auto checksum = minimal::ripemd160(decoded.data(), 33);
     if (std::memcmp(checksum.data(), decoded.data() + 33, 4) != 0) {
         return std::nullopt;
     }

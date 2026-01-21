@@ -37,7 +37,6 @@ interface UnlockedKey {
 export class MinimalWalletManager {
   private readonly wasm: MinimalCrypto;
   private readonly storage: IStorage;
-  private readonly prefix: string;
 
   // In-memory state
   private unlockedKeys: Map<string, UnlockedKey> = new Map();
@@ -46,11 +45,10 @@ export class MinimalWalletManager {
   private constructor(
     wasm: MinimalCrypto,
     storage: IStorage,
-    prefix: string
+    _prefix: string // Kept for API compatibility
   ) {
     this.wasm = wasm;
     this.storage = storage;
-    this.prefix = prefix;
   }
 
   /**

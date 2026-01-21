@@ -3,3 +3,7 @@ node_modules/
 dist/
 build_minimal/
 build_wasm_minimal/
+results.json
+results.xml
+.last-run.json
+.beekeeper/

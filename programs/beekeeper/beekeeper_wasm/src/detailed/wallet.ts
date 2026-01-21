@@ -1,37 +1,13 @@
-import { BeekeeperApi } from "./api.js";
+/**
+ * Beekeeper Wallet - handles key management and signing
+ */
+
+import { BeekeeperError } from "./errors.js";
 import { BeekeeperSession } from "./session.js";
 import { IBeekeeperUnlockedWallet, IBeekeeperSession, TPublicKey, IBeekeeperWallet, TSignature } from "./interfaces.js";
-import { safeWasmCall } from './util/wasm_error.js';
-
-interface IImportKeyResponse {
-  public_key: string;
-}
-
-interface IBeekeeperSignature {
-  signature: string;
-}
-
-interface IBeekeeperKeys {
-  keys: Array<{
-    public_key: string;
-  }>;
-}
-
-interface IEncryptData {
-  encrypted_content: string;
-}
-
-interface IDecryptData {
-  decrypted_content: string;
-}
-
-interface IHasMatchingPrivateKey {
-  exists: boolean;
-}
 
 export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   public constructor(
-    private readonly api: BeekeeperApi,
     private readonly session: BeekeeperSession,
     private readonly locked: BeekeeperLockedWallet
   ) {}
@@ -44,67 +20,89 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return this.locked.isTemporary;
   }
 
+  private getWalletState() {
+    const state = this.session.getWalletState(this.locked.name);
+    if (!state) {
+      throw new BeekeeperError(`Wallet "${this.locked.name}" not found`);
+    }
+    return state;
+  }
+
   public lock(): BeekeeperLockedWallet {
-    this.api.extract(safeWasmCall(() => this.api.api.lock(this.session.token, this.locked.name) as string, `wallet '${this.locked.name}' locking`));
+    this.session.api.updateActivity();
+
+    const state = this.getWalletState();
+    this.session.api.walletManager.lockWallet(state);
     this.locked.unlocked = undefined;
 
     return this.locked;
   }
 
   public async importKey(wifKey: string): Promise<TPublicKey> {
-    const { public_key } = this.api.extract(safeWasmCall(() => this.api.api.import_key(this.session.token, this.locked.name, wifKey) as string, `importing key to wallet '${this.locked.name}'`)) as IImportKeyResponse;
+    this.session.api.updateActivity();
 
-    await this.api.fs?.sync();
-
-    return public_key;
+    const state = this.getWalletState();
+    return this.session.api.walletManager.importKey(state, wifKey);
   }
 
   public hasMatchingPrivateKey(publicKey: TPublicKey): boolean {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.has_matching_private_key(this.session.token, this.locked.name, publicKey) as string, `checking for matching key '${publicKey}' in wallet '${this.locked.name}'`)) as IHasMatchingPrivateKey;
+    this.session.api.updateActivity();
 
-    return result.exists;
+    const state = this.getWalletState();
+    return this.session.api.walletManager.hasMatchingPrivateKey(state, publicKey);
   }
 
   public async removeKey(publicKey: TPublicKey): Promise<void> {
-    this.api.extract(safeWasmCall(() => this.api.api.remove_key(this.session.token, this.locked.name, publicKey) as string, `removing key '${publicKey}' from wallet '${this.locked.name}'`));
+    this.session.api.updateActivity();
 
-    await this.api.fs?.sync();
+    const state = this.getWalletState();
+    await this.session.api.walletManager.removeKey(state, publicKey);
   }
 
   public signDigest(publicKey: string, sigDigest: string | Uint8Array): TSignature {
-    if (sigDigest instanceof Uint8Array) {
-      // Convert Uint8Array to hex string
-      sigDigest = Array.from(sigDigest).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
+    this.session.api.updateActivity();
 
-    const result = this.api.extract(safeWasmCall(() => this.api.api.sign_digest(this.session.token, sigDigest, publicKey) as string, `signing digest with key '${publicKey}' using wallet '${this.locked.name}'`)) as IBeekeeperSignature;
-
-    return result.signature;
+    const state = this.getWalletState();
+    return this.session.api.walletManager.signDigest(state, publicKey, sigDigest);
   }
 
   public getPublicKeys(): TPublicKey[] {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.get_public_keys(this.session.token, this.locked.name) as string, `public keys retrieval from wallet '${this.locked.name}'`)) as IBeekeeperKeys;
+    this.session.api.updateActivity();
 
-    return result.keys.map(value => value.public_key);
+    const state = this.getWalletState();
+    return this.session.api.walletManager.getPublicKeys(state);
   }
 
-  public encryptData(content: string, key: TPublicKey, anotherKey: TPublicKey, nonce?: number): string {
-    let call_result;
-
-    if(typeof nonce === 'number')
-      call_result = safeWasmCall(() => this.api.api.encrypt_data(this.session.token, key, anotherKey || key, this.locked.name, content, nonce), `data encryption using keys '${key}', '${anotherKey}' from wallet '${this.locked.name}'`);
-    else
-      call_result = safeWasmCall(() => this.api.api.encrypt_data(this.session.token, key, anotherKey || key, this.locked.name, content), `data encryption using keys '${key}', '${anotherKey}' from wallet '${this.locked.name}'`);
-
-    const result = this.api.extract(call_result) as IEncryptData;
-
-    return result.encrypted_content;
+  public encryptData(_content: string, _key: TPublicKey, _anotherKey?: TPublicKey, _nonce?: number): string {
+    this.session.api.updateActivity();
+    // SubtleCrypto is async - use encryptDataAsync instead
+    throw new BeekeeperError('encryptData requires async - use encryptDataAsync instead');
   }
 
-  public decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): string {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.decrypt_data(this.session.token, key, anotherKey || key, this.locked.name, content), `data encryption using key${anotherKey === undefined ? ` '${key}'` : `s '${key}' and '${anotherKey}'`} from wallet '${this.locked.name}'`)) as IDecryptData;
+  public decryptData(_content: string, _key: TPublicKey, _anotherKey?: TPublicKey): string {
+    this.session.api.updateActivity();
+    // SubtleCrypto is async - use decryptDataAsync instead
+    throw new BeekeeperError('decryptData requires async - use decryptDataAsync instead');
+  }
 
-    return result.decrypted_content;
+  /**
+   * Async version of encryptData
+   */
+  public async encryptDataAsync(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): Promise<string> {
+    this.session.api.updateActivity();
+
+    const state = this.getWalletState();
+    return this.session.api.walletManager.encryptData(state, key, anotherKey || key, content, nonce);
+  }
+
+  /**
+   * Async version of decryptData
+   */
+  public async decryptDataAsync(content: string, key: TPublicKey, anotherKey?: TPublicKey): Promise<string> {
+    this.session.api.updateActivity();
+
+    const state = this.getWalletState();
+    return this.session.api.walletManager.decryptData(state, key, anotherKey || key, content);
   }
 
   public close(): IBeekeeperSession {
@@ -116,22 +114,38 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
   public unlocked: BeekeeperUnlockedWallet | undefined = undefined;
 
   public constructor(
-    private readonly api: BeekeeperApi,
     private readonly session: BeekeeperSession,
     public readonly name: string,
     public readonly isTemporary: boolean
   ) {}
 
-  public unlock(password: string): IBeekeeperUnlockedWallet {
-    this.api.extract(safeWasmCall(() => this.api.api.unlock(this.session.token, this.name, password) as string, `wallet '${this.name}' unlocking`));
-    this.unlocked = new BeekeeperUnlockedWallet(this.api, this.session, this);
+  public unlock(_password: string): IBeekeeperUnlockedWallet {
+    this.session.api.updateActivity();
+    // SubtleCrypto is async - use unlockAsync instead
+    throw new BeekeeperError('unlock requires async - use unlockAsync instead');
+  }
+
+  /**
+   * Async version of unlock
+   */
+  public async unlockAsync(password: string): Promise<IBeekeeperUnlockedWallet> {
+    this.session.api.updateActivity();
+
+    const state = this.session.getWalletState(this.name);
+    if (!state) {
+      throw new BeekeeperError(`Wallet "${this.name}" not found`);
+    }
+
+    await this.session.api.walletManager.unlockWallet(state, password);
+    this.unlocked = new BeekeeperUnlockedWallet(this.session, this);
 
     return this.unlocked;
   }
 
   public close(): IBeekeeperSession {
-    if(typeof this.unlocked !== 'undefined')
+    if (this.unlocked !== undefined) {
       this.unlocked.lock();
+    }
 
     this.session.closeWallet(this.name);
 

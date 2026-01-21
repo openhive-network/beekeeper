@@ -1,86 +1,171 @@
-import type { MainModule, beekeeper_api } from "../build/beekeeper_wasm.common";
+/**
+ * Beekeeper API - uses minimal WASM (secp256k1 only) + SubtleCrypto
+ */
 
 import { BeekeeperError } from "./errors.js";
-import { BeekeeperFileSystem } from "./fs.js";
 import { IBeekeeperInstance, IBeekeeperOptions, IBeekeeperSession } from "./interfaces.js";
 import { BeekeeperSession } from "./session.js";
-import { safeWasmCall } from './util/wasm_error.js';
+import { loadMinimalWasm, MinimalWasmModule } from "./wasm/index.js";
+import { createStorage, IStorage } from "./storage/index.js";
+import { WalletManager } from "./core/wallet-manager.js";
+import * as crypto from "./core/crypto.js";
 
-// We would like to expose our api using BeekeeperInstance interface, but we would not like to expose users a way of creating instance of BeekeeperApi
 export class BeekeeperApi implements IBeekeeperInstance {
-  public readonly fs?: BeekeeperFileSystem;
-  public api!: Readonly<beekeeper_api>;
+  public readonly storage: IStorage | null;
+  public readonly walletManager: WalletManager;
+  public readonly wasm: MinimalWasmModule;
 
   public readonly sessions: Map<string, BeekeeperSession> = new Map();
 
-  public constructor(
-    private readonly provider: MainModule,
-    private readonly options: Omit<IBeekeeperOptions, 'wasmLocation'>,
-    isWebEnvironment: boolean
+  private unlockTimeout: number;
+  private lastActivity: Date;
+  private autoLockTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private constructor(
+    wasm: MinimalWasmModule,
+    storage: IStorage | null,
+    options: Omit<IBeekeeperOptions, 'wasmLocation'>
   ) {
-    if (!this.options.inMemory)
-      this.fs = new BeekeeperFileSystem(this.provider.FS, isWebEnvironment);
+    this.wasm = wasm;
+    this.storage = storage;
+    this.walletManager = new WalletManager(wasm, storage);
+    this.unlockTimeout = options.unlockTimeout;
+    this.lastActivity = new Date();
+  }
+
+  /**
+   * Create and initialize a BeekeeperApi instance
+   */
+  public static async create(options: IBeekeeperOptions): Promise<BeekeeperApi> {
+    // Load minimal WASM module
+    const wasm = await loadMinimalWasm(options.wasmLocation);
+
+    // Create storage (or null for in-memory mode)
+    const storage = options.inMemory ? null : createStorage(options.storageRoot, false);
+
+    // Initialize storage
+    if (storage) {
+      await storage.init();
+      await storage.mkdir('.beekeeper');
+    }
+
+    const api = new BeekeeperApi(wasm, storage, options);
+
+    // Start auto-lock timer
+    api.startAutoLockTimer();
+
+    return api;
   }
 
   public getVersion(): string {
     return process.env.npm_package_version as string;
   }
 
-  public extract(json: string) {
-    try {
-      const parsed = JSON.parse(json);
+  /**
+   * Update last activity time (resets auto-lock timer)
+   */
+  public updateActivity(): void {
+    this.lastActivity = new Date();
+  }
 
-      if(parsed.hasOwnProperty('error'))
-        throw new BeekeeperError(`Beekeeper API error: "${String(parsed.error)}"`);
+  /**
+   * Start the auto-lock timer
+   */
+  private startAutoLockTimer(): void {
+    if (this.autoLockTimer) {
+      clearInterval(this.autoLockTimer);
+    }
 
-      if( !parsed.hasOwnProperty('result') )
-        throw new BeekeeperError(`Beekeeper response does not have contain the result: "${json}"`);
+    // Check every 10 seconds
+    this.autoLockTimer = setInterval(() => {
+      const elapsed = (Date.now() - this.lastActivity.getTime()) / 1000;
+      if (elapsed >= this.unlockTimeout) {
+        // Auto-lock all wallets
+        for (const session of this.sessions.values()) {
+          session.lockAll();
+        }
+      }
+    }, 10000);
+  }
 
-      return JSON.parse(parsed.result);
-    } catch(error) {
-      if(!(error instanceof BeekeeperError))
-        throw new BeekeeperError(`${error instanceof Error ? error.name : 'Unknown error'}: Could not extract the result from the beekeeper response: "${json}"`);
-
-      throw error;
+  /**
+   * Stop the auto-lock timer
+   */
+  private stopAutoLockTimer(): void {
+    if (this.autoLockTimer) {
+      clearInterval(this.autoLockTimer);
+      this.autoLockTimer = null;
     }
   }
 
-  public async init() {
-    await this.fs?.init(this.options.storageRoot);
-
-    const WALLET_OPTIONS = ['--wallet-dir', `${this.options.storageRoot}/.beekeeper`, '--enable-logs', Boolean(this.options.enableLogs).toString(), '--unlock-timeout', String(this.options.unlockTimeout)];
-
-    const beekeeperOptions = new this.provider.StringList();
-    WALLET_OPTIONS.forEach((opt) => void beekeeperOptions.push_back(opt));
-
-    this.api = new this.provider.beekeeper_api(beekeeperOptions);
-    safeWasmCall(() => beekeeperOptions.delete(), "StringList WASM object deletion");
-
-    this.extract(safeWasmCall(() => this.api.init() as string, "WASM api initialization"));
+  /**
+   * Get current info
+   */
+  public getInfo(): { now: Date; timeoutTime: Date } {
+    this.updateActivity();
+    const now = new Date();
+    const timeoutTime = new Date(this.lastActivity.getTime() + this.unlockTimeout * 1000);
+    return { now, timeoutTime };
   }
 
   public createSession(salt: string): IBeekeeperSession {
-    const { token } = this.extract(safeWasmCall(() => this.api.create_session(salt) as string, "session creation")) as { token: string };
-    const session = new BeekeeperSession(this, token);
+    this.updateActivity();
 
+    // Generate session token using crypto random
+    const tokenBytes = crypto.randomBytes(32);
+    const saltBytes = crypto.stringToBytes(salt);
+
+    // Combine random bytes with salt for token
+    const combined = new Uint8Array(tokenBytes.length + saltBytes.length);
+    combined.set(tokenBytes);
+    combined.set(saltBytes, tokenBytes.length);
+
+    const token = crypto.bytesToHex(tokenBytes);
+
+    const session = new BeekeeperSession(this, token);
     this.sessions.set(token, session);
 
     return session;
   }
 
   public closeSession(token: string): void {
-    if(!this.sessions.delete(token))
-      throw new BeekeeperError(`This Beekeeper API instance is not the owner of session identified by token: "${token}"`);
+    this.updateActivity();
 
-    this.extract(safeWasmCall(() => this.api.close_session(token) as string, "session closing"));
+    if (!this.sessions.delete(token)) {
+      throw new BeekeeperError(`This Beekeeper API instance is not the owner of session identified by token: "${token}"`);
+    }
   }
 
   public async delete(): Promise<void> {
-    for(const session of this.sessions.values())
+    this.stopAutoLockTimer();
+
+    for (const session of this.sessions.values()) {
       session.close();
+    }
 
-    safeWasmCall(() => this.api.delete(), "WASM api deletion");
-
-    await this.fs?.sync();
+    this.sessions.clear();
   }
+}
+
+/**
+ * Default options for BeekeeperApi
+ */
+export const defaultBeekeeperOptions: Required<IBeekeeperOptions> = {
+  storageRoot: typeof window !== 'undefined' ? '/storage_root' : './storage_root-node',
+  wasmLocation: '',
+  inMemory: false,
+  enableLogs: false,
+  unlockTimeout: 900
+};
+
+/**
+ * Create a Beekeeper instance with optional configuration
+ */
+export async function createBeekeeper(options?: Partial<IBeekeeperOptions>): Promise<IBeekeeperInstance> {
+  const mergedOptions: IBeekeeperOptions = {
+    ...defaultBeekeeperOptions,
+    ...options
+  };
+
+  return BeekeeperApi.create(mergedOptions);
 }

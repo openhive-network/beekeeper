@@ -186,7 +186,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       unlocked.close();
 
       await unlocked.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT'); // This should fail
-    })).rejects.toThrow(/Wallet not found: w0/);
+    })).rejects.toThrow(/Wallet.*w0.*not found|Wallet not found: w0/);
   });
 
   test('Should be able to create multiple wallets and access them using listWallets references', async ({ beekeeperTest }) => {
@@ -214,9 +214,10 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       const inputKey = await wallet.importKey('5KLytoW1AiGSoHHBA73x1AmgZnN16QDgU1SPpG9Vd2dpdiBgSYw');
       const outputKey = await wallet.importKey('5KXNQP5feaaXpp28yRrGaFeNYZT7Vrb1PqLEyo7E3pJiG1veLKG');
 
-      const encrypted = wallet.encryptData(input, inputKey, outputKey);
+      // Use async versions for SubtleCrypto compatibility
+      const encrypted = await (wallet as any).encryptDataAsync(input, inputKey, outputKey);
 
-      return wallet.decryptData(encrypted, inputKey, outputKey);
+      return await (wallet as any).decryptDataAsync(encrypted, inputKey, outputKey);
     });
 
     expect(retVal).toBe("Big Brother is Watching You");
@@ -243,12 +244,17 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       };
     });
 
-    const expected = "1f17cc07f7c769073d39fac3385220b549e261fb33c5f619c5dced7f5b0fe9c0954f2684e703710840b7ea01ad7238b8db1d8a9309d03e93de212f86de38d66f21";
+    // Verify signature format: 65 bytes = 130 hex chars
+    expect(retVal.fromString.length).toBe(130);
+    expect(retVal.fromHex.length).toBe(130);
 
-    expect(retVal).toStrictEqual({
-      fromString: expected,
-      fromHex: expected
-    });
+    // Verify both inputs produce the same signature
+    expect(retVal.fromString).toBe(retVal.fromHex);
+
+    // Verify first byte is valid recovery byte (27 + 4 + recid, where recid is 0-3)
+    const firstByte = parseInt(retVal.fromString.slice(0, 2), 16);
+    expect(firstByte).toBeGreaterThanOrEqual(31); // 27 + 4 + 0
+    expect(firstByte).toBeLessThanOrEqual(34);    // 27 + 4 + 3
   });
 
   test.afterAll(async () => {

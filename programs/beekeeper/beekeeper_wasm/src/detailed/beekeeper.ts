@@ -1,8 +1,9 @@
-import type Beekeeper from "../build/beekeeper_wasm.common";
+/**
+ * Factory function to create a Beekeeper instance using minimal WASM
+ */
 
 import { BeekeeperApi } from "./api.js";
 import { IBeekeeperInstance, IBeekeeperOptions } from "./interfaces.js";
-import { safeAsyncWasmCall } from "./util/wasm_error.js";
 
 const DEFAULT_BEEKEEPER_OPTIONS: Omit<IBeekeeperOptions, 'storageRoot' | 'wasmLocation'> = {
   enableLogs: false,
@@ -15,19 +16,37 @@ interface IOptionalModuleArgs {
   locateFile?: (path: string, scriptDirectory: string) => string;
 }
 
+/**
+ * Create a Beekeeper instance
+ *
+ * @param beekeeperConstructor - Unused (kept for backward compatibility)
+ * @param storageRoot - Root directory for wallet storage
+ * @param ModuleExt - Module extension options (for WASM location)
+ * @param isWebEnvironment - Whether running in browser
+ * @param options - Additional options
+ */
 const createBeekeeper = async(
-  beekeeperContstructor: typeof Beekeeper,
+  _beekeeperConstructor: unknown,
   storageRoot: string,
   ModuleExt: IOptionalModuleArgs = {},
-  isWebEnvironment: boolean,
+  _isWebEnvironment: boolean,
   options: Partial<IBeekeeperOptions> = {}
 ): Promise<IBeekeeperInstance> => {
-  const beekeeperProvider = await safeAsyncWasmCall(() => beekeeperContstructor(ModuleExt), "Beekeeper WASM module loading");
-  const api = new BeekeeperApi(beekeeperProvider, { ...DEFAULT_BEEKEEPER_OPTIONS, storageRoot, ...options }, isWebEnvironment);
+  // Determine WASM location from ModuleExt if available
+  let wasmLocation: string | undefined;
+  if (ModuleExt.locateFile) {
+    // Get the WASM file location
+    wasmLocation = ModuleExt.locateFile('beekeeper_minimal.wasm', '');
+  }
 
-  await api.init();
+  const mergedOptions: IBeekeeperOptions = {
+    ...DEFAULT_BEEKEEPER_OPTIONS,
+    storageRoot,
+    wasmLocation: wasmLocation || options.wasmLocation || '',
+    ...options
+  };
 
-  return api;
+  return BeekeeperApi.create(mergedOptions);
 };
 
 export default createBeekeeper;

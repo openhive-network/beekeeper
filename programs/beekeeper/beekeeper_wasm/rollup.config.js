@@ -9,9 +9,23 @@ export default [
     input: `dist/detailed/index.js`,
     output: {
       format: 'es',
-      file: `dist/bundle/detailed/index.js`
+      file: `dist/bundle/detailed/index.js`,
+      paths: (id) => {
+        // Rewrite path so it points to ../build_minimal/ from dist/bundle/detailed/
+        if (id.includes('beekeeper_minimal')) {
+          return '../build_minimal/beekeeper_minimal.js';
+        }
+        return id;
+      }
     },
+    external: (id) => id.includes('beekeeper_minimal'),
     plugins: [
+      copy({
+        targets: [
+          { src: ['src/build_minimal/beekeeper_minimal.js', 'src/build_minimal/beekeeper_minimal.wasm'], dest: 'dist/bundle/build_minimal' }
+        ],
+        hook: 'buildStart'
+      }),
       replace({
         values: {
           'process.env.npm_package_version': `"${process.env.npm_package_version}"`
@@ -28,18 +42,8 @@ export default [
       format: 'es',
       file: 'dist/bundle/web.js'
     },
-    external: [
-      './build/beekeeper_wasm.web.js',
-      './detailed/index.js'
-    ],
+    external: (id) => id.includes('beekeeper_minimal') || id.includes('./detailed/index'),
     plugins: [
-      replace({
-        delimiters: ['[\'"]','[\'"]'],
-        values: {
-          './build/beekeeper_wasm.common.js': '"./build/beekeeper_wasm.web.js"'
-        },
-        preventAssignment: true
-      }),
       replace({
         values: {
           'process.env.DEFAULT_STORAGE_ROOT': `"/storage_root"`,
@@ -47,7 +51,6 @@ export default [
         },
         preventAssignment: true
       })
-
     ]
   },
   {
@@ -56,24 +59,8 @@ export default [
       format: 'es',
       file: 'dist/bundle/node.js'
     },
-    external: [
-      './build/beekeeper_wasm.node.js',
-      './detailed/index.js'
-    ],
+    external: (id) => id.includes('beekeeper_minimal') || id.includes('./detailed/index'),
     plugins: [
-      copy({
-        targets: [
-          { src: ['src/build/beekeeper_wasm.common.wasm', 'src/build/beekeeper_wasm.*.js'], dest: 'dist/bundle/build' },
-          { src: ['src/build/beekeeper_wasm.common.d.ts'], dest: 'dist/build' }
-        ]
-      }),
-      replace({
-        delimiters: ['[\'"]', '[\'"]'],
-        values: {
-          './build/beekeeper_wasm.common.js': '"./build/beekeeper_wasm.node.js"'
-        },
-        preventAssignment: true
-      }),
       replace({
         values: {
           'process.env.DEFAULT_STORAGE_ROOT': `"./storage_root-node"`,
@@ -81,7 +68,6 @@ export default [
         },
         preventAssignment: true
       })
-
     ]
   },
   {

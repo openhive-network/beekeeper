@@ -59,7 +59,7 @@ export interface IBeekeeperOptions {
 
   /**
    * The path to the WASM file. It can be a relative path or an absolute URL
-   * If not specified, the default path is used: "./build/beekeeper_wasm.common.wasm" (may change if bundled)
+   * If not specified, the default path is used: "./build_minimal/beekeeper_minimal.wasm" (may change if bundled)
    *
    * This option also accepts an inlined base64 encoded string of the WASM file as a value (`data:application/wasm;base64,...`)
    *

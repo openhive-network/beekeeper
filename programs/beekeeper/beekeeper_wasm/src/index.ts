@@ -1,11 +1,8 @@
 /* @terser-ignore */
-// We want to skip minification for this file to preserve string concatination hacks used for WASM loading specifically in Vite environment
+// We want to skip minification for this file to preserve string concatenation hacks used for WASM loading
 
 // @ts-expect-error ts(6133) Types used in JSDoc generation
 import createBeekeeperBase, { type BeekeeperError, type IBeekeeperOptions, type IBeekeeperInstance } from "./detailed/index.js";
-
-// Note: This import will be replaced with Web/Node.js version upon bundling
-import Beekeeper from "./build/beekeeper_wasm.common.js";
 
 // This variable will be replaced during bundling based on the environment
 export const DEFAULT_STORAGE_ROOT: string = process.env.DEFAULT_STORAGE_ROOT as string;
@@ -14,11 +11,11 @@ export * from "./detailed/index.js";
 
 const getModuleExt = async(fileLocation?: string) => {
   if ((import.meta as any).client || (!(import.meta as any).client && typeof (import.meta as any).env === "object" && !(import.meta as any).env?.SSR)) {
-    // This is import style specific to Vite. Simple hack with concatination to avoid TypeScript & Rollup bundler related errors
-    const filePath = fileLocation ?? (await import('./build/beekeeper_wasm.common.wasm' + '?url')).default;
+    // This is import style specific to Vite. Simple hack with concatenation to avoid TypeScript & Rollup bundler related errors
+    const filePath = fileLocation ?? (await import('./build_minimal/beekeeper_minimal.wasm' + '?url')).default;
     return {
       locateFile(path: string, scriptDirectory: string): string {
-        if (path === "beekeeper_wasm.common.wasm") {
+        if (path === "beekeeper_minimal.wasm") {
           return filePath;
         }
         return scriptDirectory + path;
@@ -26,17 +23,23 @@ const getModuleExt = async(fileLocation?: string) => {
     };
   }
 
-  // Load WASM without any rewriting filepaths in non-browser environments
-  if (typeof window === "undefined" && typeof process === "object")
-    // We explicitly define the default locateFile function here to override wrong emscripten behavior of falling back
-    // to new URL(..., import.meta.url) which fails in webpack
+  // Load WASM without any rewriting filepaths in non-browser environments (Node.js)
+  if (typeof window === "undefined" && typeof process === "object") {
+    // Calculate WASM path using import.meta.url since Emscripten's scriptDirectory may be empty after minification
+    const wasmPath = fileLocation ?? new URL("./build_minimal/beekeeper_minimal.wasm", import.meta.url).href;
     return {
-      locateFile: (path: string, scriptDirectory: string): string => scriptDirectory + path
+      locateFile: (path: string): string => {
+        if (path === "beekeeper_minimal.wasm") {
+          return wasmPath;
+        }
+        return path;
+      }
     };
+  }
 
   // Warning: important change is moving conditional ternary expression outside of URL constructor call, what confused parcel analyzer.
   // Seems it must have simple variables & literals present to correctly translate code.
-  const wasmFilePath = fileLocation ?? new URL("./build/beekeeper_wasm.common.wasm", import.meta.url).href;
+  const wasmFilePath = fileLocation ?? new URL("./build_minimal/beekeeper_minimal.wasm", import.meta.url).href;
   // Fallback for client-bundled inlined WASM, e.g. when using webpack
   let wasmBinary: Uint8Array | undefined;
   if (wasmFilePath.startsWith("data:application/wasm;base64,")) {
@@ -51,7 +54,7 @@ const getModuleExt = async(fileLocation?: string) => {
 
   return {
     locateFile(path: string, scriptDirectory: string): string {
-      if (path === "beekeeper_wasm.common.wasm") {
+      if (path === "beekeeper_minimal.wasm") {
         return wasmFilePath;
       }
       return scriptDirectory + path;
@@ -72,7 +75,7 @@ const getModuleExt = async(fileLocation?: string) => {
 const createBeekeeper = async(options?: Partial<IBeekeeperOptions>): Promise<IBeekeeperInstance> => {
   const { wasmLocation, ...otherOptions } = options || {};
 
-  return createBeekeeperBase(Beekeeper, DEFAULT_STORAGE_ROOT, await getModuleExt(wasmLocation), process.env.ROLLUP_TARGET_ENV === "web", otherOptions);
+  return createBeekeeperBase(null, DEFAULT_STORAGE_ROOT, await getModuleExt(wasmLocation), process.env.ROLLUP_TARGET_ENV === "web", otherOptions);
 };
 
 export default createBeekeeper;

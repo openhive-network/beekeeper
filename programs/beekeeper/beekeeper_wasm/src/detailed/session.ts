@@ -1,94 +1,82 @@
+/**
+ * Beekeeper Session - manages wallets within a session
+ */
+
 import { BeekeeperError } from "./errors.js";
 import { BeekeeperApi } from "./api.js";
 import { IBeekeeperInfo, IBeekeeperInstance, IBeekeeperSession, IBeekeeperWallet, IWalletCreated } from "./interfaces.js";
 import { BeekeeperLockedWallet, BeekeeperUnlockedWallet } from "./wallet.js";
-import { safeWasmCall } from './util/wasm_error.js';
-
-interface IBeekeeperWalletPassword {
-  password: string;
-}
-
-interface IBeekeeperHasWallet {
-  exists: boolean;
-}
-
-interface IBeekeeperWallets {
-  wallets: Array<{
-    name: string;
-    unlocked: boolean;
-  }>;
-}
-
-interface IBeekeeperSessionInfo {
-  now: string;
-  timeout_time: string;
-}
+import { WalletState } from "./core/types.js";
+import * as crypto from "./core/crypto.js";
 
 export class BeekeeperSession implements IBeekeeperSession {
+  // Map from wallet name to wallet object
+  public readonly wallets: Map<string, BeekeeperLockedWallet> = new Map();
+  // Map from wallet name to wallet state
+  public readonly walletStates: Map<string, WalletState> = new Map();
+
   public constructor(
-    private readonly api: BeekeeperApi,
+    public readonly api: BeekeeperApi,
     public readonly token: string
   ) {}
 
-  public readonly wallets: Map<string, BeekeeperLockedWallet> = new Map();
-
   public getInfo(): IBeekeeperInfo {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.get_info(this.token) as string, "session info retrieval")) as IBeekeeperSessionInfo;
-
+    this.api.updateActivity();
+    const info = this.api.getInfo();
     return {
-      now: new Date(`${result.now}Z`),
-      timeoutTime: new Date(`${result.timeout_time}Z`)
+      now: info.now,
+      timeoutTime: info.timeoutTime
     };
   }
 
   public listWallets(): Array<IBeekeeperWallet> {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.list_wallets(this.token) as string, "listing wallets")) as IBeekeeperWallets;
-
-    const wallets: IBeekeeperWallet[] = [];
-
-    for(const value of result.wallets) {
-      const wallet = this.openWallet(value.name);
-
-      if(!value.unlocked)
-        (wallet as BeekeeperLockedWallet).unlocked = undefined;
-
-      wallets.push(wallet);
-    }
-
-    return wallets;
+    this.api.updateActivity();
+    return Array.from(this.wallets.values());
   }
 
   public hasWallet(name: string): boolean {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.has_wallet(this.token, name) as string, `checking if wallet '${name}' exists`)) as IBeekeeperHasWallet;
+    this.api.updateActivity();
 
-    return result.exists;
+    // Check if wallet is already opened in this session
+    if (this.wallets.has(name)) {
+      return true;
+    }
+
+    // Check if wallet exists in storage - this needs to be sync for interface compatibility
+    // Since walletExists is async, we check the state map instead
+    // User can use openWallet which will throw if wallet doesn't exist
+    return this.wallets.has(name);
   }
 
-  public async createWallet(name: string, password: string | undefined, isTemporary?: boolean): Promise<IWalletCreated> {
-    // Prevent creating persistent wallets when no filesystem is available - when user explicitly requests it
-    if (isTemporary === false && this.api.fs === undefined)
+  public async createWallet(name: string, password?: string, isTemporary?: boolean): Promise<IWalletCreated> {
+    this.api.updateActivity();
+
+    // Prevent creating persistent wallets when no filesystem is available
+    if (isTemporary === false && this.api.storage === null) {
       throw new BeekeeperError(
         "Trying to create persistent wallet without a filesystem (consider disabling the 'inMemory' Beekeeper option or setting 'isTemporary' function argument to true)."
       );
-
-    // When no filesystem is available, all wallets must be temporary
-    if (this.api.fs === undefined)
-      isTemporary = true;
-    else
-      isTemporary = isTemporary ?? false;
-
-    if(typeof password === 'string')
-      this.api.extract(safeWasmCall(() => this.api.api.create(this.token, name, isTemporary, password as string) as string, `${isTemporary ? 'temporary ' : ''}wallet '${name}' creation`));
-    else {
-      const result = this.api.extract(safeWasmCall(() => this.api.api.create(this.token, name) as string, `wallet '${name} creation'`)) as IBeekeeperWalletPassword;
-      ({ password } = result);
     }
 
-    await this.api.fs?.sync();
+    // When no filesystem is available, all wallets must be temporary
+    if (this.api.storage === null) {
+      isTemporary = true;
+    } else {
+      isTemporary = isTemporary ?? false;
+    }
 
-    const wallet = new BeekeeperLockedWallet(this.api, this, name, isTemporary);
-    wallet.unlocked = new BeekeeperUnlockedWallet(this.api, this, wallet);
+    // Generate password if not provided
+    if (password === undefined) {
+      password = crypto.generatePassword(32);
+    }
 
+    // Create wallet using wallet manager
+    const walletState = await this.api.walletManager.createWallet(name, password, isTemporary);
+    this.walletStates.set(name, walletState);
+
+    // Create wallet object
+    const wallet = new BeekeeperLockedWallet(this, name, isTemporary);
+    wallet.unlocked = new BeekeeperUnlockedWallet(this, wallet);
     this.wallets.set(name, wallet);
 
     return {
@@ -98,39 +86,79 @@ export class BeekeeperSession implements IBeekeeperSession {
   }
 
   public openWallet(name: string): IBeekeeperWallet {
-    if(this.wallets.has(name))
+    this.api.updateActivity();
+
+    // Return existing wallet if already opened
+    if (this.wallets.has(name)) {
       return this.wallets.get(name) as IBeekeeperWallet;
+    }
 
-    this.api.extract(safeWasmCall(() => this.api.api.open(this.token, name) as string, `wallet '${name}' opening`));
-    const wallet = new BeekeeperLockedWallet(this.api, this, name, false);
+    // Create wallet state (locked initially)
+    const walletState: WalletState = {
+      name,
+      isTemporary: false,
+      isUnlocked: false,
+      unlockedKeys: new Map(),
+      passwordHash: null
+    };
+    this.walletStates.set(name, walletState);
 
+    // Create wallet object
+    const wallet = new BeekeeperLockedWallet(this, name, false);
     this.wallets.set(name, wallet);
 
     return wallet;
   }
 
   public closeWallet(name: string): void {
-    if(!this.wallets.delete(name))
-      throw new BeekeeperError(`This Beekeeper API session is not the owner of wallet identified by name: "${name}"`);
+    this.api.updateActivity();
 
-    this.api.extract(safeWasmCall(() => this.api.api.close(this.token, name) as string, `wallet '${name}' closing`));
+    const wallet = this.wallets.get(name);
+    if (!wallet) {
+      throw new BeekeeperError(`This Beekeeper API session is not the owner of wallet identified by name: "${name}"`);
+    }
+
+    // Close wallet state
+    const state = this.walletStates.get(name);
+    if (state) {
+      this.api.walletManager.closeWallet(state);
+      this.walletStates.delete(name);
+    }
+
+    this.wallets.delete(name);
   }
 
   public lockAll(): Array<IBeekeeperWallet> {
-    const wallets = Array.from(this.wallets.values());
-    for(const wallet of wallets)
-      if(typeof wallet.unlocked !== 'undefined')
-        wallet.unlocked.lock();
+    this.api.updateActivity();
 
+    const wallets = Array.from(this.wallets.values());
+    for (const wallet of wallets) {
+      if (wallet.unlocked !== undefined) {
+        wallet.unlocked.lock();
+      }
+    }
     return wallets;
   }
 
   public close(): IBeekeeperInstance {
-    for(const wallet of this.wallets.values())
-      wallet.close();
+    // Close all wallets
+    for (const name of Array.from(this.wallets.keys())) {
+      const wallet = this.wallets.get(name);
+      if (wallet) {
+        wallet.close();
+      }
+    }
 
+    // Close session
     this.api.closeSession(this.token);
 
     return this.api;
+  }
+
+  /**
+   * Get wallet state by name (internal use)
+   */
+  public getWalletState(name: string): WalletState | undefined {
+    return this.walletStates.get(name);
   }
 }
