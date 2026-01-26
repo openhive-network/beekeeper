@@ -23,7 +23,7 @@ std::string token_generator::generate_token( const std::optional<std::string>& s
 
         std::stringstream hexstream;
         hexstream << std::hex << int(rc);
-        auto hex = hexstream.str(); 
+        auto hex = hexstream.str();
         ss << (hex.length() < 2 ? '0' + hex : hex);
     }
     return ss.str();

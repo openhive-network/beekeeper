@@ -1,12 +1,11 @@
 {
-  "extends": "./npm-common-config/ts-common/tsconfig.base.json",
   "compilerOptions": {
     "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
-
+    "outDir": "./dist",
     "rootDir": "./src",
-    "outDir": "./dist"
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
+  "extends": "./npm-common-config/ts-common/tsconfig.base.json",
   "include": [
     "./src/**/*.ts"
   ]

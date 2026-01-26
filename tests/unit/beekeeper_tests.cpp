@@ -1733,7 +1733,7 @@ BOOST_AUTO_TEST_CASE(data_reliability_when_file_with_wallet_is_removed)
 
     flat_set<public_key_type> _b;
     boost::copy( b | boost::adaptors::map_keys, std::inserter( _b, _b.end() ) );
-    
+
     if( _a.size() != _b.size() )
       return false;
 

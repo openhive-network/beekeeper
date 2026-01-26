@@ -49,4 +49,3 @@ if(ENABLE_PROFILING)
     SET( CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg" )
     message( INFO "Profiling enabled" )
 endif()
-

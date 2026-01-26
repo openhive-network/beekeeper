@@ -18,15 +18,15 @@ info:
 
 
     _Example:_
-    
-    
+
+
     A body of `beekeeper_api.get_info` is given as:
-    
+
     - `{ "token": "c8e3a065a469f3d88de46c69c46b2bfc8fe0aa5f1414748788c4a1c9a6a0f913" }`
-    
-    
+
+
     but is finally transformed to:
-    
+
     - `{"jsonrpc":"2.0","method":"beekeeper_api.get_info","id":1,"params":{"token":"c8e3a065a469f3d88de46c69c46b2bfc8fe0aa5f1414748788c4a1c9a6a0f913"}}`
 
 
@@ -64,7 +64,7 @@ info:
     It is possible to set timeout. When inactivity lasts longer than given
     timeout all unlocked wallets are locked. There are 2 options:
 
-    - A config option `unlock-timeout` that defines timeout for unlocked wallets. It is set once when the beekeeper starts. By default is `900s` (`15 minutes`). 
+    - A config option `unlock-timeout` that defines timeout for unlocked wallets. It is set once when the beekeeper starts. By default is `900s` (`15 minutes`).
 
     - An API endpoint `beekeeper_api.set_timeout` that sets timeout according to `seconds` value in a request body. Every new call of this endpoint covers old timeout and time starts from zero.
 
@@ -578,7 +578,7 @@ paths:
       tags:
         - version
       summary: Get current version.
-      description: Get current version. The version is based on git hash. 
+      description: Get current version. The version is based on git hash.
       operationId: get_version
       requestBody:
         content:

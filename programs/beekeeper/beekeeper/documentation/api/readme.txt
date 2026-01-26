@@ -22,7 +22,7 @@ serve
 │   Serving!                                │
   │                                           │
   │   - Local:    http://localhost:3000       │
-  │   - Network:  http://192.168.6.150:3000 
+  │   - Network:  http://192.168.6.150:3000
 
 
 4. Launch beekeeper documentation in webbrowser:
