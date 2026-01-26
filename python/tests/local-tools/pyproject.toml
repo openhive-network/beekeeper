@@ -1,0 +1,113 @@
+[build-system]
+build-backend = "poetry_dynamic_versioning.backend"
+requires = [
+  "poetry-core>=1.7.0",
+  "poetry-dynamic-versioning>=1.0.0,<2.0.0",
+]
+
+[tool.poetry]
+requires-poetry = "2.1.3"
+authors = [
+  "Mateusz Żebrak <mzebrak@syncad.com>",
+  "Krzysztof Mochocki <kmochocki@syncad.com>",
+]
+description = "Pack of tools and dependencies for running beekeepy tests."
+name = "local-tools"
+packages = [
+  {include = "local_tools"},
+]
+repository = "https://gitlab.syncad.com/hive/beekeeper"
+source = [
+  {name = "PyPI", priority = "primary"},
+  {name = "gitlab-schemas", url = "https://gitlab.syncad.com/api/v4/projects/362/packages/pypi/simple", priority = "supplemental"},
+]
+version = "0.0.0"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4"
+hiveio-beekeepy = { path = "../../beekeepy", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+mypy = "1.11.2"
+pre-commit = "2.21.0"
+pytest = "8.3.5"
+pytest-asyncio = "0.25.3"
+pytest-xdist = "3.6.1"
+ruff = "0.6.5"
+types-python-dateutil = "2.8.19.14"
+types-pyyaml = "6.0.12.4"
+types-requests = "2.31.0.2"
+types-psutil = "6.0.0.20240901"
+
+
+[tool.mypy]
+disallow_untyped_decorators = false
+strict = true
+
+[tool.ruff]
+exclude = [
+  "hive/"
+]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = [
+  "D1", # missing docstring in public
+  "D203", # 1 blank line required before class docstring; because we re using D211
+  "D212", # Multi-line docstring summary should start at the first line; because we re using D213
+  "D401", # Too restrictive
+  "D413", # Missing blank line after last section
+  "G004", # Too restructive, f-string are acceptable in logger calls
+  "TRY003", # Avoid specifying long messages outside the exception class; too restrictive
+  "ANN101",  # Missing annotation for self; makes no sense
+  "ANN102",  # Missing annotation for cls; makes no sense
+  "ANN401", # Any is required
+  "TD002", # Missing author in to-do; no need for that
+  "TD003",  # Missing issue link on the line following this to-do; no need for that
+  "SLF001",  # Private member accessed: {access}; too restrictive
+  "COM812", # Trailing comma missing; handled by ruff formatter
+  "EM",  # agreed not to use it in our convention
+  "FIX", # can't have that enabled, as we treat ruff result as an error on CI
+  "S101",  # Use of assert detected; too restrictive
+  "S603", # `subprocess` call: check for execution of untrusted input; https://github.com/astral-sh/ruff/issues/4045
+  "ISC001", # Implicitly concatenated string literals on one line; disabled because conflicts with ruff formatter
+]
+select = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+  "D", # no need for docstrings in tests
+  "PT004", # fixture does not return anything, add leading underscore;  issue: pytest seems to ignore (not launch) auto-use fixtures with leading underscode
+  "FBT001", # boolean arguments in tests are mostly fixtures
+]
+"**/sync_api.py" = [
+  "PLR0913", # api definitions can have as many arguments as they need
+  "FBT001", # api definitions have own argument restrictions
+  "FBT002", # api definitions have own argument restrictions
+]
+"**/async_api.py" = [
+  "PLR0913", # api definitions can have as many arguments as they need
+  "FBT001", # api definitions have own argument restrictions
+  "FBT002", # api definitions have own argument restrictions
+]
+"beekeepy/beekeepy/__init__.py"             = ["TCH004"]
+"beekeepy/beekeepy/interfaces.py"           = ["TCH004"]
+"beekeepy/beekeepy/exceptions.py"           = ["TCH004"]
+"beekeepy/beekeepy/service.py"              = ["TCH004"]
+"beekeepy/beekeepy/communication.py"        = ["TCH004"]
+"beekeepy/beekeepy/handle/**.py"            = ["TCH004"]
+
+
+[tool.ruff.lint.isort]
+known-first-party = ["schemas"]
+required-imports = ["from __future__ import annotations"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["../beekeepy_test"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
