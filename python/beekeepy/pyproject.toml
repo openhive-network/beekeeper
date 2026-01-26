@@ -1,0 +1,55 @@
+[build-system]
+build-backend = "poetry_dynamic_versioning.backend"
+requires = [
+  "poetry-core>=1.7.0",
+  "poetry-dynamic-versioning>=1.0.0,<2.0.0",
+]
+
+[tool.poetry]
+authors = [
+  "Mateusz Żebrak <mzebrak@syncad.com>",
+  "Krzysztof Mochocki <kmochocki@syncad.com>",
+]
+description = "All in one package for beekeeper interaction via Python interface."
+name = "hiveio-beekeepy"
+packages = [
+  {include = "beekeepy"},
+]
+include = [
+    { path = "beekeepy/beekeeper", format = ["sdist", "wheel"] }
+]
+repository = "https://gitlab.syncad.com/hive/beekeeper"
+source = [
+  {name = "PyPI", priority = "primary"},
+  {name = "gitlab-schemas", url = "https://gitlab.syncad.com/api/v4/projects/362/packages/pypi/simple", priority = "supplemental"},
+]
+version = "0.0.0"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4"
+aiohttp = "3.11.15"
+loguru = "0.7.2"
+psutil = "7.0.0"
+python-dateutil = "2.8.2"
+requests = "2.32.3"
+
+hiveio-schemas = "1.28.1.dev14+16dc964"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+pattern = '''v?(?P<base>\d+\.\d+\.\d+)\-?(?:(?P<stage>[a-zA-Z0-9]+)(?P<revision>\d+))?$'''
+format-jinja = """
+    {%- set dirty_postfix = '.dirty' if dirty else '' -%}
+    {%- if distance == 0 and not dirty -%}
+        {{ serialize_pep440(base, stage, revision) }}
+    {%- elif revision is not none -%}
+        {{ serialize_pep440(base, stage, revision, dev=distance, metadata=[commit]) }}{{ dirty_postfix }}
+    {%- else -%}
+        {{ serialize_pep440(bump_version(base), stage, revision, dev=distance, metadata=[commit]) }}{{ dirty_postfix }}
+    {%- endif -%}
+"""
+
+[tool.poetry-dynamic-versioning.substitution]
+files = [
+  "beekeepy/__init__.py",
+]
