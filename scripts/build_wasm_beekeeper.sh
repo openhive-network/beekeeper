@@ -50,12 +50,12 @@ build() {
   sed -i "s#return view => nodeCrypto.randomFillSync(view);##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
 }
 
-if [ ${DIRECT_EXECUTION} -eq 0 ]; then
+if [ "${DIRECT_EXECUTION}" -eq 0 ]; then
   echo "Performing a docker run"
   docker run \
     -it --rm \
     -v "${PROJECT_DIR}/":"${EXECUTION_PATH}" \
-    -u $(id -u):$(id -g) \
+    -u "$(id -u):$(id -g)" \
   registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1@sha256:79edc8ecfe7b13848466d33791daa955eb1762edc329a48c07aa700bc6cfb712 \
   /bin/bash /src/scripts/build_wasm_beekeeper.sh 1 "${EXECUTION_PATH}"
 else

@@ -75,7 +75,7 @@ ignore = [
 select = ["ALL"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = [
+"**/tests/**" = [
   "D", # no need for docstrings in tests
   "PT004", # fixture does not return anything, add leading underscore;  issue: pytest seems to ignore (not launch) auto-use fixtures with leading underscode
   "FBT001", # boolean arguments in tests are mostly fixtures
@@ -90,12 +90,12 @@ select = ["ALL"]
   "FBT001", # api definitions have own argument restrictions
   "FBT002", # api definitions have own argument restrictions
 ]
-"beekeepy/beekeepy/__init__.py"             = ["TCH004"]
-"beekeepy/beekeepy/interfaces.py"           = ["TCH004"]
-"beekeepy/beekeepy/exceptions.py"           = ["TCH004"]
-"beekeepy/beekeepy/service.py"              = ["TCH004"]
-"beekeepy/beekeepy/communication.py"        = ["TCH004"]
-"beekeepy/beekeepy/handle/**.py"            = ["TCH004"]
+"**/beekeepy/__init__.py"   = ["TCH004"]
+"**/beekeepy/interfaces.py" = ["TCH004"]
+"**/beekeepy/exceptions.py" = ["TCH004"]
+"**/beekeepy/service.py"    = ["TCH004"]
+"**/beekeepy/communication.py" = ["TCH004"]
+"**/beekeepy/handle/**.py"  = ["TCH004"]
 
 
 [tool.ruff.lint.isort]

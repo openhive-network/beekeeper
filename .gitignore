@@ -1,1 +1,26 @@
 build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+.eggs/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.env
+
+# Test artifacts
+**/generated_*
+
+# Beekeeper binary in beekeepy package (copied at build time)
+python/beekeepy/beekeepy/beekeeper
+
+# IDE
+.idea/
+.vscode/
