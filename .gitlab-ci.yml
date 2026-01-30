@@ -28,6 +28,7 @@ variables:
   LOCAL_TOOLS_DIR: ${CI_PROJECT_DIR}/python/tests/local-tools
   PACKAGES_TO_CHECK: "tests/ beekeepy/"
 
+  # Once image is stable, we can update tag to smth like :pypa_2_28-1
   CI_BASE_IMAGE_TAG: ":2fc9d83726a4fddc681c2b30fbd67701316ba85a"
   CI_BASE_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${CI_BASE_IMAGE_TAG}"
 
@@ -89,6 +90,14 @@ beekeeper_native_test:
       artifacts: true
   script:
     - ./build/tests/unit/beekeeper_test --log_level=test_suite
+
+beekeeper_native_check_static_linking:
+  stage: test
+  needs:
+    - job: beekeeper_native_build
+      artifacts: true
+  script:
+    - ./scripts/check-static-linking.sh ./build/programs/beekeeper/beekeeper/beekeeper
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| NATIVE BUILD/TEST |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
