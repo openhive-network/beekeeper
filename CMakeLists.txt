@@ -22,6 +22,22 @@ find_package(Boost REQUIRED COMPONENTS unit_test_framework)
 set(BUILD_TESTS OFF CACHE BOOL "Disable websocketpp tests" FORCE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "Disable websocketpp examples" FORCE)
 
+# Static OpenSSL linking configuration via environment variables
+# The CI base image sets these env vars pointing to static libraries (.a)
+# Only apply if the cache variable is not already set (respects user-provided -D options)
+if(DEFINED ENV{OPENSSL_ROOT_DIR} AND NOT DEFINED CACHE{OPENSSL_ROOT_DIR})
+  set(OPENSSL_ROOT_DIR "$ENV{OPENSSL_ROOT_DIR}" CACHE PATH "OpenSSL root directory")
+endif()
+if(DEFINED ENV{OPENSSL_INCLUDE_DIR} AND NOT DEFINED CACHE{OPENSSL_INCLUDE_DIR})
+  set(OPENSSL_INCLUDE_DIR "$ENV{OPENSSL_INCLUDE_DIR}" CACHE PATH "OpenSSL include directory")
+endif()
+if(DEFINED ENV{OPENSSL_CRYPTO_LIBRARY} AND NOT DEFINED CACHE{OPENSSL_CRYPTO_LIBRARY})
+  set(OPENSSL_CRYPTO_LIBRARY "$ENV{OPENSSL_CRYPTO_LIBRARY}" CACHE FILEPATH "OpenSSL crypto library")
+endif()
+if(DEFINED ENV{OPENSSL_SSL_LIBRARY} AND NOT DEFINED CACHE{OPENSSL_SSL_LIBRARY})
+  set(OPENSSL_SSL_LIBRARY "$ENV{OPENSSL_SSL_LIBRARY}" CACHE FILEPATH "OpenSSL SSL library")
+endif()
+
 # Add plugins submodule (includes fc and appbase)
 add_subdirectory(libraries/plugins)
 
