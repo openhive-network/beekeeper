@@ -37,24 +37,31 @@ hiveio-schemas = {version = ">=1.28.0", source = "gitlab-hive"}
 
 [tool.poetry-dynamic-versioning]
 enable = true
-pattern = "default-unprefixed"
+pattern = '''beekeeper-v(?P<base>\d+\.\d+\.\d+)(-?(?P<stage>[a-zA-Z]+)\.?(?P<revision>\d+)?)?$'''
 # PEP 440 compliant versioning with .post{timestamp}
 # https://peps.python.org/pep-0440/
 #
-# Version examples (assuming last tag is 1.2.3rc1):
-#   Tag (distance=0, clean):       1.2.3rc1
-#   Tag (distance=0, dirty):       1.2.3rc1+dirty
-#   develop (distance>0):          1.2.3rc1.post20260129082556
-#   develop (dirty):               1.2.3rc1.post20260129082556+dirty
-#   feature branch (distance>0):   1.2.3rc1.post20260129082556+unstable
-#   feature branch (dirty):        1.2.3rc1.post20260129082556+unstable.dirty
-#   feature branch (distance=0):   1.2.3rc1  (same as tag)
+# Pattern matches only `beekeeper-v` prefixed tags (e.g. beekeeper-v1.0.0),
+# ignoring native C++ tags like `1.28.6-alpha`.
+#
+# Version examples (assuming last tag is beekeeper-v1.0.0):
+#   Tag (distance=0, clean):       1.0.0
+#   Tag (distance=0, dirty):       1.0.0+dirty
+#   master (distance>0):           1.0.1.post20260130132734
+#   master (dirty):                1.0.1.post20260130132734+dirty
+#   feature branch (distance>0):   1.0.1.post20260130132734+unstable
+#   feature branch (dirty):        1.0.1.post20260130132734+unstable.dirty
+#
+# Pre-release tag (e.g. beekeeper-v1.0.1rc1):
+#   Tag (distance=0):              1.0.1rc1
+#   master (distance>0):           1.0.1rc1.post20260130132734
 #
 # Logic:
-#   - distance=0         -> exact tag version
-#   - distance>0         -> tag + .post{timestamp}
-#   - distance>0, unstable -> + 'unstable' marker
-#   - dirty              -> + 'dirty' marker
+#   - distance=0                -> exact tag version
+#   - distance>0, has stage     -> tag + .post{timestamp} (pre-release)
+#   - distance>0, no stage      -> bump_version(base) + .post{timestamp}
+#   - unstable branch           -> + 'unstable' marker
+#   - dirty                     -> + 'dirty' marker
 #
 # Stability detection:
 #   - stable: develop/master/main branches OR tag checkout (detached HEAD with distance=0)
@@ -70,7 +77,13 @@ format-jinja = """
     {%- set local_parts = ['unstable'] if not is_stable and distance > 0 else [] -%}
     {%- set local_parts = local_parts + ['dirty'] if dirty else local_parts -%}
 
-    {{ serialize_pep440(base, stage, revision, post=post, metadata=local_parts) }}
+    {%- if distance == 0 -%}
+        {{ serialize_pep440(base, stage, revision, metadata=local_parts) }}
+    {%- elif stage is not none -%}
+        {{ serialize_pep440(base, stage, revision, post=post, metadata=local_parts) }}
+    {%- else -%}
+        {{ serialize_pep440(bump_version(base), post=post, metadata=local_parts) }}
+    {%- endif -%}
 """
 
 [tool.poetry-dynamic-versioning.substitution]
