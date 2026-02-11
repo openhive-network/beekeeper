@@ -45,6 +45,8 @@ class Wallet(WalletCommons[SyncRemoteBeekeeper[InterfaceSettings], SyncWalletLoc
         return None
 
     def unlock(self, password: str) -> UnlockedWallet:
+        if not password:
+            raise ValueError("Password cannot be empty")
         if not self.is_unlocked():
             first_try = True
             while first_try or self._guard.error_occured():
