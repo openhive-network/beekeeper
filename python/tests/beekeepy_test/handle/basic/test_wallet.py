@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import time
 from typing import TYPE_CHECKING, Final
+from unittest.mock import MagicMock
 
 import pytest
+from beekeepy._interface.synchronous.wallet import Wallet as SyncWallet
 from beekeepy.exceptions import ErrorInResponseError
 
 if TYPE_CHECKING:
@@ -88,3 +90,15 @@ def test_create_wallet_with_custom_password(beekeeper: Beekeeper, wallet_name: s
 
     # ASSERT
     assert password == wallet_name
+
+
+def test_wallet_unlock_empty_password_raises_error() -> None:
+    """Test that calling unlock with an empty password raises ValueError instead of causing a deadlock."""
+    # ARRANGE
+    mock_beekeeper = MagicMock()
+    mock_guard = MagicMock()
+    wallet = SyncWallet(name="test-wallet", beekeeper=mock_beekeeper, session_token="token", guard=mock_guard)  # noqa: S106
+
+    # ACT & ASSERT
+    with pytest.raises(ValueError, match="Password cannot be empty"):
+        wallet.unlock("")
