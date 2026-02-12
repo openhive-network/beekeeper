@@ -27,16 +27,16 @@
   },
   "exports": {
     ".": {
-      "default": {
-        "import": {
-          "default": "./dist/bundle/web.js",
-          "types": "./dist/bundle/index.d.ts"
-        }
-      },
       "node": {
         "import": {
-          "default": "./dist/bundle/node.js",
-          "types": "./dist/bundle/index.d.ts"
+          "types": "./dist/bundle/index.d.ts",
+          "default": "./dist/bundle/node.js"
+        }
+      },
+      "default": {
+        "import": {
+          "types": "./dist/bundle/index.d.ts",
+          "default": "./dist/bundle/web.js"
         }
       }
     },
