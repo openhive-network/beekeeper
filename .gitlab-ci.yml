@@ -341,7 +341,12 @@ beekeeper_wasm_pack:
   script:
     # Set documentation URL in README
     - /home/emscripten/scripts/npm_set_doc_url.sh "${SOURCE_DIR}" "${PROJECT_URL}" "${CI_COMMIT_REF_NAME}" "${CI_COMMIT_REF_PROTECTED}" "${REPLACE_DOC_URL_ENV}" "${REPLACE_FILE_PATH}"
-    # Generate version and pack (npm_pack_package.sh calls npm_generate_version.sh internally)
+    # Generate version first (updates package.json with real version)
+    - /home/emscripten/scripts/npm_generate_version.sh "${SOURCE_DIR}" "${NPM_REGISTRY_URL}" "${NPM_PACKAGE_SCOPE}" "${NPM_PACKAGE_NAME}" "${CI_COMMIT_REF_PROTECTED}" "${CI_COMMIT_TAG}"
+    # Rebuild bundles with rollup to embed the correct version
+    # We must set npm_package_version explicitly since pnpm exec doesn't set it (unlike pnpm run)
+    - cd "${SOURCE_DIR}" && export npm_package_version=$(node -p "require('./package.json').version") && pnpm exec rollup -c
+    # Pack the package (without regenerating version since it's already done)
     - /home/emscripten/scripts/npm_pack_package.sh "${SOURCE_DIR}" "${NPM_REGISTRY_URL}" "${NPM_PACKAGE_SCOPE}" "${NPM_PACKAGE_NAME}" "${DIST_DIR}" "${CI_COMMIT_REF_PROTECTED}" "${CI_COMMIT_TAG}"
   artifacts:
     paths:
