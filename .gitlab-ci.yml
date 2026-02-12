@@ -46,7 +46,7 @@ variables:
 
 include:
   - project: 'hive/common-ci-configuration'
-    ref: 07fdf2c2bf8155477e7e1229e0bcc77852c9aa84
+    ref: f8e1b42621babbd8df2e6e197ecb598cfb9b228e
     file:
       - '/templates/python_projects.gitlab-ci.yml'
       - '/templates/npm_projects.gitlab-ci.yml'
@@ -69,10 +69,21 @@ default:
       cd libraries/plugins && git submodule update --init --recursive --jobs 4 && cd ../..
       echo -e "\e[0Ksection_end:$(date +%s):init_submodules\r\e[0K"
 
+verify_poetry_lock_stability:
+  stage: static_code_analysis
+  extends: .verify_poetry_lock_stability_template
+  image: ${CI_BASE_IMAGE}
+  variables:
+    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
+  tags:
+    - public-runner-docker
+
+
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| NATIVE BUILD/TEST |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 beekeeper_native_build:
   stage: build
+  needs: []  # Start immediately, don't wait for static_code_analysis (allows tests to run even if verify_poetry_lock_stability fails)
   before_script:
     - !reference [.submodule_init, script]
   script:
@@ -107,6 +118,7 @@ beekeeper_native_check_static_linking:
 
 beekeeper_wasm_build:
   stage: build
+  needs: []  # Start immediately, don't wait for static_code_analysis (allows tests to run even if verify_poetry_lock_stability fails)
   image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1
   variables:
     GIT_STRATEGY: clone
