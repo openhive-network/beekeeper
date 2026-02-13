@@ -176,29 +176,15 @@ beekeeper_wasm_test:
 
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| BEEKEEPY STATIC CODE ANALYSIS |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-# Override before_script to regenerate poetry.lock for Python 3.14 compatibility
-.beekeepy_regenerate_lock:
-  before_script:
-    - cd "${PYTHON_DIR}"
-    - echo "Using Python project directory - ${PYPROJECT_DIR}"
-    - poetry -C "${PYPROJECT_DIR}" env use python3
-    - source $(poetry -C "${PYPROJECT_DIR}" env info --path)/bin/activate
-    - python3 -V
-    - poetry -C "${PYPROJECT_DIR}" -V
-    - pip list
-    - poetry -C "${PYPROJECT_DIR}" lock --no-update 2>/dev/null || poetry -C "${PYPROJECT_DIR}" lock
-    - poetry -C "${PYPROJECT_DIR}" install
-    - pip install -e "${BEEKEEPY_DIR}"
-    - pip list
-
 beekeepy_pre_commit_checks:
   stage: static_code_analysis
   extends: .pre_commit_checks_template
   before_script:
-    - !reference [.beekeepy_regenerate_lock, before_script]
+    - cd "${PYTHON_DIR}"
+    - !reference [.pre_commit_checks_template, before_script]
     - !reference [.update_deps_for_static_analysis, script]
   variables:
-    PYPROJECT_DIR: "${LOCAL_TOOLS_DIR}"
+    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
     PRE_COMMIT_CONFIG: "${PYTHON_DIR}/.pre-commit-config.yaml"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -215,7 +201,8 @@ beekeepy_formatting_with_ruff_check:
     PYPROJECT_DIR: "${BEEKEEPY_DIR}"
     PYPROJECT_CONFIG_PATH: "${BEEKEEPY_DIR}/pyproject.toml"
   before_script:
-    - !reference [.beekeepy_regenerate_lock, before_script]
+    - cd "${PYTHON_DIR}"
+    - !reference [.project_develop_configuration_template, before_script]
     - !reference [.update_deps_for_static_analysis, script]
   script:
     - echo -e "${TXT_BLUE}Checking code formatting with Ruff...${TXT_CLEAR}" &&
@@ -235,7 +222,8 @@ beekeepy_type_check_with_mypy:
     PYPROJECT_DIR: "${BEEKEEPY_DIR}"
     PYPROJECT_CONFIG_PATH: "${BEEKEEPY_DIR}/pyproject.toml"
   before_script:
-    - !reference [.beekeepy_regenerate_lock, before_script]
+    - cd "${PYTHON_DIR}"
+    - !reference [.type_check_with_mypy_template, before_script]
     - !reference [.update_deps_for_static_analysis, script]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -256,11 +244,12 @@ beekeepy_type_check_with_mypy:
       artifacts: true
   variables:
     PATH_TO_REPORT: "$CI_PROJECT_DIR/beekeepy_report.xml"
-    PYPROJECT_DIR: "$LOCAL_TOOLS_DIR"
+    PYPROJECT_DIR: "$BEEKEEPY_DIR"
     HIVED_HTTP_ENDPOINT: "https://api.hive.blog"
   before_script:
     - cp $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/beekeeper $BEEKEEPY_DIR/beekeepy/beekeeper
-    - !reference [.beekeepy_regenerate_lock, before_script]
+    - cd "${PYTHON_DIR}"
+    - !reference [.project_develop_configuration_template, before_script]
     - !reference [.update_deps_for_tests, script]
   script:
     - if [ -z "${HIVED_HTTP_ENDPOINT}" ]; then HIVED_HTTP_ENDPOINT=""; else HIVED_HTTP_ENDPOINT="--hived-http-endpoint=${HIVED_HTTP_ENDPOINT}"; fi
