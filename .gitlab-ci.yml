@@ -431,9 +431,13 @@ deploy_beekeeper_wasm_dev_package:
   extends: .npm_deploy_package_template
   stage: publish
   variables:
+    GIT_STRATEGY: clone
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
     PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
     NPM_PACKAGE_SCOPE: "@hiveio"
+  before_script:
+    - !reference [.submodule_init, script]
+    - !reference [.npm_process_built_package_tarball, before_script]
   needs:
     - job: beekeeper_wasm_test
     - job: run_examples_beekeeper_wasm
@@ -448,10 +452,14 @@ deploy_beekeeper_wasm_production_public_npm:
   extends: .registry_npmjs_org_deploy_package_template
   stage: publish
   variables:
+    GIT_STRATEGY: clone
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
     NPM_PUBLISH_TOKEN: "$INTERNAL_HIDDEN_PUBLISH_TOKEN"
     NPM_PACKAGE_NAME: "beekeeper"
     PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  before_script:
+    - !reference [.submodule_init, script]
+    - !reference [.npm_process_built_package_tarball, before_script]
   needs:
     - job: beekeeper_wasm_test
     - job: run_examples_beekeeper_wasm
