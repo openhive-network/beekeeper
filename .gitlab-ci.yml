@@ -188,6 +188,7 @@ beekeeper_wasm_test:
     - pip list
     - poetry -C "${PYPROJECT_DIR}" lock --no-update 2>/dev/null || poetry -C "${PYPROJECT_DIR}" lock
     - poetry -C "${PYPROJECT_DIR}" install
+    - pip install -e "${BEEKEEPY_DIR}"
     - pip list
 
 beekeepy_pre_commit_checks:
@@ -211,9 +212,8 @@ beekeepy_formatting_with_ruff_check:
   stage: static_code_analysis
   extends: .project_develop_configuration_template
   variables:
-    PYPROJECT_DIR: "${LOCAL_TOOLS_DIR}"
-    PYPROJECT_CONFIG_PATH: "${LOCAL_TOOLS_DIR}/pyproject.toml"
-    MAYBE_EXPLICIT_CONFIG: "${PYPROJECT_CONFIG_PATH}"
+    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
+    PYPROJECT_CONFIG_PATH: "${BEEKEEPY_DIR}/pyproject.toml"
   before_script:
     - !reference [.beekeepy_regenerate_lock, before_script]
     - !reference [.update_deps_for_static_analysis, script]
@@ -232,9 +232,8 @@ beekeepy_type_check_with_mypy:
   stage: static_code_analysis
   extends: .type_check_with_mypy_template
   variables:
-    PYPROJECT_DIR: "${LOCAL_TOOLS_DIR}"
-    PYPROJECT_CONFIG_PATH: "${LOCAL_TOOLS_DIR}/pyproject.toml"
-    MAYBE_EXPLICIT_CONFIG: "${PYPROJECT_CONFIG_PATH}"
+    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
+    PYPROJECT_CONFIG_PATH: "${BEEKEEPY_DIR}/pyproject.toml"
   before_script:
     - !reference [.beekeepy_regenerate_lock, before_script]
     - !reference [.update_deps_for_static_analysis, script]
