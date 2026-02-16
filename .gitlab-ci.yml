@@ -399,6 +399,12 @@ push_to_wiki:
     DIST_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm/dist"
     PROJECT_URL: "https://gitlab.syncad.com/hive/beekeeper-doc"
     PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  script:
+    - cd "${CI_PROJECT_DIR}"
+    # Fix: patch cleanup to check branch existence against source repo (hive/beekeeper),
+    # not wiki repo (hive/beekeeper-doc). Can be removed once Docker image includes the fix.
+    - sed -i '/perform_wiki_cleanup/s/\${PROJECT_URL}/\${CI_PROJECT_URL}/' /home/emscripten/scripts/npm_push_doc.sh
+    - /home/emscripten/scripts/npm_push_doc.sh "${SOURCE_DIR}" "${PROJECT_URL}" "${WIKI_PUSH_TOKEN}" "${DIST_DIR}" "${CI_COMMIT_REF_NAME}" "${CI_COMMIT_REF_PROTECTED}" "${DOC_URL}"
   tags:
     - public-runner-docker
 
