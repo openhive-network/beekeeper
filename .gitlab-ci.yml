@@ -25,9 +25,7 @@ variables:
 
   # Python/beekeepy configuration
   PYTHON_DIR: ${CI_PROJECT_DIR}/python
-  BEEKEEPY_DIR: ${CI_PROJECT_DIR}/python/beekeepy
-  LOCAL_TOOLS_DIR: ${CI_PROJECT_DIR}/python/tests/local-tools
-  PACKAGES_TO_CHECK: "tests/ beekeepy/"
+  PACKAGES_TO_CHECK: "${PYTHON_DIR}/tests/ ${PYTHON_DIR}/beekeepy/"
 
   # Once image is stable, we can update tag to smth like :pypa_2_28-1
   CI_BASE_IMAGE_TAG: ":2fc9d83726a4fddc681c2b30fbd67701316ba85a"
@@ -74,7 +72,7 @@ verify_poetry_lock_stability:
   extends: .verify_poetry_lock_stability_template
   image: ${CI_BASE_IMAGE}
   variables:
-    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
+    PYPROJECT_DIR: "${PYTHON_DIR}"
   tags:
     - public-runner-docker
 
@@ -180,11 +178,10 @@ beekeepy_pre_commit_checks:
   stage: static_code_analysis
   extends: .pre_commit_checks_template
   before_script:
-    - cd "${PYTHON_DIR}"
     - !reference [.pre_commit_checks_template, before_script]
     - !reference [.update_deps_for_static_analysis, script]
   variables:
-    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
+    PYPROJECT_DIR: "${PYTHON_DIR}"
     PRE_COMMIT_CONFIG: "${PYTHON_DIR}/.pre-commit-config.yaml"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -198,10 +195,9 @@ beekeepy_formatting_with_ruff_check:
   stage: static_code_analysis
   extends: .project_develop_configuration_template
   variables:
-    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
-    PYPROJECT_CONFIG_PATH: "${BEEKEEPY_DIR}/pyproject.toml"
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+    PYPROJECT_CONFIG_PATH: "${PYTHON_DIR}/pyproject.toml"
   before_script:
-    - cd "${PYTHON_DIR}"
     - !reference [.project_develop_configuration_template, before_script]
     - !reference [.update_deps_for_static_analysis, script]
   script:
@@ -219,10 +215,9 @@ beekeepy_type_check_with_mypy:
   stage: static_code_analysis
   extends: .type_check_with_mypy_template
   variables:
-    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
-    PYPROJECT_CONFIG_PATH: "${BEEKEEPY_DIR}/pyproject.toml"
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+    PYPROJECT_CONFIG_PATH: "${PYTHON_DIR}/pyproject.toml"
   before_script:
-    - cd "${PYTHON_DIR}"
     - !reference [.type_check_with_mypy_template, before_script]
     - !reference [.update_deps_for_static_analysis, script]
   rules:
@@ -244,10 +239,10 @@ beekeepy_type_check_with_mypy:
       artifacts: true
   variables:
     PATH_TO_REPORT: "$CI_PROJECT_DIR/beekeepy_report.xml"
-    PYPROJECT_DIR: "$BEEKEEPY_DIR"
+    PYPROJECT_DIR: "$PYTHON_DIR"
     HIVED_HTTP_ENDPOINT: "https://api.hive.blog"
   before_script:
-    - cp $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/beekeeper $BEEKEEPY_DIR/beekeepy/beekeeper
+    - cp $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/beekeeper $PYTHON_DIR/beekeepy/beekeeper
     - cd "${PYTHON_DIR}"
     - !reference [.project_develop_configuration_template, before_script]
     - !reference [.update_deps_for_tests, script]
@@ -285,11 +280,11 @@ build_beekeepy_wheel:
     - job: beekeeper_native_build
       artifacts: true
   variables:
-    PYPROJECT_DIR: "$BEEKEEPY_DIR"
+    PYPROJECT_DIR: "$PYTHON_DIR"
   before_script:
     - ls -la $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/
-    - cp $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/beekeeper $BEEKEEPY_DIR/beekeepy/beekeeper
-    - ls -la $BEEKEEPY_DIR/beekeepy
+    - cp $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/beekeeper $PYTHON_DIR/beekeepy/beekeeper
+    - ls -la $PYTHON_DIR/beekeepy
 
 deploy_beekeepy_wheel_to_gitlab:
   stage: beekeepy
@@ -298,7 +293,7 @@ deploy_beekeepy_wheel_to_gitlab:
     - job: build_beekeepy_wheel
       artifacts: true
   variables:
-    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
+    PYPROJECT_DIR: "${PYTHON_DIR}"
   when: on_success
 
 deploy_beekeepy_wheel_to_pypi:
@@ -308,7 +303,7 @@ deploy_beekeepy_wheel_to_pypi:
     - job: build_beekeepy_wheel
       artifacts: true
   variables:
-    PYPROJECT_DIR: "${BEEKEEPY_DIR}"
+    PYPROJECT_DIR: "${PYTHON_DIR}"
   when: on_success
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| BEEKEEPY BUILD/DEPLOY |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

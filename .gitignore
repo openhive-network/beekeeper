@@ -19,7 +19,7 @@ venv/
 **/generated_*
 
 # Beekeeper binary in beekeepy package (copied at build time)
-python/beekeepy/beekeepy/beekeeper
+python/beekeepy/beekeeper
 
 # IDE
 .idea/

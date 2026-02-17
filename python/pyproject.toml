@@ -48,7 +48,7 @@ types-requests = ">=2.31.0.2"
 pytest = ">=8.3.5"
 pytest-asyncio = ">=0.25.3"
 pytest-xdist = ">=3.6.1"
-local-tools = { path = "../tests/local-tools", develop = true }
+local-tools = { path = "tests/local-tools", develop = true }
 
 [tool.mypy]
 disallow_untyped_decorators = false
@@ -120,7 +120,7 @@ allow-star-arg-any = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["../tests/beekeepy_test"]
+testpaths = ["tests/beekeepy_test"]
 
 [tool.poetry-dynamic-versioning]
 enable = true

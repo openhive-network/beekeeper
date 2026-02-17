@@ -651,7 +651,7 @@ develop = true
 
 [package.source]
 type = "directory"
-url = "../tests/local-tools"
+url = "tests/local-tools"
 
 [[package]]
 name = "loguru"
@@ -1722,4 +1722,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4"
-content-hash = "cd5de2136a9abe0a204f66fedc5da71765b9f81519edbaf300de7dccebd9046c"
+content-hash = "d99a495701f28703aa95d915682128c4f0162dbfaa666100ad158b855b856bce"

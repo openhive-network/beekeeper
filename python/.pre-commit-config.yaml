@@ -19,8 +19,8 @@ repos:
     rev: 2.1.3
     hooks:
       - id: poetry-lock
-        name: checking if beekeepy/poetry.lock is consistent with pyproject.toml
-        args: [ "-C", "./python/beekeepy" ]
+        name: checking if python/poetry.lock is consistent with pyproject.toml
+        args: [ "-C", "./python" ]
         language_version: python3.14
   - repo: https://github.com/python-poetry/poetry
     rev: 2.1.3
@@ -34,16 +34,16 @@ repos:
     hooks:
       - id: ruff
         name: linting code with Ruff
-        args: [ "--fix", "--config", "./python/beekeepy/pyproject.toml" ]
+        args: [ "--fix", "--config", "./python/pyproject.toml" ]
       - id: ruff-format
         name: format code using Ruff formatter
-        args: [ "--config", "./python/beekeepy/pyproject.toml" ]
+        args: [ "--config", "./python/pyproject.toml" ]
   - repo: local
     hooks:
     - id: mypy
       name: type check with mypy
       entry: mypy
-      args: ["--config-file", "./python/beekeepy/pyproject.toml"]
+      args: ["--config-file", "./python/pyproject.toml"]
       language: system
       types: [ python ]
   - repo: https://github.com/codespell-project/codespell
@@ -59,7 +59,7 @@ repos:
           - "--create"
           - "--python-folders"
           - "\
-            python/beekeepy/beekeepy, \
+            python/beekeepy, \
             python/tests/beekeepy_test,
             "
   - repo: https://github.com/shellcheck-py/shellcheck-py
