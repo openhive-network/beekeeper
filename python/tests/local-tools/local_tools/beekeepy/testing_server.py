@@ -13,9 +13,7 @@ from beekeepy.interfaces import HttpUrl, SelfContextAsync
 
 if TYPE_CHECKING:
     from socket import socket
-    from typing import Any, Iterator
-
-    from typing_extensions import Self
+    from typing import Any, Iterator, Self
 
 
 class AsyncHttpServerError(Exception):

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 if TYPE_CHECKING:
     from types import TracebackType

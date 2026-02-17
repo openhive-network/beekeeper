@@ -9,7 +9,7 @@ from beekeepy._runnable_handle.settings import strtobool
 from schemas._preconfigured_base_model import PreconfiguredBaseModel
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 CONFIG_MEMBER_REGEX: Final[re.Pattern[str]] = re.compile(r"^([a-zA-Z0-9]+)(\-([a-zA-Z0-9]+))*$")
 

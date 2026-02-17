@@ -19,7 +19,7 @@ from beekeepy._remote_handle.commons import (
 from beekeepy._utilities.sanitize import sanitize
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from beekeepy._communication.abc.overseer import AbstractOverseer
     from beekeepy._communication.url import HttpUrl

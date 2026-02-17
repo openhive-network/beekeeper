@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from os import environ
-from typing import TYPE_CHECKING, Any, ClassVar, cast
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self, cast
 
 from schemas._preconfigured_base_model import PreconfiguredBaseModel
 from schemas.base import field

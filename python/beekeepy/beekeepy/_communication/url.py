@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Generic, Literal, TypeVar, cast, get_args, overload
+from typing import Any, Generic, Literal, Self, TypeVar, cast, get_args, overload
 from urllib.parse import parse_qs, urlencode, urlparse
-
-from typing_extensions import Self
 
 from schemas.fields.resolvables import Resolvable
 

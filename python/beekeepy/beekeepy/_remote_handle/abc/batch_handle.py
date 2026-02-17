@@ -13,8 +13,7 @@ from schemas.jsonrpc import ExpectResultT, JSONRPCResult, get_response_model
 
 if TYPE_CHECKING:
     from types import TracebackType
-
-    from typing_extensions import Self
+    from typing import Self
 
     from beekeepy._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
     from beekeepy._communication.abc.overseer import AbstractOverseer
