@@ -117,7 +117,7 @@ beekeeper_native_check_static_linking:
 beekeeper_wasm_build:
   stage: build
   needs: []  # Start immediately, don't wait for static_code_analysis (allows tests to run even if verify_poetry_lock_stability fails)
-  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.22-6
   variables:
     GIT_STRATEGY: clone
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
@@ -144,7 +144,7 @@ beekeeper_wasm_build:
 
 beekeeper_wasm_test:
   stage: test
-  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.22-6
   variables:
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
   needs:
