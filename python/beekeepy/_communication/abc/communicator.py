@@ -80,6 +80,10 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
     def teardown(self) -> None:
         """Called when work with communicator is over."""
 
+    async def async_teardown(self) -> None:
+        """Async version of teardown. Override for communicators requiring async cleanup."""
+        self.teardown()
+
     @abstractmethod
     def _send(self, request: Request) -> Response:
         """Sends to given url given data synchronously."""

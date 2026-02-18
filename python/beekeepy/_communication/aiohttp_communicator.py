@@ -20,13 +20,15 @@ class AioHttpCommunicator(AbstractCommunicator):
 
     def __init__(self, *args: Any, settings: CommunicationSettings, **kwargs: Any) -> None:
         super().__init__(*args, settings=settings, **kwargs)
-        self.__session: aiohttp.ClientSession | None = None
+        self._session: aiohttp.ClientSession | None = None
+        self._session_loop: asyncio.AbstractEventLoop | None = None
 
     @property
     async def session(self) -> aiohttp.ClientSession:
-        if self.__session is None:
-            self.__session = aiohttp.ClientSession()
-        return self.__session
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+            self._session_loop = asyncio.get_running_loop()
+        return self._session
 
     async def _async_send(self, request: Request) -> Response:
         """Sends to given url given data asynchronously."""
@@ -49,6 +51,17 @@ class AioHttpCommunicator(AbstractCommunicator):
     def _send(self, request: Request) -> Response:
         raise NotImplementedError
 
+    async def async_teardown(self) -> None:
+        if self._session is not None:
+            await self._session.close()
+            self._session = None
+            self._session_loop = None
+
     def teardown(self) -> None:
-        if self.__session is not None:
-            self._asyncio_run(self.__session.close())
+        if self._session is not None:
+            if self._session_loop is not None and self._session_loop.is_running():
+                asyncio.run_coroutine_threadsafe(self._session.close(), self._session_loop)
+            elif self._session_loop is not None and not self._session_loop.is_closed():
+                self._session_loop.run_until_complete(self._session.close())
+            self._session = None
+            self._session_loop = None

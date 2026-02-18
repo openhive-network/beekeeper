@@ -187,6 +187,9 @@ class AbstractOverseer(ABC):
     def teardown(self) -> None:
         self.communicator.teardown()
 
+    async def async_teardown(self) -> None:
+        await self.communicator.async_teardown()
+
     def _unknown_decision_path_after_exiting_context(self, func: str) -> UnknownDecisionPathError:
         return UnknownDecisionPathError(
             "Exited _OverseerExceptionManager context without raising"

@@ -23,6 +23,11 @@ class AsyncBeekeeper(RunnableBeekeeper, RemoteBeekeeperTemplate[RunnableSettings
         self._clear_session()
         super().teardown()
 
+    async def async_teardown(self) -> None:
+        self.close()
+        self._clear_session()
+        await super().async_teardown()
+
     def _setup_ports(self, ports: PortMatchingResult) -> None:
         with self.update_settings() as settings:
             self._write_ports(settings, ports)

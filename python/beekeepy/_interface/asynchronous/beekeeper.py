@@ -15,6 +15,7 @@ from beekeepy._utilities.state_invalidator import StateInvalidator
 from beekeepy.exceptions import (
     DetachRemoteBeekeeperError,
     InvalidatedStateByClosingBeekeeperError,
+    InvalidatedStateError,
     UnknownDecisionPathError,
 )
 
@@ -116,7 +117,12 @@ class Beekeeper(BeekeeperInterface, StateInvalidator):
         return self
 
     async def _afinally(self) -> None:
-        self.teardown()
+        try:
+            if isinstance(self.__instance, AsynchronousBeekeeperHandle):
+                await self.__instance.async_teardown()
+            self.invalidate(InvalidatedStateByClosingBeekeeperError())
+        except InvalidatedStateError:
+            pass
 
     def _get_copy_of_settings(self) -> CommunicationSettings:
         return self.__instance._get_copy_of_settings()

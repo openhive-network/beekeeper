@@ -140,6 +140,9 @@ class AbstractHandle(UniqueSettingsHolder[RemoteSettingsT], ABC, Generic[RemoteS
     def teardown(self) -> None:
         self._overseer.teardown()
 
+    async def async_teardown(self) -> None:
+        await self._overseer.async_teardown()
+
     def _sanitize_data(self, data: Json | list[Json] | str) -> Json | list[Json] | str:
         return data
 
@@ -223,7 +226,7 @@ class AbstractAsyncHandle(AbstractHandle[RemoteSettingsT, ApiT], SelfContextAsyn
         """Returns async batch handle."""
 
     async def _afinally(self) -> None:
-        self.teardown()
+        await self.async_teardown()
 
 
 class AbstractSyncHandle(AbstractHandle[RemoteSettingsT, ApiT], SelfContextSync, SyncSendable, ABC):
