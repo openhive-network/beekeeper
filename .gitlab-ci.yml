@@ -48,6 +48,7 @@ include:
     file:
       - '/templates/python_projects.gitlab-ci.yml'
       - '/templates/npm_projects.gitlab-ci.yml'
+      - '/templates/verify_submodule_ref.gitlab-ci.yml'
 
 default:
   image: ${CI_BASE_IMAGE}
@@ -66,6 +67,14 @@ default:
       # Initialize nested submodules in plugins (fc, appbase)
       cd libraries/plugins && git submodule update --init --recursive --jobs 4 && cd ../..
       echo -e "\e[0Ksection_end:$(date +%s):init_submodules\r\e[0K"
+
+verify_include_refs:
+  extends: .verify_multiple_refs_template
+  needs: []
+  variables:
+    # Override global GIT_SUBMODULE_STRATEGY: none - script needs submodule checkout
+    GIT_SUBMODULE_STRATEGY: normal
+    VERIFY_REFS: "programs/beekeeper/beekeeper_wasm/npm-common-config:hive/common-ci-configuration"
 
 verify_poetry_lock_stability:
   stage: static_code_analysis
