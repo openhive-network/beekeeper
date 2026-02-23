@@ -61,3 +61,6 @@ class UnlockedWallet(Wallet, ContextAsync["UnlockedWallet"], ABC):
 
     @abstractmethod
     async def decrypt_data(self, *, from_key: PublicKey, to_key: PublicKey, content: str) -> str: ...
+
+    @abstractmethod
+    async def change_password(self, *, old_password: str, new_password: str) -> None: ...

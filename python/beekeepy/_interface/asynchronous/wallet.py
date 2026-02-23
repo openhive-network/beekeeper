@@ -104,8 +104,10 @@ class UnlockedWallet(Wallet, UnlockedWalletInterface):
     @wallet_unlocked
     async def remove_key(self, *, key: str) -> None:
         validate_public_keys(key=key)
-        with NotExistingKeyError(public_key=key), MissingSTMPrefixError(public_key=key), InvalidPublicKeyError(
-            public_keys=key
+        with (
+            NotExistingKeyError(public_key=key),
+            MissingSTMPrefixError(public_key=key),
+            InvalidPublicKeyError(public_keys=key),
         ):
             await self._beekeeper.api.remove_key(wallet_name=self.name, public_key=key, token=self.session_token)
 
@@ -117,8 +119,10 @@ class UnlockedWallet(Wallet, UnlockedWalletInterface):
     async def sign_digest(self, *, sig_digest: str, key: str) -> Signature:
         validate_public_keys(key=key)
         validate_digest(sig_digest=sig_digest)
-        with MissingSTMPrefixError(public_key=key), InvalidPublicKeyError(public_keys=key), NotExistingKeyError(
-            public_key=key
+        with (
+            MissingSTMPrefixError(public_key=key),
+            InvalidPublicKeyError(public_keys=key),
+            NotExistingKeyError(public_key=key),
         ):
             return (
                 await self._beekeeper.api.sign_digest(
@@ -143,11 +147,13 @@ class UnlockedWallet(Wallet, UnlockedWalletInterface):
     @wallet_unlocked
     async def encrypt_data(self, *, from_key: PublicKey, to_key: PublicKey, content: str, nonce: int = 0) -> str:
         validate_public_keys(from_key=from_key, to_key=to_key)
-        with MissingSTMPrefixError(public_key=from_key), MissingSTMPrefixError(
-            public_key=to_key
-        ), InvalidPublicKeyError(public_keys=[from_key, to_key]), NotExistingKeyError(
-            public_key=from_key, wallet_name=self.name
-        ), NotExistingKeyError(public_key=to_key, wallet_name=self.name):
+        with (
+            MissingSTMPrefixError(public_key=from_key),
+            MissingSTMPrefixError(public_key=to_key),
+            InvalidPublicKeyError(public_keys=[from_key, to_key]),
+            NotExistingKeyError(public_key=from_key, wallet_name=self.name),
+            NotExistingKeyError(public_key=to_key, wallet_name=self.name),
+        ):
             return (
                 await self._beekeeper.api.encrypt_data(
                     wallet_name=self.name,
@@ -163,11 +169,13 @@ class UnlockedWallet(Wallet, UnlockedWalletInterface):
     @wallet_unlocked
     async def decrypt_data(self, *, from_key: PublicKey, to_key: PublicKey, content: str) -> str:
         validate_public_keys(from_key=from_key, to_key=to_key)
-        with MissingSTMPrefixError(public_key=from_key), MissingSTMPrefixError(
-            public_key=to_key
-        ), InvalidPublicKeyError(public_keys=[from_key, to_key]), NotExistingKeyError(
-            public_key=from_key, wallet_name=self.name
-        ), NotExistingKeyError(public_key=to_key, wallet_name=self.name):
+        with (
+            MissingSTMPrefixError(public_key=from_key),
+            MissingSTMPrefixError(public_key=to_key),
+            InvalidPublicKeyError(public_keys=[from_key, to_key]),
+            NotExistingKeyError(public_key=from_key, wallet_name=self.name),
+            NotExistingKeyError(public_key=to_key, wallet_name=self.name),
+        ):
             return (
                 await self._beekeeper.api.decrypt_data(
                     wallet_name=self.name,
@@ -178,6 +186,13 @@ class UnlockedWallet(Wallet, UnlockedWalletInterface):
                 )
             ).decrypted_content
         raise UnknownDecisionPathError
+
+    @wallet_unlocked
+    async def change_password(self, *, old_password: str, new_password: str) -> None:
+        with InvalidPasswordError(wallet_name=self.name):
+            await self._beekeeper.api.change_password(
+                wallet_name=self.name, password=old_password, new_password=new_password, token=self.session_token
+            )
 
     async def _aenter(self) -> UnlockedWalletInterface:
         return self

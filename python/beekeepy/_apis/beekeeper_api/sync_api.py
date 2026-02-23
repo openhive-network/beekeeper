@@ -54,6 +54,12 @@ class BeekeeperApi(AbstractSyncApi, BeekeeperApiCommons[SyncSendable]):
         raise NotImplementedError
 
     @api
+    def change_password(
+        self, *, wallet_name: str, password: str, new_password: str, token: str | None = None
+    ) -> beekeeper_api.EmptyResponse:
+        raise NotImplementedError
+
+    @api
     def import_key(self, *, wallet_name: str, wif_key: str, token: str | None = None) -> beekeeper_api.ImportKey:
         raise NotImplementedError
 

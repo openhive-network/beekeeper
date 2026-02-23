@@ -62,6 +62,9 @@ class UnlockedWallet(Wallet, ContextSync["UnlockedWallet"], ABC):
     @abstractmethod
     def decrypt_data(self, *, from_key: PublicKey, to_key: PublicKey, content: str) -> str: ...
 
+    @abstractmethod
+    def change_password(self, *, old_password: str, new_password: str) -> None: ...
+
     def __contains__(self, obj: object) -> bool:
         if isinstance(obj, str):
             return self.has_matching_private_key(key=PublicKey(obj))

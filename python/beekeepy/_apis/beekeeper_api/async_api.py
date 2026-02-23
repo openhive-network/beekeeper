@@ -103,6 +103,22 @@ class BeekeeperApi(AbstractAsyncApi, BeekeeperApiCommons[AsyncSendable]):
         raise NotImplementedError
 
     @api
+    async def change_password(
+        self, *, wallet_name: str, password: str, new_password: str, token: str | None = None
+    ) -> beekeeper_api.EmptyResponse:
+        """Changes password of specified wallet. Wallet must be unlocked.
+
+        Args:
+            wallet_name: wallet to change password for
+            password: current password
+            new_password: new password to set
+
+        Returns:
+            Nothing.
+        """
+        raise NotImplementedError
+
+    @api
     async def import_key(self, *, wallet_name: str, wif_key: str, token: str | None = None) -> beekeeper_api.ImportKey:
         """Imports key to given wallet.
 
