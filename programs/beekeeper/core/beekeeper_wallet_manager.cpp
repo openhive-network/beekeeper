@@ -88,6 +88,12 @@ void beekeeper_wallet_manager::unlock( const std::string& token, const std::stri
   sessions->get_wallet_manager( token )->unlock( wallet_name, password );
 }
 
+void beekeeper_wallet_manager::change_password( const std::string& token, const std::string& wallet_name, const std::string& old_password, const std::string& new_password )
+{
+  sessions->check_timeout( token );
+  sessions->get_wallet_manager( token )->change_password( wallet_name, old_password, new_password );
+}
+
 std::string beekeeper_wallet_manager::import_key( const std::string& token, const std::string& wallet_name, const std::string& wif_key, const std::string& prefix )
 {
   sessions->check_timeout( token );

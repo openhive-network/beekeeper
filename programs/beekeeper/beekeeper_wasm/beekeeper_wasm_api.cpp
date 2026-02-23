@@ -178,6 +178,16 @@ namespace beekeeper {
     return exception_handler( _method );
   }
 
+  std::string beekeeper_api::change_password( const std::string& token, const std::string& wallet_name, const std::string& old_password, const std::string& new_password )
+  {
+    auto _method = [&, this]()
+    {
+      _impl->app.get_wallet_manager()->change_password( token, wallet_name, old_password, new_password );
+      return to_string( empty_response );
+    };
+    return exception_handler( _method );
+  }
+
   std::string beekeeper_api::open( const std::string& token, const std::string& wallet_name )
   {
     auto _method = [&, this]()

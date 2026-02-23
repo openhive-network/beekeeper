@@ -91,6 +91,18 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     .function("unlock(token, wallet_name, password)", &beekeeper_api::unlock)
 
     /*
+      ****changing password of a wallet****
+      PARAMS:
+        token:          a token representing a session
+        wallet_name:    a name of wallet
+        old_password:   the current wallet's password
+        new_password:   the new wallet's password
+      RESULT:
+        nothing
+    */
+    .function("change_password(token, wallet_name, old_password, new_password)", &beekeeper_api::change_password)
+
+    /*
       ****opening of a wallet****
       PARAMS:
         token:        a token representing a session

@@ -96,6 +96,16 @@ class wallet_content_handler
        */
       void    set_password( const std::string& password );
 
+      /** Changes the password on an unlocked wallet.
+       *
+       * Verifies the old password, re-encrypts with the new password,
+       * and saves the wallet file. The wallet remains unlocked.
+       * @param old_password the current password
+       * @param new_password the new password to set
+       * @ingroup Wallet Management
+       */
+      void    change_password( const std::string& old_password, const std::string& new_password );
+
       /** Returns details about private/public keys. In further processing proper data is extracted i.e.
        * for `get_public_keys` endpoint only public keys are returned, but for saving locally data for backup are returned both keys (private/public).
        * @returns a std::vector containing the public keys

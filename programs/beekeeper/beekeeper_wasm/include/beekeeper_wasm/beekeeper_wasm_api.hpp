@@ -77,6 +77,7 @@ class beekeeper_api final
     }
 
     std::string unlock( const std::string& token, const std::string& wallet_name, const std::string& password );
+    std::string change_password( const std::string& token, const std::string& wallet_name, const std::string& old_password, const std::string& new_password );
     std::string open( const std::string& token, const std::string& wallet_name );
     std::string close( const std::string& token, const std::string& wallet_name );
 

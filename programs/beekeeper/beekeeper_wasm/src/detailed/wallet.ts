@@ -107,6 +107,12 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return result.decrypted_content;
   }
 
+  public async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    this.api.extract(safeWasmCall(() => this.api.api.change_password(this.session.token, this.locked.name, oldPassword, newPassword) as string, `changing password for wallet '${this.locked.name}'`));
+
+    await this.api.fs?.sync();
+  }
+
   public close(): IBeekeeperSession {
     return this.locked.close();
   }

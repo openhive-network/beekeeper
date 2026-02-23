@@ -47,6 +47,7 @@ class beekeeper_api_impl
       (lock_all)
       (lock)
       (unlock)
+      (change_password)
       (import_key)
       (import_keys)
       (remove_key)
@@ -135,6 +136,14 @@ DEFINE_API_IMPL( beekeeper_api_impl, unlock )
     FC_ASSERT(false, "unlock is not accessible");
 
   return unlock_return();
+}
+
+DEFINE_API_IMPL( beekeeper_api_impl, change_password )
+{
+  std::unique_lock guard( _mtx_handler->get_mutex() );
+
+  _wallet_mgr->change_password( args.token, args.wallet_name, args.password, args.new_password );
+  return change_password_return();
 }
 
 DEFINE_API_IMPL( beekeeper_api_impl, import_key )
@@ -272,6 +281,7 @@ DEFINE_LOCKLESS_APIS( beekeeper_wallet_api,
   (lock_all)
   (lock)
   (unlock)
+  (change_password)
   (import_key)
   (import_keys)
   (remove_key)

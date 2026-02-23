@@ -271,6 +271,23 @@ void wallet_manager_impl::unlock( const std::string& wallet_name, const std::str
   });
 }
 
+void wallet_manager_impl::change_password( const std::string& wallet_name, const std::string& old_password, const std::string& new_password )
+{
+  FC_ASSERT( new_password.size() > 0, "New password can't be empty" );
+  FC_ASSERT( new_password.size() < max_password_length,
+            "Got ${password_size} bytes, but a password limit has ${max_password_length} bytes", ("password_size", new_password.size())(max_password_length) );
+
+  auto _wallet = content_deliverer.find( token, wallet_name );
+  FC_ASSERT( _wallet, "Wallet not found: ${w}", ("w", wallet_name));
+
+  auto __wallet = *_wallet;
+  FC_ASSERT( __wallet );
+
+  FC_ASSERT( !__wallet->is_locked(), "Wallet is locked: ${w}", ("w", wallet_name));
+
+  __wallet->get_content()->change_password( old_password, new_password );
+}
+
 std::string wallet_manager_impl::import_key( const std::string& name, const std::string& wif_key, const std::string& prefix )
 {
   auto _wallet = content_deliverer.find( token, name );

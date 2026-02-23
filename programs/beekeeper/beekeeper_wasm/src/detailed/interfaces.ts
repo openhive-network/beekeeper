@@ -186,6 +186,16 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error, fs sync error etc.)
    */
   getPublicKeys(): TPublicKey[];
+
+  /**
+   * Changes the password of the wallet. The wallet remains unlocked after the password change.
+   *
+   * @param {string} oldPassword current password of the wallet
+   * @param {string} newPassword new password for the wallet
+   *
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error, fs sync error etc.)
+   */
+  changePassword(oldPassword: string, newPassword: string): Promise<void>;
 }
 
 export interface IBeekeeperWallet extends IWallet {

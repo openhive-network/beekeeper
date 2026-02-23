@@ -161,7 +161,19 @@ public:
 
 
   /**
-   * 
+   *
+   * Change the password of specified wallet.
+   * Wallet must be opened and unlocked. The wallet remains unlocked after the password change.
+   * @param token        Session's identifier.
+   * @param wallet_name  A name of a wallet.
+   * @param old_password The current plaintext password.
+   * @param new_password The new plaintext password.
+   * @throws             An exception `fc::exception` if wallet not found, locked, or old password is invalid.
+   */
+  void change_password( const std::string& token, const std::string& wallet_name, const std::string& old_password, const std::string& new_password );
+
+  /**
+   *
    * Import a private key into specified wallet.
    * Wallet must be opened and unlocked.
    * @param token       Session's identifier.

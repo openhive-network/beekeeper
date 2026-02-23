@@ -2432,6 +2432,62 @@ BOOST_AUTO_TEST_CASE(is_wallet_unlocked)
   } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(change_password)
+{
+  try
+  {
+    test_utils::beekeeper_mgr b_mgr;
+    b_mgr.remove_wallets();
+
+    const uint64_t _timeout = 90;
+    const uint32_t _session_limit = 64;
+
+    appbase::application app;
+
+    beekeeper_wallet_manager _beekeeper = b_mgr.create_wallet( app, _timeout, _session_limit );
+    BOOST_REQUIRE( _beekeeper.start() );
+
+    auto _token = _beekeeper.create_session( "salt" );
+
+    const std::string _wallet_name = "wallet_cp";
+    const std::string _old_password = "old_pass";
+    const std::string _new_password = "new_pass";
+    const auto _prefix = "STM";
+
+    const auto key_str = "5JktVNHnRX48BUdtewU7N1CyL4Z886c42x7wYW7XhNWkDQRhdcS";
+
+    _beekeeper.create( _token, _wallet_name, _old_password, false/*is_temporary*/ );
+    _beekeeper.import_key( _token, _wallet_name, key_str, _prefix );
+    BOOST_REQUIRE_EQUAL( 1u, _beekeeper.get_public_keys( _token, std::optional<std::string>( _wallet_name ) ).size() );
+
+    // Change password: wallet stays unlocked
+    _beekeeper.change_password( _token, _wallet_name, _old_password, _new_password );
+
+    // Wallet should still be unlocked and keys accessible
+    auto _wallet_info = _beekeeper.is_wallet_unlocked( _token, _wallet_name );
+    BOOST_REQUIRE( _wallet_info.unlocked == true );
+    BOOST_REQUIRE_EQUAL( 1u, _beekeeper.get_public_keys( _token, std::optional<std::string>( _wallet_name ) ).size() );
+
+    // Lock and unlock with new password
+    _beekeeper.lock( _token, _wallet_name );
+    _beekeeper.unlock( _token, _wallet_name, _new_password );
+    BOOST_REQUIRE_EQUAL( 1u, _beekeeper.get_public_keys( _token, std::optional<std::string>( _wallet_name ) ).size() );
+
+    // Old password should fail
+    _beekeeper.lock( _token, _wallet_name );
+    BOOST_REQUIRE_THROW( _beekeeper.unlock( _token, _wallet_name, _old_password ), fc::exception );
+
+    // Wrong old password should fail during change
+    _beekeeper.unlock( _token, _wallet_name, _new_password );
+    BOOST_REQUIRE_THROW( _beekeeper.change_password( _token, _wallet_name, "wrong_pass", "another_pass" ), fc::exception );
+
+    // Change password on locked wallet should fail
+    _beekeeper.lock( _token, _wallet_name );
+    BOOST_REQUIRE_THROW( _beekeeper.change_password( _token, _wallet_name, _new_password, "another_pass" ), fc::exception );
+
+  } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 #endif

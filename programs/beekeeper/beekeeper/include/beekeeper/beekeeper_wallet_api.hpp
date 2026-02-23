@@ -38,6 +38,7 @@ class beekeeper_wallet_api
       (lock_all)
       (lock)
       (unlock)
+      (change_password)
       (import_key)
       (import_keys)
       (remove_key)

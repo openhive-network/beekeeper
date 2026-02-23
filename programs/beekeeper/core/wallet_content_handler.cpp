@@ -339,6 +339,13 @@ void wallet_content_handler::set_password( const std::string& password )
   lock();
 }
 
+void wallet_content_handler::change_password( const std::string& old_password, const std::string& new_password )
+{
+  check_password( old_password );
+  my->_checksum = fc::sha512::hash( new_password.c_str(), new_password.size() );
+  save_wallet_file();
+}
+
 keys_details wallet_content_handler::get_keys_details()
 {
   return my->_keys;
