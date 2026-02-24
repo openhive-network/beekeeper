@@ -11,7 +11,6 @@ export class BeekeeperInstanceHelper {
 
   #instance = undefined;
   #implicitSessionToken = undefined;
-  #version = undefined;
 
   #acceptError = false;
 
@@ -25,10 +24,6 @@ export class BeekeeperInstanceHelper {
 
   get instance() {
     return this.#instance;
-  }
-
-  get version() {
-    return this.#version;
   }
 
   /**
@@ -71,20 +66,28 @@ export class BeekeeperInstanceHelper {
     }
   }
 
-  #parseStringList(provider, options) {
-    const params = new provider.StringList();
-    for(const option of options)
-      params.push_back(option);
+  /**
+   * Parse options array (--wallet-dir X --unlock-timeout Y --enable-logs Z)
+   * into { walletDir, unlockTimeout } for the new minimal constructor.
+   */
+  static #parseOptions(options) {
+    let walletDir = '.';
+    let unlockTimeout = 900;
 
-    const s = params.size();
-    if(s !== options.length)
-      throw new Error("Invalid params size");
+    for (let i = 0; i < options.length; i++) {
+      if (options[i] === '--wallet-dir' && i + 1 < options.length) {
+        walletDir = options[++i];
+      } else if (options[i] === '--unlock-timeout' && i + 1 < options.length) {
+        unlockTimeout = parseInt(options[++i], 10);
+      }
+      // --enable-logs is ignored (no logging in core_minimal)
+    }
 
-    return params;
+    return { walletDir, unlockTimeout };
   }
 
   /**
-   * Prepares beekeeper instance helper for given profider
+   * Prepares beekeeper instance helper for given provider
    * @returns {BeekeeperInstanceHelper}
    */
   static for(provider) {
@@ -92,11 +95,8 @@ export class BeekeeperInstanceHelper {
   }
 
   constructor(provider, options) {
-    const params = this.#parseStringList(provider, options);
-    this.#instance = new provider.beekeeper_api(params);
-
-    const initResult = this.instance.init();
-    this.#version = this.#extract(initResult).version;
+    const { walletDir, unlockTimeout } = BeekeeperInstanceHelper.#parseOptions(options);
+    this.#instance = new provider.beekeeper_api(walletDir, unlockTimeout);
     this.#implicitSessionToken = this.createSessionWithoutSalt();
   }
 
@@ -130,13 +130,6 @@ export class BeekeeperInstanceHelper {
     return value.exists;
   }
 
-  hasWallet(token, walletName) {
-    const returnedValue = this.instance.has_wallet(token, walletName);
-    const value = this.#extract(returnedValue);
-
-    return value.exists;
-  }
-
   create(sessionToken, walletName) {
     const returnedValue = this.instance.create(sessionToken, walletName);
 
@@ -154,23 +147,7 @@ export class BeekeeperInstanceHelper {
   }
 
   create_with_password(sessionToken, walletName, explicitPassword) {
-    const returnedValue = this.instance.create(sessionToken, walletName, false, explicitPassword);
-
-    if( this.#acceptError )
-    {
-      return this.#extract(returnedValue);
-    }
-    else
-    {
-      const value = this.#extract(returnedValue);
-      BeekeeperInstanceHelper.#setPassword(walletName, value.password);
-
-      return value.password;
-    }
-  }
-
-  create_temporary_wallet_with_password(sessionToken, walletName, explicitPassword, isTemporary) {
-    const returnedValue = this.instance.create(sessionToken, walletName, isTemporary, explicitPassword);
+    const returnedValue = this.instance.create(sessionToken, walletName, explicitPassword);
 
     if( this.#acceptError )
     {
@@ -200,56 +177,10 @@ export class BeekeeperInstanceHelper {
     }
   };
 
-  importKeys(sessionToken, walletName, keys) {
-    const returnedValue = this.instance.import_keys(sessionToken, walletName, keys);
-
-    if( this.#acceptError )
-    {
-      return this.#extract(returnedValue);
-    }
-    else
-    {
-      const value = this.#extract(returnedValue);
-
-      return value.public_key;
-    }
-  };
-
-  encryptData(sessionToken, fromPublicKey, toPublicKey, walletName, content) {
-    const returnedValue = this.instance.encrypt_data(sessionToken, fromPublicKey, toPublicKey, walletName, content);
-
-    if( this.#acceptError )
-    {
-      return this.#extract(returnedValue);
-    }
-    else
-    {
-      const value = this.#extract(returnedValue);
-
-      return value.encrypted_content;
-    }
-  };
-
-  decryptData(sessionToken, fromPublicKey, toPublicKey, walletName, encryptedContent) {
-    const returnedValue = this.instance.decrypt_data(sessionToken, fromPublicKey, toPublicKey, walletName, encryptedContent);
-
-    if( this.#acceptError )
-    {
-      return this.#extract(returnedValue);
-    }
-    else
-    {
-      const value = this.#extract(returnedValue);
-
-      return value.decrypted_content;
-    }
-  };
-
   /**
    * @param {string} sessionToken
    * @param {string} walletName
    * @param {string} key
-   * @param {null|string} explicitPassword
    */
   removeKey(sessionToken, walletName, key) {
     const returnedValue = this.instance.remove_key(sessionToken, walletName, key);
@@ -270,12 +201,6 @@ export class BeekeeperInstanceHelper {
 
       return value.signature;
     }
-  }
-
-  listWallets(sessionToken) {
-    const returnedValue = this.instance.list_wallets(sessionToken);
-
-    return this.#extract(returnedValue);
   }
 
   getPublicKeys(sessionToken) {
@@ -328,16 +253,5 @@ export class BeekeeperInstanceHelper {
 
   deleteInstance() {
     this.instance.delete();
-  }
-
-  setTimeout(sessionToken, seconds) {
-    let returnedValue = this.instance.set_timeout(sessionToken, seconds);
-
-    return this.#extract(returnedValue);
-  }
-
-  isWalletUnlocked(sessionToken, walletName) {
-    const returnedValue = this.instance.is_wallet_unlocked(sessionToken, walletName);
-    return this.#extract(returnedValue);
   }
 }
