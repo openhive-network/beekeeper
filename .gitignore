@@ -24,3 +24,9 @@ python/beekeepy/beekeeper
 # IDE
 .idea/
 .vscode/
+
+node_modules/
+results.json
+results.xml
+.beekeeper
+.last-run.json
