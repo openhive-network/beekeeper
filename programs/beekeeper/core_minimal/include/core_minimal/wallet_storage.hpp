@@ -1,0 +1,21 @@
+#pragma once
+
+#include <string>
+#include <vector>
+
+namespace beekeeper_minimal {
+
+/// Abstract filesystem hooks. The consumer provides the implementation.
+/// These are the ONLY two I/O operations the minimal beekeeper ever needs.
+struct wallet_storage
+{
+  virtual ~wallet_storage() = default;
+
+  /// Persist a wallet blob at the given path.
+  virtual void save(const std::string& path, const std::vector<char>& buffer) = 0;
+
+  /// Retrieve a previously-persisted wallet blob. Throws if not found.
+  virtual std::vector<char> load(const std::string& path) = 0;
+};
+
+} // namespace beekeeper_minimal
