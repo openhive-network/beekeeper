@@ -96,6 +96,10 @@ export class BeekeeperInstanceHelper {
 
   constructor(provider, options) {
     const { walletDir, unlockTimeout } = BeekeeperInstanceHelper.#parseOptions(options);
+    // Ensure the wallet directory exists (Emscripten FS or Node fs)
+    if (provider.FS && typeof provider.FS.mkdirTree === 'function') {
+      try { provider.FS.mkdirTree(walletDir); } catch { /* already exists */ }
+    }
     this.#instance = new provider.beekeeper_api(walletDir, unlockTimeout);
     this.#implicitSessionToken = this.createSessionWithoutSalt();
   }

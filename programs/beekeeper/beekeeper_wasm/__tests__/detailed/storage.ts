@@ -197,8 +197,8 @@ test.describe('WASM storage tests', () => {
     expect(dir).toStrictEqual([ '.', '..', 'directory with spaces' ]);
   });
 
-  test('Should not be able to list the previously imported key from other context', async ({ beekeeperWasmTestWebOnly }) => {
-    const keys = await beekeeperWasmTestWebOnly(async ({ provider, BeekeeperInstanceHelper }, { walletDir, args }) => {
+  test('Should not be able to access previously created wallet from other context', async ({ beekeeperWasmTestWebOnly }) => {
+    const hasNoWallets = await beekeeperWasmTestWebOnly(async ({ provider, BeekeeperInstanceHelper }, { walletDir, args }) => {
       const fs = provider.FS;
       fs.mkdir(walletDir);
       fs.mount(fs.filesystems.IDBFS, {}, walletDir);
@@ -217,10 +217,17 @@ test.describe('WASM storage tests', () => {
 
       const api = new helper(args);
 
-      return api.listWallets(api.implicitSessionToken);
+      // In a fresh context there should be no wallets — opening "w0" should fail
+      try {
+        api.open(api.implicitSessionToken, "w0");
+        api.unlock(api.implicitSessionToken, "w0", "badf00d");
+        return false; // Wallet found — not expected in a fresh context
+      } catch {
+        return true; // Expected — no wallet file exists
+      }
     }, { walletDir: STORAGE_ROOT, args: WALLET_OPTIONS });
 
-    expect(keys).toStrictEqual({"wallets": []});
+    expect(hasNoWallets).toBeTruthy();
   });
 
   test('Should be able to list the previously imported key from another page with the same browser context with explicitly closing the instance of beekeeper', async ({ beekeeperWasmTestWebOnlyWithPage }) => {

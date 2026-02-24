@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <sstream>
 #include <stdexcept>
+#include <sys/stat.h>   // mkdirs
 
 namespace beekeeper_wasm {
 
@@ -54,12 +55,32 @@ std::string error_json(const std::string& msg)
 
 // ── emscripten_fs_storage ──────────────────────────────────
 
+namespace {
+
+/// Recursively create directories (like mkdir -p).
+void mkdirs(const std::string& path)
+{
+  if (path.empty()) return;
+  std::string accumulated;
+  for (size_t i = 0; i < path.size(); ++i)
+  {
+    accumulated += path[i];
+    if (path[i] == '/' || i == path.size() - 1)
+      ::mkdir(accumulated.c_str(), 0755); // ignore errors — dir may already exist
+  }
+}
+
+} // anon
+
 emscripten_fs_storage::emscripten_fs_storage(std::string wallet_dir)
   : wallet_dir_(std::move(wallet_dir))
 {
   // Ensure trailing separator
   if (!wallet_dir_.empty() && wallet_dir_.back() != '/')
     wallet_dir_ += '/';
+
+  // Ensure the wallet directory exists
+  mkdirs(wallet_dir_);
 }
 
 std::string emscripten_fs_storage::resolve(const std::string& name) const

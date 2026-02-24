@@ -11,24 +11,13 @@ test.describe('WASM Base tests', () => {
     });
   });
 
-  test('Should be able to create instance of StringList', async ({ beekeeperWasmTest }) => {
-    const retVal = await beekeeperWasmTest(async ({ provider }) => {
-      return new provider.StringList();
-    });
-
-    expect(retVal).toBeDefined();
-  });
-
   test('Should be able to create instance of beekeeper_api', async ({ beekeeperWasmTest }) => {
     const retVal = await beekeeperWasmTest(async ({ provider }, WALLET_OPTIONS_NODE) => {
-      const beekeeperOptions = new provider.StringList();
-
-      WALLET_OPTIONS_NODE.forEach((opt) => void beekeeperOptions.push_back(opt));
-
-      return new provider.beekeeper_api(beekeeperOptions);
+      // core_minimal constructor: (walletDir: string, unlockTimeout: uint32_t)
+      return typeof new provider.beekeeper_api('.beekeeper', 900);
     }, WALLET_OPTIONS_NODE);
 
-    expect(retVal).toBeDefined();
+    expect(retVal).toBe('object');
   });
 
   test('Should be able to create instance of ExtractError - import script', async ({ beekeeperWasmTest }) => {
