@@ -4,31 +4,22 @@
 #include <fc/crypto/aes.hpp>
 #include <fc/crypto/sha256.hpp>
 #include <fc/crypto/sha512.hpp>
+#include <fc/crypto/ripemd160.hpp>
 #include <fc/crypto/hex.hpp>
-#include <fc/crypto/crypto_data.hpp>
-#include <fc/io/json.hpp>
-#include <fc/io/raw.hpp>
+#include <fc/crypto/base58.hpp>
 
 #include <cstring>
 #include <stdexcept>
 
 namespace {
 
-// ── Type conversion helpers (our types <-> FC types) ──────────
+// ── Type conversion helpers ────────────────────────────────────
 
 fc::ecc::private_key to_fc_private(const beekeeper_minimal::private_key_type& key)
 {
   fc::sha256 secret;
   std::memcpy(secret.data(), key.data.data(), 32);
   return fc::ecc::private_key::regenerate(secret);
-}
-
-beekeeper_minimal::private_key_type from_fc_private(const fc::ecc::private_key& key)
-{
-  beekeeper_minimal::private_key_type result;
-  auto secret = key.get_secret();
-  std::memcpy(result.data.data(), secret.data(), 32);
-  return result;
 }
 
 fc::ecc::public_key to_fc_public(const beekeeper_minimal::public_key_type& key)
@@ -38,240 +29,146 @@ fc::ecc::public_key to_fc_public(const beekeeper_minimal::public_key_type& key)
   return fc::ecc::public_key(pkd);
 }
 
-beekeeper_minimal::public_key_type from_fc_public(const fc::ecc::public_key& key)
+} // anonymous namespace
+
+namespace beekeeper_minimal {
+
+// ── fc_crypto_provider (just wires primitives → impl) ──────────
+
+fc_crypto_provider::fc_crypto_provider()
+  : crypto_provider_impl(prims_)
 {
-  beekeeper_minimal::public_key_type result;
-  auto serialized = key.serialize();
+}
+
+// ── Hashing ────────────────────────────────────────────────────
+
+digest_type fc_crypto_primitives::sha256(const uint8_t* data, size_t len)
+{
+  auto h = fc::sha256::hash(reinterpret_cast<const char*>(data),
+                             static_cast<uint32_t>(len));
+  digest_type result;
+  std::memcpy(result.data.data(), h.data(), 32);
+  return result;
+}
+
+sha512_hash fc_crypto_primitives::sha512(const uint8_t* data, size_t len)
+{
+  auto h = fc::sha512::hash(reinterpret_cast<const char*>(data),
+                             static_cast<uint32_t>(len));
+  sha512_hash result;
+  std::memcpy(result.data.data(), h.data(), 64);
+  return result;
+}
+
+std::array<uint8_t, 20> fc_crypto_primitives::ripemd160(const uint8_t* data, size_t len)
+{
+  auto h = fc::ripemd160::hash(reinterpret_cast<const char*>(data),
+                                static_cast<uint32_t>(len));
+  std::array<uint8_t, 20> result;
+  std::memcpy(result.data(), h.data(), 20);
+  return result;
+}
+
+// ── AES ────────────────────────────────────────────────────────
+
+std::vector<uint8_t> fc_crypto_primitives::aes256_cbc_encrypt(
+    const uint8_t* key, const uint8_t* iv,
+    const uint8_t* data, size_t len)
+{
+  // FC's aes_encrypt takes a sha512 as key (first 32 = key, next 16 = IV)
+  // We reconstruct the sha512 from our separate key + iv
+  fc::sha512 combined;
+  std::memset(combined.data(), 0, 64);
+  std::memcpy(combined.data(), key, 32);
+  std::memcpy(reinterpret_cast<char*>(combined.data()) + 32, iv, 16);
+
+  std::vector<char> plain(reinterpret_cast<const char*>(data),
+                           reinterpret_cast<const char*>(data) + len);
+  auto encrypted = fc::aes_encrypt(combined, plain);
+
+  return std::vector<uint8_t>(
+    reinterpret_cast<const uint8_t*>(encrypted.data()),
+    reinterpret_cast<const uint8_t*>(encrypted.data()) + encrypted.size());
+}
+
+std::vector<uint8_t> fc_crypto_primitives::aes256_cbc_decrypt(
+    const uint8_t* key, const uint8_t* iv,
+    const uint8_t* data, size_t len)
+{
+  fc::sha512 combined;
+  std::memset(combined.data(), 0, 64);
+  std::memcpy(combined.data(), key, 32);
+  std::memcpy(reinterpret_cast<char*>(combined.data()) + 32, iv, 16);
+
+  std::vector<char> cipher(reinterpret_cast<const char*>(data),
+                            reinterpret_cast<const char*>(data) + len);
+  auto decrypted = fc::aes_decrypt(combined, cipher);
+
+  return std::vector<uint8_t>(
+    reinterpret_cast<const uint8_t*>(decrypted.data()),
+    reinterpret_cast<const uint8_t*>(decrypted.data()) + decrypted.size());
+}
+
+// ── secp256k1 ──────────────────────────────────────────────────
+
+private_key_type fc_crypto_primitives::generate_private_key()
+{
+  auto fc_key = fc::ecc::private_key::generate();
+  private_key_type result;
+  auto secret = fc_key.get_secret();
+  std::memcpy(result.data.data(), secret.data(), 32);
+  return result;
+}
+
+public_key_type fc_crypto_primitives::get_public_key(const private_key_type& privkey)
+{
+  auto fc_key = to_fc_private(privkey);
+  auto fc_pub = fc_key.get_public_key();
+  auto serialized = fc_pub.serialize();
+
+  public_key_type result;
   std::memcpy(result.data.data(), serialized.data, 33);
   return result;
 }
 
-fc::sha256 to_fc_digest(const beekeeper_minimal::digest_type& d)
+signature_type fc_crypto_primitives::sign_compact(const private_key_type& privkey,
+                                                   const digest_type& digest)
 {
-  fc::sha256 result;
-  std::memcpy(result.data(), d.data.data(), 32);
+  auto fc_key = to_fc_private(privkey);
+  fc::sha256 fc_digest;
+  std::memcpy(fc_digest.data(), digest.data.data(), 32);
+
+  auto fc_sig = fc_key.sign_compact(fc_digest);
+
+  signature_type result;
+  std::memcpy(result.data.data(), fc_sig.data, 65);
   return result;
 }
 
-beekeeper_minimal::signature_type from_fc_signature(const fc::ecc::compact_signature& sig)
+sha512_hash fc_crypto_primitives::ecdh_shared_secret(const private_key_type& privkey,
+                                                      const public_key_type& pubkey)
 {
-  beekeeper_minimal::signature_type result;
-  std::memcpy(result.data.data(), sig.data, 65);
+  auto fc_priv = to_fc_private(privkey);
+  auto fc_pub = to_fc_public(pubkey);
+  auto shared = fc_priv.get_shared_secret(fc_pub);
+
+  sha512_hash result;
+  std::memcpy(result.data.data(), shared.data(), 64);
   return result;
 }
 
-// ── FC serialization types (internal only) ───────────────────
-// These mirror the original plain_keys/wallet_data structs but with FC types.
-// They exist ONLY inside this bridge for serialization purposes.
+// ── Base58 ─────────────────────────────────────────────────────
 
-using fc_private_key_type = fc::ecc::private_key;
-using fc_public_key_type  = fc::ecc::public_key;
-using fc_key_data    = std::pair<fc_private_key_type, std::string>;
-using fc_keys_map    = std::map<fc_public_key_type, fc_key_data>;
-
-struct fc_plain_keys
+std::string fc_crypto_primitives::base58_encode(const uint8_t* data, size_t len)
 {
-  fc::sha512    checksum;
-  fc_keys_map   keys;
-};
-
-struct fc_wallet_data
-{
-  std::vector<char> cipher_keys;
-};
-
-fc_keys_map to_fc_keys(const beekeeper_minimal::keys_map& keys)
-{
-  fc_keys_map result;
-  for (auto& [pub, data] : keys)
-    result.emplace(to_fc_public(pub), fc_key_data(to_fc_private(data.first), data.second));
-  return result;
+  return fc::to_base58(reinterpret_cast<const char*>(data),
+                        static_cast<size_t>(len));
 }
 
-beekeeper_minimal::keys_map from_fc_keys(const fc_keys_map& keys)
+std::vector<uint8_t> fc_crypto_primitives::base58_decode(const std::string& str)
 {
-  beekeeper_minimal::keys_map result;
-  for (auto& [pub, data] : keys)
-    result.emplace(from_fc_public(pub),
-                   beekeeper_minimal::key_data(from_fc_private(data.first), data.second));
-  return result;
-}
-
-} // anonymous namespace
-
-FC_REFLECT(fc_plain_keys, (checksum)(keys))
-FC_REFLECT(fc_wallet_data, (cipher_keys))
-
-namespace fc {
-
-inline void from_variant(const fc::variant& var, fc_wallet_data& vo)
-{
-  from_variant(var, vo.cipher_keys);
-}
-
-inline void to_variant(const fc_wallet_data& var, fc::variant& vo)
-{
-  to_variant(var.cipher_keys, vo);
-}
-
-} // namespace fc
-
-namespace beekeeper_minimal {
-
-// ── Key operations ────────────────────────────────────────────
-
-private_key_type fc_crypto_provider::generate_private_key()
-{
-  return from_fc_private(fc::ecc::private_key::generate());
-}
-
-std::optional<private_key_type> fc_crypto_provider::wif_to_key(const std::string& wif)
-{
-  auto key = fc::ecc::private_key::wif_to_key(wif);
-  if (!key.valid())
-    return std::nullopt;
-  return from_fc_private(*key);
-}
-
-std::string fc_crypto_provider::key_to_wif(const private_key_type& key)
-{
-  return to_fc_private(key).key_to_wif();
-}
-
-public_key_type fc_crypto_provider::get_public_key(const private_key_type& key)
-{
-  return from_fc_public(to_fc_private(key).get_public_key());
-}
-
-std::string fc_crypto_provider::public_key_to_string(const public_key_type& key,
-                                                     const std::string& prefix)
-{
-  auto fc_key = to_fc_public(key);
-  return prefix + fc::ecc::public_key::to_base58(fc_key, false);
-}
-
-public_key_type fc_crypto_provider::public_key_from_string(const std::string& str,
-                                                           const std::string& prefix)
-{
-  if (str.substr(0, prefix.size()) != prefix)
-    throw std::invalid_argument("public key requires prefix: " + prefix);
-  return from_fc_public(fc::ecc::public_key::from_base58(str.substr(prefix.size()), false));
-}
-
-// ── Signing ───────────────────────────────────────────────────
-
-signature_type fc_crypto_provider::sign_compact(const private_key_type& key,
-                                                const digest_type& digest)
-{
-  auto fc_sig = to_fc_private(key).sign_compact(to_fc_digest(digest));
-  return from_fc_signature(fc_sig);
-}
-
-// ── Digest / signature hex ────────────────────────────────────
-
-digest_type fc_crypto_provider::digest_from_hex(const std::string& hex)
-{
-  auto fc_digest = fc::sha256(hex);
-  digest_type result;
-  std::memcpy(result.data.data(), fc_digest.data(), 32);
-  return result;
-}
-
-std::string fc_crypto_provider::signature_to_hex(const signature_type& sig)
-{
-  return fc::to_hex(reinterpret_cast<const char*>(sig.data.data()), sig.size());
-}
-
-// ── Wallet encryption ─────────────────────────────────────────
-
-std::vector<char> fc_crypto_provider::encrypt_wallet_data(
-    const std::string& password, const keys_map& keys)
-{
-  auto pw = fc::sha512::hash(password.c_str(), password.size());
-
-  fc_plain_keys pk;
-  pk.checksum = pw;
-  pk.keys = to_fc_keys(keys);
-
-  auto plain_txt = fc::raw::pack_to_vector(pk);
-
-  fc_wallet_data wd;
-  wd.cipher_keys = fc::aes_encrypt(pw, plain_txt);
-
-  std::string json = fc::json::to_pretty_string(wd);
-  return std::vector<char>(json.begin(), json.end());
-}
-
-keys_map fc_crypto_provider::decrypt_wallet_data(
-    const std::string& password, const std::vector<char>& cipher_keys)
-{
-  auto pw = fc::sha512::hash(password.c_str(), password.size());
-
-  std::vector<char> decrypted;
-  try
-  {
-    decrypted = fc::aes_decrypt(pw, cipher_keys);
-  }
-  catch (...)
-  {
-    throw std::runtime_error("Invalid password");
-  }
-
-  // Validate checksum
-  fc::sha512 stored_checksum;
-  fc::raw::unpack_from_vector<fc::sha512>(decrypted, stored_checksum);
-  if (pw != stored_checksum)
-    throw std::runtime_error("Invalid password");
-
-  fc_plain_keys pk;
-  fc::raw::unpack_from_vector<fc_plain_keys>(decrypted, pk, 0, true);
-
-  return from_fc_keys(pk.keys);
-}
-
-std::vector<char> fc_crypto_provider::parse_wallet_file(
-    const std::vector<char>& wallet_file_content)
-{
-  std::string json(wallet_file_content.begin(), wallet_file_content.end());
-  auto wd = fc::json::from_string(json, fc::json::format_validation_mode::full)
-              .as<fc_wallet_data>();
-  return wd.cipher_keys;
-}
-
-void fc_crypto_provider::validate_password(
-    const std::string& password, const std::vector<char>& cipher_keys)
-{
-  // Attempt decryption; throws on failure
-  decrypt_wallet_data(password, cipher_keys);
-}
-
-// ── ECDH ──────────────────────────────────────────────────────
-
-std::string fc_crypto_provider::ecdh_encrypt(
-    const private_key_type& from_key, const public_key_type& to_key,
-    const std::string& content, std::optional<uint64_t> nonce)
-{
-  fc::crypto_data cd;
-  return cd.encrypt(to_fc_private(from_key), to_fc_public(to_key), content, nonce);
-}
-
-std::string fc_crypto_provider::ecdh_decrypt(
-    key_finder_type key_finder, const public_key_type& from_key,
-    const public_key_type& to_key, const std::string& encrypted_content)
-{
-  fc::crypto_data cd;
-
-  // Wrap our key_finder into an FC-typed key_finder
-  fc::crypto_data::key_finder_type fc_finder =
-    [&key_finder](const fc::ecc::public_key& pk) -> fc::optional<fc::ecc::private_key> {
-      auto our_pub = from_fc_public(pk);
-      auto result = key_finder(our_pub);
-      if (result)
-        return to_fc_private(*result);
-      return {};
-    };
-
-  return cd.decrypt(fc_finder, to_fc_public(from_key), to_fc_public(to_key), encrypted_content);
+  auto decoded = fc::from_base58(str);
+  return std::vector<uint8_t>(decoded.begin(), decoded.end());
 }
 
 } // namespace beekeeper_minimal

@@ -2,7 +2,7 @@ import { BeekeeperError } from "./errors.js";
 import { BeekeeperApi } from "./api.js";
 import { IBeekeeperInfo, IBeekeeperInstance, IBeekeeperSession, IBeekeeperWallet, IWalletCreated } from "./interfaces.js";
 import { BeekeeperLockedWallet, BeekeeperUnlockedWallet } from "./wallet.js";
-import { safeWasmCall } from './util/wasm_error.js';
+import { safeAsyncWasmCall, safeWasmCall } from './util/wasm_error.js';
 
 interface IBeekeeperWalletPassword {
   password: string;
@@ -46,14 +46,16 @@ export class BeekeeperSession implements IBeekeeperSession {
     return Array.from(this.wallets.values());
   }
 
-  public createWallet(name: string, password?: string, isTemporary?: boolean): IWalletCreated {
+  public async createWallet(name: string, password?: string, isTemporary?: boolean): Promise<IWalletCreated> {
     if (isTemporary === undefined)
       isTemporary = this.api.isInMemory;
 
-    if(typeof password === 'string')
-      this.api.extract(safeWasmCall(() => this.api.api.create(this.token, name, password as string) as string, `wallet '${name}' creation`));
-    else {
-      const result = this.api.extract(safeWasmCall(() => this.api.api.create(this.token, name) as string, `wallet '${name}' creation`)) as IBeekeeperWalletPassword;
+    if(typeof password === 'string') {
+      const json = await safeAsyncWasmCall(() => this.api.api.create(this.token, name, password as string) as string, `wallet '${name}' creation`);
+      this.api.extract(json);
+    } else {
+      const json = await safeAsyncWasmCall(() => this.api.api.create(this.token, name) as string, `wallet '${name}' creation`);
+      const result = this.api.extract(json) as IBeekeeperWalletPassword;
       ({ password } = result);
     }
 
@@ -87,18 +89,18 @@ export class BeekeeperSession implements IBeekeeperSession {
     this.api.extract(safeWasmCall(() => this.api.api.close(this.token, name) as string, `wallet '${name}' closing`));
   }
 
-  public lockAll(): Array<IBeekeeperWallet> {
+  public async lockAll(): Promise<Array<IBeekeeperWallet>> {
     const wallets = Array.from(this.wallets.values());
     for(const wallet of wallets)
       if(typeof wallet.unlocked !== 'undefined')
-        wallet.unlocked.lock();
+        await wallet.unlocked.lock();
 
     return wallets;
   }
 
-  public close(): IBeekeeperInstance {
+  public async close(): Promise<IBeekeeperInstance> {
     for(const wallet of this.wallets.values())
-      wallet.close();
+      await wallet.close();
 
     this.api.closeSession(this.token);
 

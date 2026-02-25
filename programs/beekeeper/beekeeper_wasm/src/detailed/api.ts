@@ -1,6 +1,7 @@
 import type { MainModule, beekeeper_api } from "../build/beekeeper_wasm.common";
 
 import { BeekeeperError } from "./errors.js";
+import type { ICryptoCallbacks } from "./crypto.js";
 import type { IStorageCallbacks } from "./fs.js";
 import { IBeekeeperInstance, IBeekeeperOptions, IBeekeeperSession } from "./interfaces.js";
 import { BeekeeperSession } from "./session.js";
@@ -15,13 +16,17 @@ export class BeekeeperApi implements IBeekeeperInstance {
   public readonly isInMemory: boolean;
   public readonly storageCallbacks: IStorageCallbacks;
 
+  private readonly crypto: ICryptoCallbacks;
+
   public constructor(
     private readonly provider: MainModule,
     private readonly options: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'>,
-    storage: IStorageCallbacks
+    storage: IStorageCallbacks,
+    crypto: ICryptoCallbacks
   ) {
     this.isInMemory = Boolean(options.inMemory);
     this.storageCallbacks = storage;
+    this.crypto = crypto;
   }
 
   public getVersion(): string {
@@ -51,6 +56,7 @@ export class BeekeeperApi implements IBeekeeperInstance {
     this.api = new this.provider.beekeeper_api(
       this.storageCallbacks.save_fn,
       this.storageCallbacks.load_fn,
+      this.crypto,
       this.options.unlockTimeout
     );
   }
@@ -73,7 +79,7 @@ export class BeekeeperApi implements IBeekeeperInstance {
 
   public async delete(): Promise<void> {
     for(const session of this.sessions.values())
-      session.close();
+      await session.close();
 
     safeWasmCall(() => this.api.delete(), "WASM api deletion");
   }

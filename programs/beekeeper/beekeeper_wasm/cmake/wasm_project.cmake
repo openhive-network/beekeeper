@@ -1,14 +1,5 @@
-set(HIVE_BUILD_ON_MINIMAL_FC ON)
-set(BOOST_COMPONENTS)
-LIST(APPEND BOOST_COMPONENTS
-  chrono
-  date_time
-  filesystem
-  program_options
-  system)
-# Paths adjusted for beekeeper standalone repo structure
-include( ${CMAKE_CURRENT_LIST_DIR}/../../../../libraries/plugins/cmake/hive_targets.cmake )
-add_subdirectory( ${CMAKE_CURRENT_LIST_DIR}/../../../../libraries/plugins/libraries/fc build_fc_minimal )
+# Minimal WASM build configuration — no FC, no Boost, no OpenSSL.
+# All crypto primitives are provided by JS callbacks.
 
 set(WASM_RUNTIME_COMPONENT_NAME "wasm_runtime_components")
 
@@ -18,19 +9,6 @@ function( DEFINE_WASM_TARGET_FOR wasm_target_basename )
   set(multiValueArgs LINK_LIBRARIES LINK_OPTIONS)
   cmake_parse_arguments(PARSE_ARGV 0 arg
     "${options}" "${oneValueArgs}" "${multiValueArgs}"
-  )
-
-  # Override common options specific to exception handling for **WHOLE SET OF HIVE SPECIFIC MODULES**
-  TARGET_COMPILE_OPTIONS( CommonBuildOptions INTERFACE
-    -Oz
-    -fwasm-exceptions
-  )
-  TARGET_LINK_OPTIONS( CommonBuildOptions INTERFACE
-    -Oz
-    -fwasm-exceptions
-    -sEXPORT_EXCEPTION_HANDLING_HELPERS=1
-    -sEXCEPTION_STACK_TRACES=1
-    -sELIMINATE_DUPLICATE_FUNCTIONS=1
   )
 
   set( exec_wasm_name "${wasm_target_basename}.${arg_TARGET_ENVIRONMENT}" )
@@ -52,12 +30,22 @@ function( DEFINE_WASM_TARGET_FOR wasm_target_basename )
 
   target_include_directories( ${exec_wasm_name} PUBLIC ${INCLUDES} )
 
+  target_compile_options( ${exec_wasm_name} PUBLIC
+    -Oz
+  )
+
   target_link_libraries( ${exec_wasm_name} PUBLIC embind )
-  # add -sASSERTIONS to `target_link_options` if you want more information
-  # INITIAL_MEMORY by default = 16777216
+
   target_link_options( ${exec_wasm_name} PUBLIC
+    -Oz
+    -sDISABLE_EXCEPTION_CATCHING=0
+    -sEXPORT_EXCEPTION_HANDLING_HELPERS=1
+    -sEXCEPTION_STACK_TRACES=1
+    -sELIMINATE_DUPLICATE_FUNCTIONS=1
     -sMODULARIZE=1 -sSINGLE_FILE=0 -sUSE_ES6_IMPORT_META=1
     -sEXPORT_ES6=1 -sINITIAL_MEMORY=67108864 -sWASM_ASYNC_COMPILATION=1
+    -sNO_FILESYSTEM=1
+    -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=65536
     --minify=0 --emit-symbol-map -sENVIRONMENT=${WASM_ENV}
     --emit-tsd "${CMAKE_CURRENT_BINARY_DIR}/${exec_common_name}.d.ts"
   )

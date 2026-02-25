@@ -1,52 +1,49 @@
 #pragma once
 
-#include <core_minimal/crypto_provider.hpp>
+#include <core_minimal/crypto_provider_impl.hpp>
+#include <core_minimal/crypto_primitives.hpp>
 
 namespace beekeeper_minimal {
 
-/// crypto_provider implementation backed by the FC library.
-/// Handles all FC type conversions internally.
-class fc_crypto_provider final : public crypto_provider
+/// Low-level crypto primitives backed by the FC library (OpenSSL / secp256k1).
+/// All high-level methods (wallet encryption, ECDH messaging, WIF, etc.) are
+/// inherited from crypto_provider_impl.
+class fc_crypto_primitives final : public crypto_primitives
 {
 public:
-  fc_crypto_provider() = default;
+  digest_type sha256(const uint8_t* data, size_t len) override;
+  sha512_hash sha512(const uint8_t* data, size_t len) override;
+  std::array<uint8_t, 20> ripemd160(const uint8_t* data, size_t len) override;
 
-  // ── Key operations ──────────────────────────────────────────
+  std::vector<uint8_t> aes256_cbc_encrypt(
+      const uint8_t* key, const uint8_t* iv,
+      const uint8_t* data, size_t len) override;
+  std::vector<uint8_t> aes256_cbc_decrypt(
+      const uint8_t* key, const uint8_t* iv,
+      const uint8_t* data, size_t len) override;
+
   private_key_type generate_private_key() override;
-  std::optional<private_key_type> wif_to_key(const std::string& wif) override;
-  std::string key_to_wif(const private_key_type& key) override;
-  public_key_type get_public_key(const private_key_type& key) override;
-  std::string public_key_to_string(const public_key_type& key,
-                                   const std::string& prefix) override;
-  public_key_type public_key_from_string(const std::string& str,
-                                         const std::string& prefix) override;
+  public_key_type get_public_key(const private_key_type& privkey) override;
+  signature_type sign_compact(const private_key_type& privkey,
+                               const digest_type& digest) override;
 
-  // ── Signing ─────────────────────────────────────────────────
-  signature_type sign_compact(const private_key_type& key,
-                              const digest_type& digest) override;
+  sha512_hash ecdh_shared_secret(const private_key_type& privkey,
+                                  const public_key_type& pubkey) override;
 
-  // ── Digest / signature hex ──────────────────────────────────
-  digest_type digest_from_hex(const std::string& hex) override;
-  std::string signature_to_hex(const signature_type& sig) override;
+  std::string base58_encode(const uint8_t* data, size_t len) override;
+  std::vector<uint8_t> base58_decode(const std::string& str) override;
+};
 
-  // ── Wallet encryption ───────────────────────────────────────
-  std::vector<char> encrypt_wallet_data(const std::string& password,
-                                        const keys_map& keys) override;
-  keys_map decrypt_wallet_data(const std::string& password,
-                               const std::vector<char>& cipher_keys) override;
-  std::vector<char> parse_wallet_file(const std::vector<char>& wallet_file_content) override;
-  void validate_password(const std::string& password,
-                         const std::vector<char>& cipher_keys) override;
+/// Full crypto_provider backed by FC.
+/// Inherits all high-level logic from crypto_provider_impl,
+/// primitives from fc_crypto_primitives.
+class fc_crypto_provider final : public crypto_provider_impl
+{
+public:
+  fc_crypto_provider();
 
-  // ── ECDH ────────────────────────────────────────────────────
-  std::string ecdh_encrypt(const private_key_type& from_key,
-                           const public_key_type& to_key,
-                           const std::string& content,
-                           std::optional<uint64_t> nonce) override;
-  std::string ecdh_decrypt(key_finder_type key_finder,
-                           const public_key_type& from_key,
-                           const public_key_type& to_key,
-                           const std::string& encrypted_content) override;
+private:
+  fc_crypto_primitives prims_;
 };
 
 } // namespace beekeeper_minimal

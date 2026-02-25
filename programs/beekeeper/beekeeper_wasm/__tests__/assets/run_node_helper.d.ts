@@ -1,4 +1,5 @@
 import { beekeeper_api, MainModule } from "../../dist/build/beekeeper_wasm.common.js";
+import type { ICryptoCallbacks } from "../../src/detailed/crypto.js";
 
 export declare class ExtractError extends Error {
   constructor(parsed: object);
@@ -22,6 +23,8 @@ export declare class BeekeeperInstanceHelper {
 
   public set setAcceptError(acceptError: boolean);
 
+  public static cryptoCallbacks: ICryptoCallbacks | undefined;
+
   public static createInMemoryStorage(): IStorageFns & { store: Map<string, Uint8Array> };
 
   public static for(provider: MainModule): IBeekeeperInstanceHelperConstructorSimplified;
@@ -36,17 +39,17 @@ export declare class BeekeeperInstanceHelper {
 
   public hasMatchingPrivateKey(token: string, walletName: string, publicKey: string): boolean;
 
-  public create(sessionToken: string, walletName: string): string;
+  public create(sessionToken: string, walletName: string): Promise<string>;
 
-  public create_with_password(sessionToken: string, walletName: string, explicitPassword: string): string;
+  public create_with_password(sessionToken: string, walletName: string, explicitPassword: string): Promise<string>;
 
-  public importKey(sessionToken: string, walletName: string, key: string): string;
+  public importKey(sessionToken: string, walletName: string, key: string): Promise<string>;
 
-  public removeKey(sessionToken: string, walletName: string, key: string): string;
+  public removeKey(sessionToken: string, walletName: string, key: string): Promise<string>;
 
-  public encryptData(sessionToken: string, walletName: string, fromPublicKey: string, toPublicKey: string, content: string, nonce?: number): string;
+  public encryptData(sessionToken: string, walletName: string, fromPublicKey: string, toPublicKey: string, content: string, nonce?: number): Promise<string>;
 
-  public decryptData(sessionToken: string, walletName: string, fromPublicKey: string, toPublicKey: string, encryptedContent: string): string;
+  public decryptData(sessionToken: string, walletName: string, fromPublicKey: string, toPublicKey: string, encryptedContent: string): Promise<string>;
 
   public signDigest(sessionToken: string, sigDigest: string, publicKey: string): string;
 
@@ -58,11 +61,11 @@ export declare class BeekeeperInstanceHelper {
 
   public close(sessionToken: string, walletName: string): string;
 
-  public unlock(sessionToken: string, walletName: string, explicitPassword: string): string;
+  public unlock(sessionToken: string, walletName: string, explicitPassword: string): Promise<string>;
 
-  public lock(sessionToken: string, walletName: string): string;
+  public lock(sessionToken: string, walletName: string): Promise<string>;
 
-  public lockAll(sessionToken: string): string;
+  public lockAll(sessionToken: string): Promise<string>;
 
   public deleteInstance(): void;
 }

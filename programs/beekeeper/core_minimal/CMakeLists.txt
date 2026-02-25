@@ -4,6 +4,7 @@ add_library( beekeeper_core_minimal
              wallet.cpp
              session.cpp
              beekeeper.cpp
+             crypto_provider_impl.cpp
              ${HEADERS}
            )
 

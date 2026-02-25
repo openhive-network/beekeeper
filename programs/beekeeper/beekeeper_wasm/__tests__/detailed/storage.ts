@@ -22,8 +22,8 @@ const saveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeep
 
     const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn });
 
-    api.create_with_password(api.implicitSessionToken, "w0", "badf00d");
-    api.importKey(api.implicitSessionToken, "w0", "5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT");
+    await api.create_with_password(api.implicitSessionToken, "w0", "badf00d");
+    await api.importKey(api.implicitSessionToken, "w0", "5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT");
 
     await storage.syncToIdb();
 
@@ -47,7 +47,7 @@ const retrieveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['bee
     const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn });
 
     api.open(api.implicitSessionToken, "w0");
-    api.unlock(api.implicitSessionToken, "w0", "badf00d");
+    await api.unlock(api.implicitSessionToken, "w0", "badf00d");
 
     const keys = api.getPublicKeys(api.implicitSessionToken);
 
@@ -80,7 +80,7 @@ test.describe('WASM storage tests', () => {
 
       const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn });
 
-      api.create_with_password(api.implicitSessionToken, "test_wallet", "pass123");
+      await api.create_with_password(api.implicitSessionToken, "test_wallet", "pass123");
 
       await storage.syncToIdb();
 
@@ -136,7 +136,7 @@ test.describe('WASM storage tests', () => {
       // In a fresh context there should be no wallets — opening "w0" should fail
       try {
         api.open(api.implicitSessionToken, "w0");
-        api.unlock(api.implicitSessionToken, "w0", "badf00d");
+        await api.unlock(api.implicitSessionToken, "w0", "badf00d");
         return false; // Wallet found — not expected in a fresh context
       } catch {
         return true; // Expected — no wallet file exists

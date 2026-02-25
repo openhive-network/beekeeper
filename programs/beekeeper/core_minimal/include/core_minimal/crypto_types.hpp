@@ -44,6 +44,9 @@ using private_key_type = byte_array<32>;
 /// 65-byte compact recoverable signature (replaces fc::ecc::compact_signature)
 using signature_type   = byte_array<65>;
 
+/// 64-byte hash (replaces fc::sha512)
+using sha512_hash      = byte_array<64>;
+
 /// (private_key, public_key_prefix)
 using key_data = std::pair<private_key_type, std::string>;
 

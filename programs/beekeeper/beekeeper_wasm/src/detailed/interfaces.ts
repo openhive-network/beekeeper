@@ -13,7 +13,7 @@ export interface IWallet {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  close(): IBeekeeperSession;
+  close(): Promise<IBeekeeperSession>;
 
   /**
    * Name of this wallet
@@ -117,7 +117,7 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  lock(): IBeekeeperWallet;
+  lock(): Promise<IBeekeeperWallet>;
 
   /**
    * Imports given private key to this wallet and returns the associated public key for further use
@@ -128,7 +128,7 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  importKey(wifKey: string): TPublicKey;
+  importKey(wifKey: string): Promise<TPublicKey>;
 
   /**
    * Removes given key from this wallet
@@ -137,7 +137,7 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    *
    * @throws {BeekeeperError} if key not found or on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  removeKey(publicKey: TPublicKey): void;
+  removeKey(publicKey: TPublicKey): Promise<void>;
 
   /**
    * Checks if this wallet has a private key matching the given public key
@@ -182,7 +182,7 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error, fs sync error etc.)
    */
-  encryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): string;
+  encryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): Promise<string>;
 
   /**
    * Decrypts given data from a specific entity and returns the decrypted message
@@ -195,7 +195,7 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error, fs sync error etc.)
    */
-  decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): string;
+  decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): Promise<string>;
 }
 
 export interface IBeekeeperWallet extends IWallet {
@@ -208,7 +208,7 @@ export interface IBeekeeperWallet extends IWallet {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  unlock(password: string): IBeekeeperUnlockedWallet;
+  unlock(password: string): Promise<IBeekeeperUnlockedWallet>;
 
   /**
    * Indicates if the wallet is unlocked. If the wallet is locked, this property will be undefined. IBeekeeperUnlockedWallet type otherwise
@@ -274,11 +274,11 @@ export interface IBeekeeperSession {
    * @param {?string} password password used for creation of a wallet. Should be strong enough to protect your keys.
    *                           If not provided, safe password is automatically generated and returned.
    *
-   * @returns {IWalletCreated} the created unlocked Beekeeper wallet object
+   * @returns {Promise<IWalletCreated>} the created unlocked Beekeeper wallet object
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  createWallet(name: string, password?: string): IWalletCreated;
+  createWallet(name: string, password?: string): Promise<IWalletCreated>;
 
   /**
    * Creates a new Beekeeper wallet object owned by this session
@@ -287,11 +287,11 @@ export interface IBeekeeperSession {
    * @param {string | undefined} password password used for creation of a wallet. Should be strong enough to protect your keys. Provide undefined to auto-generate a safe password.
    * @param {?boolean} isTemporary If `true` the wallet exists only in memory otherwise is saved into persistent storage. (defaults to `true` when {@link IBeekeeperOptions inMemory} is enabled, and `false` otherwise)
    *
-   * @returns {IWalletCreated} the created unlocked Beekeeper wallet object
+   * @returns {Promise<IWalletCreated>} the created unlocked Beekeeper wallet object
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  createWallet(name: string, password: string | undefined, isTemporary?: boolean): IWalletCreated;
+  createWallet(name: string, password: string | undefined, isTemporary?: boolean): Promise<IWalletCreated>;
 
   /**
    * Opens Beekeeper wallet object owned by this session
@@ -311,7 +311,7 @@ export interface IBeekeeperSession {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  lockAll(): Array<IBeekeeperWallet>;
+  lockAll(): Promise<Array<IBeekeeperWallet>>;
 
   /**
    * Locks all of the unlocked wallets, closes them, closes this session and makes it unusable
@@ -320,7 +320,7 @@ export interface IBeekeeperSession {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  close(): IBeekeeperInstance;
+  close(): Promise<IBeekeeperInstance>;
 }
 
 export interface IBeekeeperInstance {

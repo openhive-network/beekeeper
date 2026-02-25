@@ -2,13 +2,13 @@
 
 #include <core_minimal/beekeeper.hpp>
 #include <core_minimal/wallet_storage.hpp>
-#include <fc_crypto_bridge/fc_crypto_provider.hpp>
+#include <beekeeper_wasm/wasm_crypto_primitives.hpp>
 
 #include <emscripten/val.h>
 
 #include <string>
 #include <vector>
-#include <functional>
+#include <stdexcept>
 
 namespace beekeeper_wasm {
 
@@ -36,8 +36,10 @@ class beekeeper_api final
 public:
   /// @param save_fn         JS callback: (name: string, data: Uint8Array) => void
   /// @param load_fn         JS callback: (name: string) => Uint8Array  (throws if not found)
+  /// @param crypto          JS object with async hash/AES methods (sha256, sha512, aes256CbcEncrypt/Decrypt)
   /// @param unlock_timeout  Inactivity timeout in seconds (default 900)
-  beekeeper_api(emscripten::val save_fn, emscripten::val load_fn, uint32_t unlock_timeout);
+  beekeeper_api(emscripten::val save_fn, emscripten::val load_fn,
+                emscripten::val crypto, uint32_t unlock_timeout);
 
   // ── session ──────────────────────────────────────────────
 
@@ -90,12 +92,20 @@ public:
 private:
   static constexpr const char* prefix_ = "STM";
 
-  beekeeper_minimal::fc_crypto_provider  crypto_;
+  wasm_crypto_provider                   crypto_;
   js_callback_storage                    storage_;
   beekeeper_minimal::beekeeper           bk_;
 
   /// Runs fn() and wraps the result in {"result":...} / {"error":...}
-  std::string wrap(std::function<std::string()> fn);
+  template<typename F>
+  std::string wrap(F&& fn)
+  {
+    try { return fn(); }
+    catch (const std::exception& e) { return error_json(e.what()); }
+    catch (...) { return error_json("unknown exception"); }
+  }
+
+  static std::string error_json(const std::string& msg);
 };
 
 } // namespace beekeeper_wasm

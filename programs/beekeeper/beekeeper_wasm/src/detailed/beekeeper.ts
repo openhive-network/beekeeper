@@ -1,6 +1,7 @@
 import type Beekeeper from "../build/beekeeper_wasm.common";
 
 import { BeekeeperApi } from "./api.js";
+import { createCryptoCallbacks } from "./crypto.js";
 import type { IStorageCallbacks } from "./fs.js";
 import { createInMemoryStorage } from "./fs.js";
 import { IBeekeeperInstance, IBeekeeperOptions } from "./interfaces.js";
@@ -27,8 +28,10 @@ const createBeekeeper = async(
 
   const storage: IStorageCallbacks = mergedOptions.inMemory ? createInMemoryStorage() : (mergedOptions.storage ?? createInMemoryStorage());
 
+  const crypto = createCryptoCallbacks();
+
   const beekeeperProvider = await safeAsyncWasmCall(() => beekeeperContstructor(ModuleExt), "Beekeeper WASM module loading");
-  const api = new BeekeeperApi(beekeeperProvider, mergedOptions, storage);
+  const api = new BeekeeperApi(beekeeperProvider, mergedOptions, storage, crypto);
 
   api.init();
 

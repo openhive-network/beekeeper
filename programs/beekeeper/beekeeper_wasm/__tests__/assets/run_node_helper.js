@@ -16,6 +16,9 @@ export class BeekeeperInstanceHelper {
 
   static #passwords = new Map();
 
+  /** Crypto callbacks for the WASM beekeeper_api constructor (4th arg). */
+  static cryptoCallbacks = undefined;
+
   // Getters for private properties:
 
   get implicitSessionToken() {
@@ -112,7 +115,11 @@ export class BeekeeperInstanceHelper {
   constructor(provider, options, storageFns) {
     const { unlockTimeout } = BeekeeperInstanceHelper.#parseOptions(options);
     const { save_fn, load_fn } = storageFns || BeekeeperInstanceHelper.createInMemoryStorage();
-    this.#instance = new provider.beekeeper_api(save_fn, load_fn, unlockTimeout);
+    const crypto = BeekeeperInstanceHelper.cryptoCallbacks;
+    if (crypto)
+      this.#instance = new provider.beekeeper_api(save_fn, load_fn, crypto, unlockTimeout);
+    else
+      this.#instance = new provider.beekeeper_api(save_fn, load_fn, unlockTimeout);
     this.#implicitSessionToken = this.createSessionWithoutSalt();
   }
 
@@ -146,8 +153,8 @@ export class BeekeeperInstanceHelper {
     return value.exists;
   }
 
-  create(sessionToken, walletName) {
-    const returnedValue = this.instance.create(sessionToken, walletName);
+  async create(sessionToken, walletName) {
+    const returnedValue = await this.instance.create(sessionToken, walletName);
 
     if( this.#acceptError )
     {
@@ -162,8 +169,8 @@ export class BeekeeperInstanceHelper {
     }
   }
 
-  create_with_password(sessionToken, walletName, explicitPassword) {
-    const returnedValue = this.instance.create(sessionToken, walletName, explicitPassword);
+  async create_with_password(sessionToken, walletName, explicitPassword) {
+    const returnedValue = await this.instance.create(sessionToken, walletName, explicitPassword);
 
     if( this.#acceptError )
     {
@@ -178,8 +185,8 @@ export class BeekeeperInstanceHelper {
     }
   }
 
-  importKey(sessionToken, walletName, key) {
-    const returnedValue = this.instance.import_key(sessionToken, walletName, key);
+  async importKey(sessionToken, walletName, key) {
+    const returnedValue = await this.instance.import_key(sessionToken, walletName, key);
 
     if( this.#acceptError )
     {
@@ -198,18 +205,18 @@ export class BeekeeperInstanceHelper {
    * @param {string} walletName
    * @param {string} key
    */
-  removeKey(sessionToken, walletName, key) {
-    const returnedValue = this.instance.remove_key(sessionToken, walletName, key);
+  async removeKey(sessionToken, walletName, key) {
+    const returnedValue = await this.instance.remove_key(sessionToken, walletName, key);
 
     return this.#extract(returnedValue);
   }
 
-  encryptData(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce) {
+  async encryptData(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce) {
     let returnedValue;
     if (nonce !== undefined)
-      returnedValue = this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce);
+      returnedValue = await this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce);
     else
-      returnedValue = this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content);
+      returnedValue = await this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content);
 
     if( this.#acceptError )
     {
@@ -223,8 +230,8 @@ export class BeekeeperInstanceHelper {
     }
   }
 
-  decryptData(sessionToken, walletName, fromPublicKey, toPublicKey, encryptedContent) {
-    const returnedValue = this.instance.decrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, encryptedContent);
+  async decryptData(sessionToken, walletName, fromPublicKey, toPublicKey, encryptedContent) {
+    const returnedValue = await this.instance.decrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, encryptedContent);
 
     if( this.#acceptError )
     {
@@ -282,21 +289,21 @@ export class BeekeeperInstanceHelper {
    * @param {string} walletName
    * @param {string | null} explicitPassword
    */
-  unlock(sessionToken, walletName, explicitPassword = null) {
+  async unlock(sessionToken, walletName, explicitPassword = null) {
     const pass = ( explicitPassword == null ) ? BeekeeperInstanceHelper.#getPassword(walletName) : explicitPassword;
-    const returnedValue = this.instance.unlock(sessionToken, walletName, pass);
+    const returnedValue = await this.instance.unlock(sessionToken, walletName, pass);
 
     return this.#extract(returnedValue);
   }
 
-  lock(sessionToken, walletName) {
-    const returnedValue = this.instance.lock(sessionToken, walletName);
+  async lock(sessionToken, walletName) {
+    const returnedValue = await this.instance.lock(sessionToken, walletName);
 
     return this.#extract(returnedValue);
   }
 
-  lockAll(sessionToken) {
-    const returnedValue = this.instance.lock_all(sessionToken);
+  async lockAll(sessionToken) {
+    const returnedValue = await this.instance.lock_all(sessionToken);
 
     return this.#extract(returnedValue);
   }

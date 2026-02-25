@@ -1,7 +1,5 @@
 #include <beekeeper_wasm/beekeeper_wasm_api.hpp>
 
-#include <fc/exception/exception.hpp>
-
 #include <emscripten/val.h>
 
 #include <sstream>
@@ -43,11 +41,6 @@ std::string ok_empty()
   return "{\"result\":\"{}\"}";
 }
 
-std::string error_json(const std::string& msg)
-{
-  return "{\"error\":\"" + json_escape(msg) + "\"}";
-}
-
 } // anon
 
 // ── js_callback_storage ───────────────────────────────────
@@ -84,31 +77,17 @@ std::vector<char> js_callback_storage::load(const std::string& name)
 
 // ── beekeeper_api ──────────────────────────────────────────
 
-beekeeper_api::beekeeper_api(emscripten::val save_fn, emscripten::val load_fn, uint32_t unlock_timeout)
-  : crypto_()
+beekeeper_api::beekeeper_api(emscripten::val save_fn, emscripten::val load_fn,
+                             emscripten::val crypto, uint32_t unlock_timeout)
+  : crypto_(std::move(crypto))
   , storage_(std::move(save_fn), std::move(load_fn))
   , bk_(crypto_, storage_, unlock_timeout)
 {
 }
 
-std::string beekeeper_api::wrap(std::function<std::string()> fn)
+std::string beekeeper_api::error_json(const std::string& msg)
 {
-  try
-  {
-    return fn();
-  }
-  catch (const fc::exception& e)
-  {
-    return error_json(e.to_detail_string());
-  }
-  catch (const std::exception& e)
-  {
-    return error_json(e.what());
-  }
-  catch (...)
-  {
-    return error_json("unknown exception");
-  }
+  return "{\"error\":\"" + json_escape(msg) + "\"}";
 }
 
 // ── session ────────────────────────────────────────────────

@@ -13,12 +13,18 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
       PARAMS:
       save_fn         : JS callback (name: string, data: Uint8Array) => void
       load_fn         : JS callback (name: string) => Uint8Array  (throws if not found)
+      crypto          : JS object with async hash/AES methods:
+                        sha256(Uint8Array) => Promise<Uint8Array>,
+                        sha512(Uint8Array) => Promise<Uint8Array>,
+                        aes256CbcEncrypt(key, iv, data) => Promise<Uint8Array>,
+                        aes256CbcDecrypt(key, iv, data) => Promise<Uint8Array>
+                        (secp256k1, ripemd160, base58 are native in WASM)
       unlock_timeout  : timeout for an unlocked wallet in seconds. Default: `900`
 
       RESULT:
         an instance of a beekeeper (ready to use, no separate init() call needed)
     */
-    .constructor<val, val, uint32_t>()
+    .constructor<val, val, val, uint32_t>()
 
     /*
       ****creation of a session****

@@ -1,5 +1,10 @@
 import { BeekeeperInstanceHelper, ExtractError } from './run_node_helper.js';
 
+async function loadCryptoCallbacks() {
+  const detailedModule = await import('../../dist/bundle/detailed/index.js');
+  return detailedModule.createCryptoCallbacks();
+}
+
 globalThis.createBeekeeperTestFor = async function createBeekeeperTestFor (env) {
   const locBeekeeper = env === 'web' ? '../../dist/bundle/web' : '../../dist/bundle/node';
 
@@ -20,10 +25,15 @@ globalThis.createBeekeeperWasmTestFor = async function createBeekeeperWasmTestFo
   const wasm = await import(locBeekeeperWasm);
 
   const provider = await wasm.default();
+  const cryptoCallbacks = await loadCryptoCallbacks();
+
+  // Set crypto callbacks on the helper so all tests automatically use the 4-arg constructor
+  BeekeeperInstanceHelper.cryptoCallbacks = cryptoCallbacks;
 
   return {
     env,
     provider,
+    cryptoCallbacks,
     ExtractError,
     BeekeeperInstanceHelper
   };
