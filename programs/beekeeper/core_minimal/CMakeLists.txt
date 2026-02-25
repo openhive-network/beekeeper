@@ -7,7 +7,7 @@ add_library( beekeeper_core_minimal
              ${HEADERS}
            )
 
-target_link_libraries( beekeeper_core_minimal fc )
+# No external dependencies — core_minimal is pure C++17
 target_include_directories( beekeeper_core_minimal PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
 INSTALL( TARGETS

@@ -1,11 +1,13 @@
 #include <core_minimal/session.hpp>
 
-#include <fc/crypto/crypto_data.hpp>
+#include <stdexcept>
 
 namespace beekeeper_minimal {
 
-session::session(std::string token, uint32_t unlock_timeout_seconds, wallet_storage* storage)
+session::session(std::string token, uint32_t unlock_timeout_seconds,
+                 crypto_provider& crypto, wallet_storage* storage)
   : token_(std::move(token))
+  , crypto_(crypto)
   , storage_(storage)
   , timeout_(unlock_timeout_seconds)
   , timeout_time_(unlock_timeout_seconds > 0
@@ -30,8 +32,8 @@ void session::check_timeout()
 
 std::string session::gen_password() const
 {
-  auto key = private_key_type::generate();
-  return "PW" + key.key_to_wif();
+  auto key = crypto_.generate_private_key();
+  return "PW" + crypto_.key_to_wif(key);
 }
 
 wallet& session::get_wallet(const std::string& wallet_name)
@@ -62,7 +64,7 @@ std::string session::create_wallet(const std::string& wallet_name,
 
   std::string pw = password.empty() ? gen_password() : password;
 
-  auto [it, _] = wallets_.emplace(wallet_name, wallet(storage_, wallet_name));
+  auto [it, _] = wallets_.emplace(wallet_name, wallet(crypto_, storage_, wallet_name));
   it->second.create(pw);
 
   return pw;
@@ -75,7 +77,7 @@ void session::open_wallet(const std::string& wallet_name)
   if (wallets_.count(wallet_name))
     return; // already loaded
 
-  auto [it, _] = wallets_.emplace(wallet_name, wallet(storage_, wallet_name));
+  auto [it, _] = wallets_.emplace(wallet_name, wallet(crypto_, storage_, wallet_name));
   it->second.open(); // loads from storage, remains locked
 }
 
@@ -160,7 +162,7 @@ signature_type session::sign_digest(const std::string& wallet_name,
     auto sig = get_wallet(wallet_name).try_sign_digest(digest, public_key);
     if (sig)
       return *sig;
-    throw std::runtime_error("Public key " + public_key_to_string(public_key, prefix) +
+    throw std::runtime_error("Public key " + crypto_.public_key_to_string(public_key, prefix) +
                              " not found in wallet " + wallet_name);
   }
 
@@ -172,7 +174,7 @@ signature_type session::sign_digest(const std::string& wallet_name,
       return *sig;
   }
 
-  throw std::runtime_error("Public key " + public_key_to_string(public_key, prefix) +
+  throw std::runtime_error("Public key " + crypto_.public_key_to_string(public_key, prefix) +
                            " not found in any unlocked wallet");
 }
 
@@ -186,8 +188,6 @@ std::string session::encrypt_data(const std::string& wallet_name,
                                   std::optional<uint64_t> nonce)
 {
   refresh_timeout();
-
-  fc::crypto_data cd;
 
   // Find from_key's private key in the named wallet (or all wallets)
   std::optional<private_key_type> priv;
@@ -206,10 +206,10 @@ std::string session::encrypt_data(const std::string& wallet_name,
   }
 
   if (!priv)
-    throw std::runtime_error("Public key " + public_key_to_string(from_key, prefix) +
+    throw std::runtime_error("Public key " + crypto_.public_key_to_string(from_key, prefix) +
                              " not found in " + (wallet_name.empty() ? "any unlocked wallet" : ("wallet " + wallet_name)));
 
-  return cd.encrypt(*priv, to_key, content, nonce);
+  return crypto_.ecdh_encrypt(*priv, to_key, content, nonce);
 }
 
 std::string session::decrypt_data(const std::string& wallet_name,
@@ -220,34 +220,29 @@ std::string session::decrypt_data(const std::string& wallet_name,
 {
   refresh_timeout();
 
-  fc::crypto_data cd;
-
   // Build a key_finder that searches the named wallet (or all wallets)
-  fc::crypto_data::key_finder_type key_finder;
+  crypto_provider::key_finder_type key_finder;
   if (!wallet_name.empty())
   {
     auto& w = get_wallet(wallet_name);
-    key_finder = [&w](const public_key_type& pk) -> fc::optional<private_key_type> {
-      auto priv = w.find_private_key(pk);
-      if (priv)
-        return *priv;
-      return {};
+    key_finder = [&w](const public_key_type& pk) -> std::optional<private_key_type> {
+      return w.find_private_key(pk);
     };
   }
   else
   {
-    key_finder = [this](const public_key_type& pk) -> fc::optional<private_key_type> {
+    key_finder = [this](const public_key_type& pk) -> std::optional<private_key_type> {
       for (auto& [name, w] : wallets_)
       {
         auto priv = w.find_private_key(pk);
         if (priv)
-          return *priv;
+          return priv;
       }
-      return {};
+      return std::nullopt;
     };
   }
 
-  return cd.decrypt(key_finder, from_key, to_key, encrypted_content);
+  return crypto_.ecdh_decrypt(key_finder, from_key, to_key, encrypted_content);
 }
 
 } // namespace beekeeper_minimal

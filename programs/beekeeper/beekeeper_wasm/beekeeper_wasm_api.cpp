@@ -1,9 +1,6 @@
 #include <beekeeper_wasm/beekeeper_wasm_api.hpp>
 
-#include <core_minimal/types.hpp>
-
-#include <fc/io/json.hpp>
-#include <fc/crypto/hex.hpp>
+#include <fc/exception/exception.hpp>
 
 #include <emscripten/val.h>
 
@@ -88,8 +85,9 @@ std::vector<char> js_callback_storage::load(const std::string& name)
 // ── beekeeper_api ──────────────────────────────────────────
 
 beekeeper_api::beekeeper_api(emscripten::val save_fn, emscripten::val load_fn, uint32_t unlock_timeout)
-  : storage_(std::move(save_fn), std::move(load_fn))
-  , bk_(storage_, unlock_timeout)
+  : crypto_()
+  , storage_(std::move(save_fn), std::move(load_fn))
+  , bk_(crypto_, storage_, unlock_timeout)
 {
 }
 
@@ -219,7 +217,7 @@ std::string beekeeper_api::remove_key(const std::string& token, const std::strin
 {
   return wrap([&]() {
     auto& ses = bk_.get_session(token);
-    auto pk = beekeeper_minimal::public_key_from_string(public_key, prefix_);
+    auto pk = crypto_.public_key_from_string(public_key, prefix_);
     ses.remove_key(wallet_name, pk);
     return ok_empty();
   });
@@ -236,7 +234,7 @@ std::string beekeeper_api::get_public_keys(const std::string& token)
     {
       if (!first) arr += ",";
       first = false;
-      arr += "{\"public_key\":\"" + beekeeper_minimal::public_key_to_string(kv.first, kv.second.second) + "\"}";
+      arr += "{\"public_key\":\"" + crypto_.public_key_to_string(kv.first, kv.second.second) + "\"}";
     }
     arr += "]";
     return ok_json("{\"keys\":" + arr + "}");
@@ -254,7 +252,7 @@ std::string beekeeper_api::get_public_keys(const std::string& token, const std::
     {
       if (!first) arr += ",";
       first = false;
-      arr += "{\"public_key\":\"" + beekeeper_minimal::public_key_to_string(kv.first, kv.second.second) + "\"}";
+      arr += "{\"public_key\":\"" + crypto_.public_key_to_string(kv.first, kv.second.second) + "\"}";
     }
     arr += "]";
     return ok_json("{\"keys\":" + arr + "}");
@@ -267,10 +265,10 @@ std::string beekeeper_api::sign_digest(const std::string& token, const std::stri
 {
   return wrap([&]() {
     auto& ses = bk_.get_session(token);
-    auto pk = beekeeper_minimal::public_key_from_string(public_key, prefix_);
-    auto digest = fc::sha256(sig_digest);
+    auto pk = crypto_.public_key_from_string(public_key, prefix_);
+    auto digest = crypto_.digest_from_hex(sig_digest);
     auto sig = ses.sign_digest("", digest, pk, prefix_);  // empty wallet name → search all
-    auto sig_str = fc::to_hex(reinterpret_cast<const char*>(&sig), sizeof(sig));
+    auto sig_str = crypto_.signature_to_hex(sig);
     return ok_json("{\"signature\":\"" + sig_str + "\"}");
   });
 }
@@ -279,10 +277,10 @@ std::string beekeeper_api::sign_digest(const std::string& token, const std::stri
 {
   return wrap([&]() {
     auto& ses = bk_.get_session(token);
-    auto pk = beekeeper_minimal::public_key_from_string(public_key, prefix_);
-    auto digest = fc::sha256(sig_digest);
+    auto pk = crypto_.public_key_from_string(public_key, prefix_);
+    auto digest = crypto_.digest_from_hex(sig_digest);
     auto sig = ses.sign_digest(wallet_name, digest, pk, prefix_);
-    auto sig_str = fc::to_hex(reinterpret_cast<const char*>(&sig), sizeof(sig));
+    auto sig_str = crypto_.signature_to_hex(sig);
     return ok_json("{\"signature\":\"" + sig_str + "\"}");
   });
 }
@@ -295,8 +293,8 @@ std::string beekeeper_api::encrypt_data(const std::string& token, const std::str
 {
   return wrap([&]() {
     auto& ses = bk_.get_session(token);
-    auto from_pk = beekeeper_minimal::public_key_from_string(from_key, prefix_);
-    auto to_pk = beekeeper_minimal::public_key_from_string(to_key, prefix_);
+    auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
+    auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
     auto encrypted = ses.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_);
     return ok_json("{\"encrypted_content\":\"" + json_escape(encrypted) + "\"}");
   });
@@ -308,8 +306,8 @@ std::string beekeeper_api::encrypt_data(const std::string& token, const std::str
 {
   return wrap([&]() {
     auto& ses = bk_.get_session(token);
-    auto from_pk = beekeeper_minimal::public_key_from_string(from_key, prefix_);
-    auto to_pk = beekeeper_minimal::public_key_from_string(to_key, prefix_);
+    auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
+    auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
     auto encrypted = ses.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
     return ok_json("{\"encrypted_content\":\"" + json_escape(encrypted) + "\"}");
   });
@@ -321,8 +319,8 @@ std::string beekeeper_api::decrypt_data(const std::string& token, const std::str
 {
   return wrap([&]() {
     auto& ses = bk_.get_session(token);
-    auto from_pk = beekeeper_minimal::public_key_from_string(from_key, prefix_);
-    auto to_pk = beekeeper_minimal::public_key_from_string(to_key, prefix_);
+    auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
+    auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
     auto decrypted = ses.decrypt_data(wallet_name, from_pk, to_pk, encrypted_content, prefix_);
     return ok_json("{\"decrypted_content\":\"" + json_escape(decrypted) + "\"}");
   });
@@ -335,7 +333,7 @@ std::string beekeeper_api::has_matching_private_key(const std::string& token, co
   return wrap([&]() {
     auto& ses = bk_.get_session(token);
     auto keys = ses.get_public_keys(wallet_name);
-    auto pk = beekeeper_minimal::public_key_from_string(public_key, prefix_);
+    auto pk = crypto_.public_key_from_string(public_key, prefix_);
     bool found = keys.find(pk) != keys.end();
     return ok_json(std::string("{\"exists\":") + (found ? "true" : "false") + "}");
   });

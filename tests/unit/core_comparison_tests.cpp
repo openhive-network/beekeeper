@@ -17,8 +17,14 @@
 // ── minimal core ─────────────────────────────────────────────
 #include <core_minimal/beekeeper.hpp>
 
+// ── FC crypto bridge ─────────────────────────────────────────
+#include <fc_crypto_bridge/fc_crypto_provider.hpp>
+
 #include <fc/io/json.hpp>
+#include <fc/io/raw.hpp>
 #include <fc/crypto/elliptic.hpp>
+#include <fc/crypto/aes.hpp>
+#include <fc/crypto/hex.hpp>
 #include <fc/filesystem.hpp>
 
 #include <fstream>
@@ -29,6 +35,36 @@
 // ─────────────────────────────────────────────────────────────
 
 namespace {
+
+/// Shared crypto provider for all tests
+beekeeper_minimal::fc_crypto_provider crypto;
+
+/// Convert an FC public key to a core_minimal public_key_type via string round-trip
+beekeeper_minimal::public_key_type to_min_pubkey(const fc::ecc::public_key& fc_pub,
+                                                  const std::string& prefix = "STM")
+{
+  auto str = beekeeper::utility::public_key::to_string(fc_pub, prefix);
+  return crypto.public_key_from_string(str, prefix);
+}
+
+/// Convert an FC sha256 to a core_minimal digest_type
+beekeeper_minimal::digest_type to_min_digest(const fc::sha256& fc_dig)
+{
+  auto hex = fc_dig.str();
+  return crypto.digest_from_hex(hex);
+}
+
+/// Convert an FC compact_signature to a hex string for comparison
+std::string fc_sig_to_hex(const fc::ecc::compact_signature& sig)
+{
+  return fc::to_hex(reinterpret_cast<const char*>(&sig), sizeof(sig));
+}
+
+/// Convert a core_minimal signature_type to a hex string for comparison
+std::string min_sig_to_hex(const beekeeper_minimal::signature_type& sig)
+{
+  return crypto.signature_to_hex(sig);
+}
 
 /// An in-memory wallet_storage for core_minimal tests.
 /// Stores blobs in a map keyed by path.
@@ -72,6 +108,26 @@ struct tmp_dir
   }
 };
 
+/// File-based wallet_storage for cross-load tests
+struct file_storage : beekeeper_minimal::wallet_storage
+{
+  void save(const std::string& path, const std::vector<char>& buf) override
+  {
+    std::ofstream f(path, std::ios::binary);
+    f.write(buf.data(), buf.size());
+  }
+  std::vector<char> load(const std::string& path) override
+  {
+    std::ifstream f(path, std::ios::binary | std::ios::ate);
+    if (!f) throw std::runtime_error("Cannot open: " + path);
+    auto sz = f.tellg();
+    f.seekg(0);
+    std::vector<char> buf(sz);
+    f.read(buf.data(), sz);
+    return buf;
+  }
+};
+
 } // anon
 
 // ─────────────────────────────────────────────────────────────
@@ -96,26 +152,9 @@ BOOST_AUTO_TEST_CASE(cross_load_original_to_minimal)
   auto orig_keys = original.get_keys_details();
 
   // ── minimal: load same file via storage ──
-  struct file_storage : beekeeper_minimal::wallet_storage
-  {
-    void save(const std::string& path, const std::vector<char>& buf) override
-    {
-      std::ofstream f(path, std::ios::binary);
-      f.write(buf.data(), buf.size());
-    }
-    std::vector<char> load(const std::string& path) override
-    {
-      std::ifstream f(path, std::ios::binary | std::ios::ate);
-      if (!f) throw std::runtime_error("Cannot open: " + path);
-      auto sz = f.tellg();
-      f.seekg(0);
-      std::vector<char> buf(sz);
-      f.read(buf.data(), sz);
-      return buf;
-    }
-  } fs;
+  file_storage fs;
 
-  beekeeper_minimal::wallet minimal(&fs, wallet_file);
+  beekeeper_minimal::wallet minimal(crypto, &fs, wallet_file);
   minimal.open();
   BOOST_REQUIRE(minimal.is_locked());
 
@@ -125,13 +164,14 @@ BOOST_AUTO_TEST_CASE(cross_load_original_to_minimal)
   auto& min_keys = minimal.get_keys();
   BOOST_REQUIRE_EQUAL(min_keys.size(), orig_keys.size());
 
-  // Verify every key pair matches
-  for (auto& [pub, data] : orig_keys)
+  // Verify every key pair matches (compare via WIF string)
+  for (auto& [fc_pub, fc_data] : orig_keys)
   {
-    auto it = min_keys.find(pub);
+    auto min_pub = to_min_pubkey(fc_pub);
+    auto it = min_keys.find(min_pub);
     BOOST_REQUIRE(it != min_keys.end());
-    BOOST_REQUIRE_EQUAL(it->second.first.key_to_wif(), data.first.key_to_wif());
-    BOOST_REQUIRE_EQUAL(it->second.second, data.second);
+    BOOST_REQUIRE_EQUAL(crypto.key_to_wif(it->second.first), fc_data.first.key_to_wif());
+    BOOST_REQUIRE_EQUAL(it->second.second, fc_data.second);
   }
 }
 
@@ -142,26 +182,9 @@ BOOST_AUTO_TEST_CASE(cross_load_minimal_to_original)
   auto wallet_file = (td.dir / "cross2").string();
 
   // ── minimal: create, import, persist ──
-  struct file_storage : beekeeper_minimal::wallet_storage
-  {
-    void save(const std::string& path, const std::vector<char>& buf) override
-    {
-      std::ofstream f(path, std::ios::binary);
-      f.write(buf.data(), buf.size());
-    }
-    std::vector<char> load(const std::string& path) override
-    {
-      std::ifstream f(path, std::ios::binary | std::ios::ate);
-      if (!f) throw std::runtime_error("Cannot open: " + path);
-      auto sz = f.tellg();
-      f.seekg(0);
-      std::vector<char> buf(sz);
-      f.read(buf.data(), sz);
-      return buf;
-    }
-  } fs;
+  file_storage fs;
 
-  beekeeper_minimal::wallet minimal(&fs, wallet_file);
+  beekeeper_minimal::wallet minimal(crypto, &fs, wallet_file);
   minimal.create(password);
   std::string pub1_min = minimal.import_key(wif_key1, prefix);
   std::string pub2_min = minimal.import_key(wif_key2, prefix);
@@ -179,12 +202,14 @@ BOOST_AUTO_TEST_CASE(cross_load_minimal_to_original)
   auto orig_keys = original.get_keys_details();
   BOOST_REQUIRE_EQUAL(orig_keys.size(), min_keys.size());
 
-  for (auto& [pub, data] : min_keys)
+  for (auto& [min_pub, min_data] : min_keys)
   {
-    auto it = orig_keys.find(pub);
+    auto pub_str = crypto.public_key_to_string(min_pub, prefix);
+    auto fc_pub = beekeeper::utility::public_key::create(pub_str, prefix);
+    auto it = orig_keys.find(fc_pub);
     BOOST_REQUIRE(it != orig_keys.end());
-    BOOST_REQUIRE_EQUAL(it->second.first.key_to_wif(), data.first.key_to_wif());
-    BOOST_REQUIRE_EQUAL(it->second.second, data.second);
+    BOOST_REQUIRE_EQUAL(it->second.first.key_to_wif(), crypto.key_to_wif(min_data.first));
+    BOOST_REQUIRE_EQUAL(it->second.second, min_data.second);
   }
 }
 
@@ -195,7 +220,7 @@ BOOST_AUTO_TEST_CASE(encryption_decryption_equivalence)
   memory_storage ms;
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "enc_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "enc_test");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
   w_min.import_key(wif_key2, prefix);
@@ -250,15 +275,17 @@ BOOST_AUTO_TEST_CASE(sign_digest_same_result)
   BOOST_REQUIRE(sig_orig.has_value());
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "sign_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "sign_test");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
 
-  auto sig_min = w_min.try_sign_digest(digest, pub1);
+  auto min_pub1 = to_min_pubkey(pub1);
+  auto min_digest = to_min_digest(digest);
+  auto sig_min = w_min.try_sign_digest(min_digest, min_pub1);
   BOOST_REQUIRE(sig_min.has_value());
 
-  // sign_compact is deterministic for the same key + digest
-  BOOST_REQUIRE(*sig_orig == *sig_min);
+  // Compare via hex string
+  BOOST_REQUIRE_EQUAL(fc_sig_to_hex(*sig_orig), min_sig_to_hex(*sig_min));
 }
 
 /// 5. Both produce the same public key string from an imported WIF key
@@ -273,7 +300,7 @@ BOOST_AUTO_TEST_CASE(import_key_same_public_key)
   std::string pub_orig = original.import_key(wif_key1, prefix);
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "import_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "import_test");
   w_min.create(password);
   std::string pub_min = w_min.import_key(wif_key1, prefix);
 
@@ -299,7 +326,7 @@ BOOST_AUTO_TEST_CASE(lock_unlock_preserves_keys)
   auto orig_keys = original.get_keys_details();
 
   // ── minimal (in-memory) ──
-  beekeeper_minimal::wallet w_min(&ms, "lock_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "lock_test");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
   w_min.import_key(wif_key2, prefix);
@@ -311,11 +338,12 @@ BOOST_AUTO_TEST_CASE(lock_unlock_preserves_keys)
   auto& min_keys = w_min.get_keys();
 
   BOOST_REQUIRE_EQUAL(orig_keys.size(), min_keys.size());
-  for (auto& [pub, data] : orig_keys)
+  for (auto& [fc_pub, fc_data] : orig_keys)
   {
-    auto it = min_keys.find(pub);
+    auto min_pub = to_min_pubkey(fc_pub);
+    auto it = min_keys.find(min_pub);
     BOOST_REQUIRE(it != min_keys.end());
-    BOOST_REQUIRE_EQUAL(it->second.first.key_to_wif(), data.first.key_to_wif());
+    BOOST_REQUIRE_EQUAL(crypto.key_to_wif(it->second.first), fc_data.first.key_to_wif());
   }
 }
 
@@ -326,6 +354,7 @@ BOOST_AUTO_TEST_CASE(remove_key_same_result)
 
   auto priv2 = fc::ecc::private_key::wif_to_key(wif_key2).value();
   auto pub2  = priv2.get_public_key();
+  auto min_pub2 = to_min_pubkey(pub2);
 
   // ── original ──
   beekeeper::wallet_content_handler original(true);
@@ -338,12 +367,12 @@ BOOST_AUTO_TEST_CASE(remove_key_same_result)
   auto orig_keys = original.get_keys_details();
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "remove_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "remove_test");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
   w_min.import_key(wif_key2, prefix);
   w_min.import_key(wif_key3, prefix);
-  w_min.remove_key(pub2);
+  w_min.remove_key(min_pub2);
   auto& min_keys = w_min.get_keys();
 
   BOOST_REQUIRE_EQUAL(orig_keys.size(), 2u);
@@ -351,13 +380,14 @@ BOOST_AUTO_TEST_CASE(remove_key_same_result)
 
   // key2 should be gone in both
   BOOST_REQUIRE(orig_keys.find(pub2) == orig_keys.end());
-  BOOST_REQUIRE(min_keys.find(pub2) == min_keys.end());
+  BOOST_REQUIRE(min_keys.find(min_pub2) == min_keys.end());
 
-  for (auto& [pub, data] : orig_keys)
+  for (auto& [fc_pub, fc_data] : orig_keys)
   {
-    auto it = min_keys.find(pub);
+    auto min_pub = to_min_pubkey(fc_pub);
+    auto it = min_keys.find(min_pub);
     BOOST_REQUIRE(it != min_keys.end());
-    BOOST_REQUIRE_EQUAL(it->second.first.key_to_wif(), data.first.key_to_wif());
+    BOOST_REQUIRE_EQUAL(crypto.key_to_wif(it->second.first), fc_data.first.key_to_wif());
   }
 }
 
@@ -377,7 +407,7 @@ BOOST_AUTO_TEST_CASE(wrong_password_throws_in_both)
   BOOST_REQUIRE(original.is_locked());
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "badpw_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "badpw_test");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
   w_min.lock();
@@ -396,6 +426,9 @@ BOOST_AUTO_TEST_CASE(has_matching_private_key_agrees)
   auto priv3 = fc::ecc::private_key::wif_to_key(wif_key3).value();
   auto pub3  = priv3.get_public_key();
 
+  auto min_pub1 = to_min_pubkey(pub1);
+  auto min_pub3 = to_min_pubkey(pub3);
+
   // ── original ──
   beekeeper::wallet_content_handler original(true);
   original.set_password(password);
@@ -406,12 +439,12 @@ BOOST_AUTO_TEST_CASE(has_matching_private_key_agrees)
   BOOST_REQUIRE(!original.has_matching_private_key(pub3));
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "has_key_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "has_key_test");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
 
-  BOOST_REQUIRE(w_min.has_private_key(pub1));
-  BOOST_REQUIRE(!w_min.has_private_key(pub3));
+  BOOST_REQUIRE(w_min.has_private_key(min_pub1));
+  BOOST_REQUIRE(!w_min.has_private_key(min_pub3));
 }
 
 /// 10. Session-level: sign_digest across multiple wallets gives same result
@@ -425,8 +458,11 @@ BOOST_AUTO_TEST_CASE(session_sign_across_wallets)
   auto pub3  = priv3.get_public_key();
   auto digest = fc::sha256::hash("session sign test data");
 
+  auto min_pub3 = to_min_pubkey(pub3);
+  auto min_digest = to_min_digest(digest);
+
   // ── minimal session ──
-  beekeeper_minimal::beekeeper bk(ms, 900);
+  beekeeper_minimal::beekeeper bk(crypto, ms, 900);
   auto token = bk.create_session("test-salt");
   auto& sess = bk.get_session(token);
 
@@ -436,7 +472,7 @@ BOOST_AUTO_TEST_CASE(session_sign_across_wallets)
   sess.import_key("w2", wif_key3, prefix);
 
   // Sign without specifying wallet (searches all)
-  auto sig_min = sess.sign_digest("", digest, pub3, prefix);
+  auto sig_min = sess.sign_digest("", min_digest, min_pub3, prefix);
 
   // ── original (direct wallet) ──
   beekeeper::wallet_content_handler original(true);
@@ -446,7 +482,7 @@ BOOST_AUTO_TEST_CASE(session_sign_across_wallets)
   auto sig_orig = original.try_sign_digest(digest, pub3);
   BOOST_REQUIRE(sig_orig.has_value());
 
-  BOOST_REQUIRE(sig_min == *sig_orig);
+  BOOST_REQUIRE_EQUAL(min_sig_to_hex(sig_min), fc_sig_to_hex(*sig_orig));
 }
 
 /// 11. Verify check_password works identically
@@ -464,7 +500,7 @@ BOOST_AUTO_TEST_CASE(check_password_equivalence)
   BOOST_REQUIRE_THROW(original.check_password("wrong"), fc::exception);
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "checkpw_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "checkpw_test");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
 
@@ -496,7 +532,7 @@ BOOST_AUTO_TEST_CASE(bulk_import_same_keys)
   auto orig_keys = original.get_keys_details();
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "bulk_test");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "bulk_test");
   w_min.create(password);
   for (auto& wif : wif_keys)
     w_min.import_key(wif, prefix);
@@ -505,12 +541,13 @@ BOOST_AUTO_TEST_CASE(bulk_import_same_keys)
   BOOST_REQUIRE_EQUAL(orig_keys.size(), min_keys.size());
   BOOST_REQUIRE_EQUAL(orig_keys.size(), 10u);
 
-  for (auto& [pub, data] : orig_keys)
+  for (auto& [fc_pub, fc_data] : orig_keys)
   {
-    auto it = min_keys.find(pub);
+    auto min_pub = to_min_pubkey(fc_pub);
+    auto it = min_keys.find(min_pub);
     BOOST_REQUIRE(it != min_keys.end());
-    BOOST_REQUIRE_EQUAL(it->second.first.key_to_wif(), data.first.key_to_wif());
-    BOOST_REQUIRE_EQUAL(it->second.second, data.second);
+    BOOST_REQUIRE_EQUAL(crypto.key_to_wif(it->second.first), fc_data.first.key_to_wif());
+    BOOST_REQUIRE_EQUAL(it->second.second, fc_data.second);
   }
 }
 
@@ -535,7 +572,7 @@ BOOST_AUTO_TEST_CASE(multi_key_sign_digest)
   original.import_key(wif_key3, prefix);
 
   // ── minimal ──
-  beekeeper_minimal::wallet w_min(&ms, "multi_sign");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "multi_sign");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
   w_min.import_key(wif_key2, prefix);
@@ -555,10 +592,12 @@ BOOST_AUTO_TEST_CASE(multi_key_sign_digest)
   for (auto& tc : cases)
   {
     auto sig_orig = original.try_sign_digest(tc.digest, tc.pub);
-    auto sig_min  = w_min.try_sign_digest(tc.digest, tc.pub);
+    auto min_pub = to_min_pubkey(tc.pub);
+    auto min_dig = to_min_digest(tc.digest);
+    auto sig_min  = w_min.try_sign_digest(min_dig, min_pub);
     BOOST_REQUIRE(sig_orig.has_value());
     BOOST_REQUIRE(sig_min.has_value());
-    BOOST_REQUIRE(*sig_orig == *sig_min);
+    BOOST_REQUIRE_EQUAL(fc_sig_to_hex(*sig_orig), min_sig_to_hex(*sig_min));
   }
 }
 
@@ -573,23 +612,27 @@ BOOST_AUTO_TEST_CASE(sign_missing_key_returns_nullopt)
   auto pub3  = priv3.get_public_key();
   auto digest = fc::sha256::hash("test");
 
+  auto min_pub1 = to_min_pubkey(pub1);
+  auto min_pub3 = to_min_pubkey(pub3);
+  auto min_digest = to_min_digest(digest);
+
   // Only import key1
   beekeeper::wallet_content_handler original(true);
   original.set_password(password);
   original.unlock(password);
   original.import_key(wif_key1, prefix);
 
-  beekeeper_minimal::wallet w_min(&ms, "missing_key");
+  beekeeper_minimal::wallet w_min(crypto, &ms, "missing_key");
   w_min.create(password);
   w_min.import_key(wif_key1, prefix);
 
   // key3 not imported → nullopt
   BOOST_REQUIRE(!original.try_sign_digest(digest, pub3).has_value());
-  BOOST_REQUIRE(!w_min.try_sign_digest(digest, pub3).has_value());
+  BOOST_REQUIRE(!w_min.try_sign_digest(min_digest, min_pub3).has_value());
 
   // key1 is present → has value
   BOOST_REQUIRE(original.try_sign_digest(digest, pub1).has_value());
-  BOOST_REQUIRE(w_min.try_sign_digest(digest, pub1).has_value());
+  BOOST_REQUIRE(w_min.try_sign_digest(min_digest, min_pub1).has_value());
 }
 
 // ─────────────────────────────────────────────────────────────

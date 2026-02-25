@@ -5,8 +5,10 @@
 
 namespace beekeeper_minimal {
 
-beekeeper::beekeeper(wallet_storage& storage, uint32_t unlock_timeout_sec)
-  : storage_(storage)
+beekeeper::beekeeper(crypto_provider& crypto, wallet_storage& storage,
+                     uint32_t unlock_timeout_sec)
+  : crypto_(crypto)
+  , storage_(storage)
   , unlock_timeout_sec_(unlock_timeout_sec)
 {
 }
@@ -43,7 +45,7 @@ std::string beekeeper::create_session(const std::string& salt)
   while (sessions_.count(token))
     token = generate_token(salt);
 
-  sessions_.emplace(token, session(token, unlock_timeout_sec_, &storage_));
+  sessions_.emplace(token, session(token, unlock_timeout_sec_, crypto_, &storage_));
   return token;
 }
 

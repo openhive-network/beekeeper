@@ -2,6 +2,7 @@
 
 #include <core_minimal/beekeeper.hpp>
 #include <core_minimal/wallet_storage.hpp>
+#include <fc_crypto_bridge/fc_crypto_provider.hpp>
 
 #include <emscripten/val.h>
 
@@ -89,8 +90,9 @@ public:
 private:
   static constexpr const char* prefix_ = "STM";
 
-  js_callback_storage            storage_;
-  beekeeper_minimal::beekeeper   bk_;
+  beekeeper_minimal::fc_crypto_provider  crypto_;
+  js_callback_storage                    storage_;
+  beekeeper_minimal::beekeeper           bk_;
 
   /// Runs fn() and wraps the result in {"result":...} / {"error":...}
   std::string wrap(std::function<std::string()> fn);

@@ -74,9 +74,12 @@ if(BUILD_TESTS)
   )
   target_include_directories(beekeeper_wasm_native PUBLIC
     programs/beekeeper/beekeeper_wasm/include
+    programs/beekeeper/core_minimal/include
+    programs/beekeeper/fc_crypto_bridge/include
   )
   target_link_libraries(beekeeper_wasm_native PUBLIC
     beekeeper_core
+    fc_crypto_bridge
   )
 
   add_subdirectory(tests)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core_minimal/wallet.hpp>
+#include <core_minimal/crypto_provider.hpp>
 
 #include <chrono>
 #include <map>
@@ -16,8 +17,10 @@ public:
 
   /// @param token           Unique session identifier.
   /// @param unlock_timeout  Inactivity timeout (seconds) before all wallets are locked. 0 = never.
+  /// @param crypto          Crypto provider hooks.
   /// @param storage         FS hooks forwarded to wallets.
-  session(std::string token, uint32_t unlock_timeout_seconds, wallet_storage* storage);
+  session(std::string token, uint32_t unlock_timeout_seconds,
+          crypto_provider& crypto, wallet_storage* storage);
 
   const std::string& get_token() const;
 
@@ -86,6 +89,7 @@ private:
   std::string gen_password() const;
 
   std::string                              token_;
+  crypto_provider&                         crypto_;
   wallet_storage*                          storage_;
   std::map<std::string, wallet>            wallets_;
 

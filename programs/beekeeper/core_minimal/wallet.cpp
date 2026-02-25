@@ -1,11 +1,11 @@
 #include <core_minimal/wallet.hpp>
 
-#include <fc/io/json.hpp>
+#include <stdexcept>
 
 namespace beekeeper_minimal {
 
-wallet::wallet(wallet_storage* storage, std::string name)
-  : storage_(storage), name_(std::move(name))
+wallet::wallet(crypto_provider& crypto, wallet_storage* storage, std::string name)
+  : crypto_(crypto), storage_(storage), name_(std::move(name))
 {
 }
 
@@ -13,57 +13,24 @@ const std::string& wallet::get_name() const { return name_; }
 
 // ── helpers ──────────────────────────────────────────────────
 
-bool wallet::is_checksum_valid(const fc::sha512& pw, const std::vector<char>& decrypted) const
-{
-  fc::sha512 stored_checksum;
-  fc::raw::unpack_from_vector<fc::sha512>(decrypted, stored_checksum);
-  return pw == stored_checksum;
-}
-
-std::vector<char> wallet::decrypt_with(const std::string& password) const
-{
-  auto pw = fc::sha512::hash(password.c_str(), password.size());
-
-  std::vector<char> decrypted;
-  try
-  {
-    decrypted = fc::aes_decrypt(pw, wallet_data_.cipher_keys);
-    if (!is_checksum_valid(pw, decrypted))
-      throw std::runtime_error("checksum mismatch");
-  }
-  catch (...)
-  {
-    throw std::runtime_error("Invalid password for wallet: '" + name_ + "'");
-  }
-
-  return decrypted;
-}
-
 void wallet::encrypt_and_save()
 {
-  plain_keys data;
-  data.keys     = keys_;
-  data.checksum = checksum_;
-  auto plain_txt = fc::raw::pack_to_vector(data);
-  wallet_data_.cipher_keys = fc::aes_encrypt(data.checksum, plain_txt);
+  auto wallet_file_content = crypto_.encrypt_wallet_data(password_, keys_);
+
+  wallet_data_.cipher_keys = crypto_.parse_wallet_file(wallet_file_content);
 
   if (storage_)
-  {
-    std::string json = fc::json::to_pretty_string(wallet_data_);
-    std::vector<char> buf(json.begin(), json.end());
-    storage_->save(name_, buf);
-  }
+    storage_->save(name_, wallet_file_content);
 }
 
 // ── lifecycle ────────────────────────────────────────────────
 
 void wallet::create(const std::string& password)
 {
-  checksum_ = fc::sha512::hash(password.c_str(), password.size());
-  // Start with empty keys, encrypt, save, then remain unlocked
+  password_ = password;
+  unlocked_ = true;
   keys_.clear();
   encrypt_and_save();
-  // wallet is now unlocked (checksum_ is set, keys_ is accessible)
 }
 
 void wallet::open()
@@ -72,11 +39,11 @@ void wallet::open()
     throw std::runtime_error("Cannot open wallet without storage");
 
   auto buf = storage_->load(name_);
-  std::string json(buf.begin(), buf.end());
-  wallet_data_ = fc::json::from_string(json, fc::json::format_validation_mode::full).as<wallet_data>();
-  // Remains locked until unlock() is called
+  wallet_data_.cipher_keys = crypto_.parse_wallet_file(buf);
+
   keys_.clear();
-  checksum_ = fc::sha512();
+  password_.clear();
+  unlocked_ = false;
 }
 
 void wallet::unlock(const std::string& password)
@@ -84,13 +51,11 @@ void wallet::unlock(const std::string& password)
   if (!is_locked())
     throw std::runtime_error("Wallet is already unlocked: " + name_);
 
-  auto decrypted = decrypt_with(password);
+  // decrypt_wallet_data throws on bad password
+  keys_ = crypto_.decrypt_wallet_data(password, wallet_data_.cipher_keys);
 
-  plain_keys pk;
-  fc::raw::unpack_from_vector<plain_keys>(decrypted, pk, 0, true);
-
-  keys_     = std::move(pk.keys);
-  checksum_ = pk.checksum;
+  password_ = password;
+  unlocked_ = true;
 }
 
 void wallet::lock()
@@ -104,17 +69,18 @@ void wallet::lock()
     kv.second = key_data(private_key_type(), "");
 
   keys_.clear();
-  checksum_ = fc::sha512();
+  password_.clear();
+  unlocked_ = false;
 }
 
 bool wallet::is_locked() const
 {
-  return checksum_ == fc::sha512();
+  return !unlocked_;
 }
 
 void wallet::check_password(const std::string& password) const
 {
-  decrypt_with(password); // throws on bad password
+  crypto_.validate_password(password, wallet_data_.cipher_keys);
 }
 
 // ── key management ───────────────────────────────────────────
@@ -124,12 +90,12 @@ std::string wallet::import_key(const std::string& wif_key, const std::string& pr
   if (is_locked())
     throw std::runtime_error("Wallet is locked: " + name_);
 
-  auto priv = private_key_type::wif_to_key(wif_key);
-  if (!priv.valid())
+  auto priv = crypto_.wif_to_key(wif_key);
+  if (!priv)
     throw std::runtime_error("Invalid WIF key");
 
-  auto pub = priv->get_public_key();
-  std::string pub_str = public_key_to_string(pub, prefix);
+  auto pub = crypto_.get_public_key(*priv);
+  std::string pub_str = crypto_.public_key_to_string(pub, prefix);
 
   if (keys_.find(pub) == keys_.end())
   {
@@ -189,7 +155,7 @@ std::optional<signature_type> wallet::try_sign_digest(const digest_type& digest,
   if (it == keys_.end())
     return std::nullopt;
 
-  return it->second.first.sign_compact(digest);
+  return crypto_.sign_compact(it->second.first, digest);
 }
 
 } // namespace beekeeper_minimal

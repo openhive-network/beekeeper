@@ -2,19 +2,24 @@
 
 #include <core_minimal/types.hpp>
 #include <core_minimal/wallet_storage.hpp>
+#include <core_minimal/crypto_provider.hpp>
 
 #include <memory>
 
 namespace beekeeper_minimal {
 
 /// A single wallet: password-based AES encryption of private keys.
-/// All persistence is delegated to the wallet_storage hooks.
+/// All persistence is delegated to wallet_storage hooks.
+/// All crypto is delegated to crypto_provider hooks.
 class wallet
 {
 public:
+  /// @param crypto   Crypto hooks (encrypt, decrypt, sign, etc.).
   /// @param storage  FS hooks (save/load). nullptr for in-memory-only wallets.
   /// @param name     Logical wallet name (used as storage path/identifier).
-  explicit wallet(wallet_storage* storage = nullptr, std::string name = "");
+  explicit wallet(crypto_provider& crypto,
+                  wallet_storage* storage = nullptr,
+                  std::string name = "");
 
   const std::string& get_name() const;
 
@@ -64,15 +69,15 @@ public:
 
 private:
   void encrypt_and_save();
-  std::vector<char> decrypt_with(const std::string& password) const;
-  bool is_checksum_valid(const fc::sha512& pw, const std::vector<char>& decrypted) const;
 
+  crypto_provider&   crypto_;
   wallet_storage*    storage_;
   std::string        name_;
 
   wallet_data        wallet_data_;   // encrypted blob
   keys_map           keys_;          // plaintext keys (empty when locked)
-  fc::sha512         checksum_;      // sha512(password), zero when locked
+  std::string        password_;      // stored while unlocked, cleared on lock
+  bool               unlocked_{false};
 };
 
 } // namespace beekeeper_minimal

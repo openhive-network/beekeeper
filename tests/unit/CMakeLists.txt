@@ -56,11 +56,13 @@ target_include_directories(core_comparison_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/programs/beekeeper/core/include
     ${CMAKE_SOURCE_DIR}/programs/beekeeper/core_minimal/include
+    ${CMAKE_SOURCE_DIR}/programs/beekeeper/fc_crypto_bridge/include
 )
 
 target_link_libraries(core_comparison_test PRIVATE
     beekeeper_core
     beekeeper_core_minimal
+    fc_crypto_bridge
     fc
     Boost::unit_test_framework
 )
