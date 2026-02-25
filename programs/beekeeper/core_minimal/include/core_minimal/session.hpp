@@ -60,6 +60,25 @@ public:
                              const public_key_type& public_key,
                              const std::string& prefix);
 
+  // ── encrypt / decrypt ───────────────────────────────────────
+
+  /// Encrypt data using ECDH between from_key and to_key.
+  /// Searches the named wallet (or all wallets if name is empty) for from_key's private key.
+  std::string encrypt_data(const std::string& wallet_name,
+                           const public_key_type& from_key,
+                           const public_key_type& to_key,
+                           const std::string& content,
+                           const std::string& prefix,
+                           std::optional<uint64_t> nonce = {});
+
+  /// Decrypt data using ECDH between from_key and to_key.
+  /// Searches the named wallet (or all wallets if name is empty) for the matching private key.
+  std::string decrypt_data(const std::string& wallet_name,
+                           const public_key_type& from_key,
+                           const public_key_type& to_key,
+                           const std::string& encrypted_content,
+                           const std::string& prefix);
+
 private:
   void refresh_timeout();
   wallet& get_wallet(const std::string& wallet_name);

@@ -1,5 +1,7 @@
 #include <core_minimal/session.hpp>
 
+#include <fc/crypto/crypto_data.hpp>
+
 namespace beekeeper_minimal {
 
 session::session(std::string token, uint32_t unlock_timeout_seconds, wallet_storage* storage)
@@ -172,6 +174,80 @@ signature_type session::sign_digest(const std::string& wallet_name,
 
   throw std::runtime_error("Public key " + public_key_to_string(public_key, prefix) +
                            " not found in any unlocked wallet");
+}
+
+// ── encrypt / decrypt ────────────────────────────────────────
+
+std::string session::encrypt_data(const std::string& wallet_name,
+                                  const public_key_type& from_key,
+                                  const public_key_type& to_key,
+                                  const std::string& content,
+                                  const std::string& prefix,
+                                  std::optional<uint64_t> nonce)
+{
+  refresh_timeout();
+
+  fc::crypto_data cd;
+
+  // Find from_key's private key in the named wallet (or all wallets)
+  std::optional<private_key_type> priv;
+  if (!wallet_name.empty())
+  {
+    priv = get_wallet(wallet_name).find_private_key(from_key);
+  }
+  else
+  {
+    for (auto& [name, w] : wallets_)
+    {
+      priv = w.find_private_key(from_key);
+      if (priv)
+        break;
+    }
+  }
+
+  if (!priv)
+    throw std::runtime_error("Public key " + public_key_to_string(from_key, prefix) +
+                             " not found in " + (wallet_name.empty() ? "any unlocked wallet" : ("wallet " + wallet_name)));
+
+  return cd.encrypt(*priv, to_key, content, nonce);
+}
+
+std::string session::decrypt_data(const std::string& wallet_name,
+                                  const public_key_type& from_key,
+                                  const public_key_type& to_key,
+                                  const std::string& encrypted_content,
+                                  const std::string& prefix)
+{
+  refresh_timeout();
+
+  fc::crypto_data cd;
+
+  // Build a key_finder that searches the named wallet (or all wallets)
+  fc::crypto_data::key_finder_type key_finder;
+  if (!wallet_name.empty())
+  {
+    auto& w = get_wallet(wallet_name);
+    key_finder = [&w](const public_key_type& pk) -> fc::optional<private_key_type> {
+      auto priv = w.find_private_key(pk);
+      if (priv)
+        return *priv;
+      return {};
+    };
+  }
+  else
+  {
+    key_finder = [this](const public_key_type& pk) -> fc::optional<private_key_type> {
+      for (auto& [name, w] : wallets_)
+      {
+        auto priv = w.find_private_key(pk);
+        if (priv)
+          return *priv;
+      }
+      return {};
+    };
+  }
+
+  return cd.decrypt(key_finder, from_key, to_key, encrypted_content);
 }
 
 } // namespace beekeeper_minimal

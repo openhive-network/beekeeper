@@ -21,6 +21,14 @@ interface IHasMatchingPrivateKey {
   exists: boolean;
 }
 
+interface IEncryptedContent {
+  encrypted_content: string;
+}
+
+interface IDecryptedContent {
+  decrypted_content: string;
+}
+
 export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   public constructor(
     private readonly api: BeekeeperApi,
@@ -30,6 +38,10 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
 
   get name(): string {
     return this.locked.name;
+  }
+
+  get isTemporary(): boolean {
+    return this.locked.isTemporary;
   }
 
   public lock(): BeekeeperLockedWallet {
@@ -72,6 +84,26 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return result.keys.map(value => value.public_key);
   }
 
+  public encryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): string {
+    const toKey = anotherKey ?? key;
+    const result = this.api.extract(safeWasmCall(() => {
+      if (nonce !== undefined)
+        return this.api.api.encrypt_data(this.session.token, this.locked.name, key, toKey, content, nonce) as string;
+      return this.api.api.encrypt_data(this.session.token, this.locked.name, key, toKey, content) as string;
+    }, `encrypting data in wallet '${this.locked.name}'`)) as IEncryptedContent;
+
+    return result.encrypted_content;
+  }
+
+  public decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): string {
+    const toKey = anotherKey ?? key;
+    const result = this.api.extract(safeWasmCall(() =>
+      this.api.api.decrypt_data(this.session.token, this.locked.name, key, toKey, content) as string,
+    `decrypting data in wallet '${this.locked.name}'`)) as IDecryptedContent;
+
+    return result.decrypted_content;
+  }
+
   public close(): IBeekeeperSession {
     return this.locked.close();
   }
@@ -83,7 +115,8 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
   public constructor(
     private readonly api: BeekeeperApi,
     private readonly session: BeekeeperSession,
-    public readonly name: string
+    public readonly name: string,
+    public readonly isTemporary: boolean
   ) {}
 
   public unlock(password: string): IBeekeeperUnlockedWallet {

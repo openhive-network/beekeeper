@@ -51,6 +51,10 @@ public:
 
   bool has_private_key(const public_key_type& public_key) const;
 
+  /// Look up the private key that corresponds to the given public key.
+  /// Returns nullopt if locked or key not found.
+  std::optional<private_key_type> find_private_key(const public_key_type& public_key) const;
+
   // ── signing ────────────────────────────────────────────────
 
   /// Sign a digest with the private key that corresponds to the given public key.

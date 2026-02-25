@@ -287,6 +287,47 @@ std::string beekeeper_api::sign_digest(const std::string& token, const std::stri
   });
 }
 
+// ── encrypt / decrypt ───────────────────────────────────────
+
+std::string beekeeper_api::encrypt_data(const std::string& token, const std::string& wallet_name,
+                                        const std::string& from_key, const std::string& to_key,
+                                        const std::string& content)
+{
+  return wrap([&]() {
+    auto& ses = bk_.get_session(token);
+    auto from_pk = beekeeper_minimal::public_key_from_string(from_key, prefix_);
+    auto to_pk = beekeeper_minimal::public_key_from_string(to_key, prefix_);
+    auto encrypted = ses.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_);
+    return ok_json("{\"encrypted_content\":\"" + json_escape(encrypted) + "\"}");
+  });
+}
+
+std::string beekeeper_api::encrypt_data(const std::string& token, const std::string& wallet_name,
+                                        const std::string& from_key, const std::string& to_key,
+                                        const std::string& content, uint32_t nonce)
+{
+  return wrap([&]() {
+    auto& ses = bk_.get_session(token);
+    auto from_pk = beekeeper_minimal::public_key_from_string(from_key, prefix_);
+    auto to_pk = beekeeper_minimal::public_key_from_string(to_key, prefix_);
+    auto encrypted = ses.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
+    return ok_json("{\"encrypted_content\":\"" + json_escape(encrypted) + "\"}");
+  });
+}
+
+std::string beekeeper_api::decrypt_data(const std::string& token, const std::string& wallet_name,
+                                        const std::string& from_key, const std::string& to_key,
+                                        const std::string& encrypted_content)
+{
+  return wrap([&]() {
+    auto& ses = bk_.get_session(token);
+    auto from_pk = beekeeper_minimal::public_key_from_string(from_key, prefix_);
+    auto to_pk = beekeeper_minimal::public_key_from_string(to_key, prefix_);
+    auto decrypted = ses.decrypt_data(wallet_name, from_pk, to_pk, encrypted_content, prefix_);
+    return ok_json("{\"decrypted_content\":\"" + json_escape(decrypted) + "\"}");
+  });
+}
+
 // ── query ──────────────────────────────────────────────────
 
 std::string beekeeper_api::has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key)

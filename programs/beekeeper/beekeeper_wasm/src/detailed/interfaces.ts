@@ -22,6 +22,17 @@ export interface IWallet {
    * @readonly
    */
   readonly name: string;
+
+  /**
+   * Indicates if wallet exists only in memory or is saved into persistent storage.
+   *
+   * When the beekeeper is created with `inMemory: true`, all wallets are temporary.
+   * Otherwise defaults to `false` (persistent), overridable per wallet via {@link IBeekeeperSession.createWallet}.
+   *
+   * @type {boolean}
+   * @readonly
+   */
+  readonly isTemporary: boolean;
 };
 
 export interface IBeekeeperInfo {
@@ -159,6 +170,32 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
   getPublicKeys(): TPublicKey[];
+
+  /**
+   * Encrypts given data for a specific entity and returns the encrypted message
+   *
+   * @param {string} content Content to be encrypted. Does not have to be in any specific format. Can contain any characters encodable by JS string (UTF-16 characters)
+   * @param {TPublicKey} key public key in WIF format to find the private key in the wallet and encrypt the data
+   * @param {?TPublicKey} anotherKey other public key in WIF format to find the private key in the wallet and encrypt the data (optional - use if the message is to encrypt for somebody else)
+   * @param {?number} nonce optional nonce to be explicitly specified for encryption. Used for reproducible results. If not provided, random nonce is generated internally
+   * @returns {string} base58 encrypted buffer
+   *
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error, fs sync error etc.)
+   */
+  encryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): string;
+
+  /**
+   * Decrypts given data from a specific entity and returns the decrypted message
+   *
+   * @param {string} content Base58 content to be decrypted
+   * @param {TPublicKey} key public key to find the private key in the wallet and decrypt the data
+   * @param {?TPublicKey} anotherKey other public key to find the private key in the wallet and decrypt the data (optional - use if the message was encrypted for somebody else)
+   *
+   * @returns {string} decrypted buffer as a JS string
+   *
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error, fs sync error etc.)
+   */
+  decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): string;
 }
 
 export interface IBeekeeperWallet extends IWallet {
@@ -209,17 +246,52 @@ export interface IBeekeeperSession {
   getInfo(): IBeekeeperInfo;
 
   /**
+   * Checks if wallet with given name exists
+   *
+   * @param {string} name name of the wallet
+   *
+   * @returns {boolean} `true` if a wallet exists otherwise `false`
+   *
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   */
+  hasWallet(name: string): boolean;
+
+  /**
+   * Lists all of the opened wallets
+   *
+   * @returns {Array<IBeekeeperWallet>} array of opened Beekeeper wallets (either unlocked or locked)
+   *
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   */
+  listWallets(): Array<IBeekeeperWallet>;
+
+  /**
    * Creates a new Beekeeper wallet object owned by this session.
+   * When used in {@link IBeekeeperOptions inMemory} mode, the wallet will be implicitly created as temporary.
+   * The wallet will be created as persistent otherwise.
    *
    * @param {string} name name of wallet
    * @param {?string} password password used for creation of a wallet. Should be strong enough to protect your keys.
    *                           If not provided, safe password is automatically generated and returned.
    *
-   * @returns {Promise<IWalletCreated>} the created unlocked Beekeeper wallet object
+   * @returns {IWalletCreated} the created unlocked Beekeeper wallet object
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  createWallet(name: string, password?: string): Promise<IWalletCreated>;
+  createWallet(name: string, password?: string): IWalletCreated;
+
+  /**
+   * Creates a new Beekeeper wallet object owned by this session
+   *
+   * @param {string} name name of wallet
+   * @param {string | undefined} password password used for creation of a wallet. Should be strong enough to protect your keys. Provide undefined to auto-generate a safe password.
+   * @param {?boolean} isTemporary If `true` the wallet exists only in memory otherwise is saved into persistent storage. (defaults to `true` when {@link IBeekeeperOptions inMemory} is enabled, and `false` otherwise)
+   *
+   * @returns {IWalletCreated} the created unlocked Beekeeper wallet object
+   *
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   */
+  createWallet(name: string, password: string | undefined, isTemporary?: boolean): IWalletCreated;
 
   /**
    * Opens Beekeeper wallet object owned by this session

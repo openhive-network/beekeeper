@@ -167,6 +167,16 @@ bool wallet::has_private_key(const public_key_type& public_key) const
   return keys_.find(public_key) != keys_.end();
 }
 
+std::optional<private_key_type> wallet::find_private_key(const public_key_type& public_key) const
+{
+  if (is_locked())
+    return std::nullopt;
+  auto it = keys_.find(public_key);
+  if (it == keys_.end())
+    return std::nullopt;
+  return it->second.first;
+}
+
 // ── signing ──────────────────────────────────────────────────
 
 std::optional<signature_type> wallet::try_sign_digest(const digest_type& digest,

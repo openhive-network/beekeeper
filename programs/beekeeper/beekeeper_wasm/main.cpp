@@ -102,6 +102,34 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     .function("sign_digest(token, sig_digest, public_key, wallet_name)", select_overload<std::string(const std::string&, const std::string&, const std::string&, const std::string&)>(&beekeeper_api::sign_digest)) //(2)
 
     /*
+      ****encrypting data using ECDH****
+      PARAMS:
+        token:        a token representing a session
+        wallet_name:  a name of wallet containing the private key for from_key
+        from_key:     public key of the sender (private key must be in the wallet)
+        to_key:       public key of the receiver
+        content:      data to encrypt
+        nonce:        optional nonce for deterministic encryption
+      RESULT:
+        {"encrypted_content":"<base58 encoded encrypted data>"}
+    */
+    .function("encrypt_data(token, wallet_name, from_key, to_key, content)", select_overload<std::string(const std::string&, const std::string&, const std::string&, const std::string&, const std::string&)>(&beekeeper_api::encrypt_data))
+    .function("encrypt_data(token, wallet_name, from_key, to_key, content, nonce)", select_overload<std::string(const std::string&, const std::string&, const std::string&, const std::string&, const std::string&, uint32_t)>(&beekeeper_api::encrypt_data))
+
+    /*
+      ****decrypting data using ECDH****
+      PARAMS:
+        token:             a token representing a session
+        wallet_name:       a name of wallet containing the private key
+        from_key:          public key of the sender
+        to_key:            public key of the receiver
+        encrypted_content: base58 encoded encrypted data
+      RESULT:
+        {"decrypted_content":"<decrypted string>"}
+    */
+    .function("decrypt_data(token, wallet_name, from_key, to_key, encrypted_content)", &beekeeper_api::decrypt_data)
+
+    /*
       ****information about a session****
     */
     .function("get_info(token)", &beekeeper_api::get_info)

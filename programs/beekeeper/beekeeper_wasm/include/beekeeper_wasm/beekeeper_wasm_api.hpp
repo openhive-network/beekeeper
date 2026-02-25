@@ -69,6 +69,18 @@ public:
   std::string sign_digest(const std::string& token, const std::string& sig_digest, const std::string& public_key);
   std::string sign_digest(const std::string& token, const std::string& sig_digest, const std::string& public_key, const std::string& wallet_name);
 
+  // ── encrypt / decrypt ────────────────────────────────────
+
+  std::string encrypt_data(const std::string& token, const std::string& wallet_name,
+                           const std::string& from_key, const std::string& to_key,
+                           const std::string& content);
+  std::string encrypt_data(const std::string& token, const std::string& wallet_name,
+                           const std::string& from_key, const std::string& to_key,
+                           const std::string& content, uint32_t nonce);
+  std::string decrypt_data(const std::string& token, const std::string& wallet_name,
+                           const std::string& from_key, const std::string& to_key,
+                           const std::string& encrypted_content);
+
   // ── query ────────────────────────────────────────────────
 
   std::string has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);

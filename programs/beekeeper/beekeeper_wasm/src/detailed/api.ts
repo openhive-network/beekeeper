@@ -12,11 +12,17 @@ export class BeekeeperApi implements IBeekeeperInstance {
 
   public readonly sessions: Map<string, BeekeeperSession> = new Map();
 
+  public readonly isInMemory: boolean;
+  public readonly storageCallbacks: IStorageCallbacks;
+
   public constructor(
     private readonly provider: MainModule,
     private readonly options: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'>,
-    private readonly storage: IStorageCallbacks
-  ) {}
+    storage: IStorageCallbacks
+  ) {
+    this.isInMemory = Boolean(options.inMemory);
+    this.storageCallbacks = storage;
+  }
 
   public getVersion(): string {
     return process.env.npm_package_version as string;
@@ -43,8 +49,8 @@ export class BeekeeperApi implements IBeekeeperInstance {
 
   public init() {
     this.api = new this.provider.beekeeper_api(
-      this.storage.save_fn,
-      this.storage.load_fn,
+      this.storageCallbacks.save_fn,
+      this.storageCallbacks.load_fn,
       this.options.unlockTimeout
     );
   }

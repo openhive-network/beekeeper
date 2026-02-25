@@ -45,18 +45,18 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       const session1 = beekeeper.createSession("avocado1");
       const session2 = beekeeper.createSession("avocado2");
 
-      await session1.createWallet('w0');
-      await session2.createWallet('w1');
+      session1.createWallet('w0');
+      session2.createWallet('w1');
 
       await beekeeper.delete();
     })).resolves.toBeUndefined();
   });
 
   test('Should be able to create a wallet and import and remove keys', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");
 
-      const { wallet: unlocked } = await session.createWallet('w0', 'mypassword');
+      const { wallet: unlocked } = session.createWallet('w0', 'mypassword');
 
       unlocked.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
       unlocked.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
@@ -70,11 +70,11 @@ test.describe('Beekeeper factory tests for Node.js', () => {
   });
 
   test('Should be able to display only private keys in specific wallet', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");
 
-      const { wallet: unlocked1 } = await session.createWallet('w0', 'mypassword');
-      const { wallet: unlocked2 } = await session.createWallet('w1', 'mypassword');
+      const { wallet: unlocked1 } = session.createWallet('w0', 'mypassword');
+      const { wallet: unlocked2 } = session.createWallet('w1', 'mypassword');
 
       unlocked1.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
       unlocked2.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
@@ -86,10 +86,10 @@ test.describe('Beekeeper factory tests for Node.js', () => {
   });
 
   test('Should be able to create a wallet, import keys and check if matching key exists', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");
 
-      const { wallet: unlocked } = await session.createWallet('w0', 'mypassword');
+      const { wallet: unlocked } = session.createWallet('w0', 'mypassword');
 
       unlocked.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
 
@@ -100,10 +100,10 @@ test.describe('Beekeeper factory tests for Node.js', () => {
   });
 
   test('Should not be able to import keys after closing a wallet', async ({ beekeeperTest }) => {
-    await expect(beekeeperTest(async ({ beekeeper }) => {
+    await expect(beekeeperTest(({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");
 
-      const { wallet: unlocked } = await session.createWallet('w0', 'mypassword');
+      const { wallet: unlocked } = session.createWallet('w0', 'mypassword');
 
       unlocked.close();
 
@@ -116,7 +116,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       const bk = await provider.default({ inMemory: true, enableLogs: false });
 
       const session = bk.createSession("my.salt");
-      const { wallet } = await session.createWallet('tmp', 'mypassword');
+      const { wallet } = session.createWallet('tmp', 'mypassword');
 
       const publicKey = wallet.importKey('5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n');
 
@@ -130,15 +130,141 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     expect(retVal).toBe("1f17cc07f7c769073d39fac3385220b549e261fb33c5f619c5dced7f5b0fe9c0954f2684e703710840b7ea01ad7238b8db1d8a9309d03e93de212f86de38d66f21");
   });
 
+  test('Should wallet be a temporary wallet when inMemory is true', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ provider }) => {
+      const bk = await provider.default({ inMemory: true, enableLogs: false });
+      const session = bk.createSession("my.salt");
+
+      const { wallet: unlocked } = session.createWallet('w0', 'mypassword');
+
+      return unlocked.isTemporary;
+    });
+
+    expect(retVal).toBeTruthy();
+  });
+
+  test('Should wallet not be temporary by default', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      const { wallet: unlocked } = session.createWallet('w0', 'mypassword');
+
+      return unlocked.isTemporary;
+    });
+
+    expect(retVal).toBeFalsy();
+  });
+
+  test('Should be able to create an explicitly temporary wallet', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      const { wallet: unlocked } = session.createWallet('w0', 'mypassword', true);
+
+      return unlocked.isTemporary;
+    });
+
+    expect(retVal).toBeTruthy();
+  });
+
+  test('Should have a wallet via hasWallet after creation', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      session.createWallet('w0', 'mypassword');
+
+      return session.hasWallet('w0');
+    });
+
+    expect(retVal).toBeTruthy();
+  });
+
+  test('Should not have a non-existent wallet via hasWallet', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      return session.hasWallet('nonexistent');
+    });
+
+    expect(retVal).toBeFalsy();
+  });
+
+  test('Should be able to create multiple wallets and access them using listWallets references', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      session.createWallet('w0', 'mypassword');
+      session.createWallet('w1', 'mypassword');
+      session.createWallet('w2', 'mypassword');
+
+      return session.listWallets().map(value => value.name);
+    });
+
+    expect(retVal).toStrictEqual(['w0','w1','w2']);
+  });
+
+  test('Should be able to encrypt and decrypt data (round-trip)', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = session.createWallet('w0', 'mypassword');
+
+      const key = wallet.importKey('5KLytoW1AiGSoHHBA73x1AmgZnN16QDgU1SPpG9Vd2dpdiBgSYw');
+
+      const encrypted = wallet.encryptData("hello beekeeper", key, undefined, 12345);
+      const decrypted = wallet.decryptData(encrypted, key);
+
+      return { encrypted, decrypted };
+    });
+
+    expect(retVal.decrypted).toBe("hello beekeeper");
+    expect(typeof retVal.encrypted).toBe('string');
+    expect(retVal.encrypted.length).toBeGreaterThan(0);
+  });
+
+  test('Should be able to encrypt for another key and decrypt with that key', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = session.createWallet('w0', 'mypassword');
+
+      const key1 = wallet.importKey('5KLytoW1AiGSoHHBA73x1AmgZnN16QDgU1SPpG9Vd2dpdiBgSYw');
+      const key2 = wallet.importKey('5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n');
+
+      // Encrypt from key1 to key2
+      const encrypted = wallet.encryptData("secret message", key1, key2, 67890);
+      // Decrypt using key2 (receiver) and key1 (sender)
+      const decrypted = wallet.decryptData(encrypted, key1, key2);
+
+      return decrypted;
+    });
+
+    expect(retVal).toBe("secret message");
+  });
+
+  test('Should produce deterministic encryption with explicit nonce', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = session.createWallet('w0', 'mypassword');
+
+      const key = wallet.importKey('5KLytoW1AiGSoHHBA73x1AmgZnN16QDgU1SPpG9Vd2dpdiBgSYw');
+
+      const encrypted1 = wallet.encryptData("deterministic test", key, undefined, 99999);
+      const encrypted2 = wallet.encryptData("deterministic test", key, undefined, 99999);
+
+      return { encrypted1, encrypted2 };
+    });
+
+    expect(retVal.encrypted1).toBe(retVal.encrypted2);
+  });
+
   test('Should be able to sign digest', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+    const retVal = await beekeeperTest(({ beekeeper }) => {
       const digestStr = "390f34297cfcb8fa4b37353431ecbab05b8dc0c9c15fb9ca1a3d510c52177542";
       // Convert hex string to Uint8Array
       const uint8Array = new Uint8Array(digestStr.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
 
       const session = beekeeper.createSession("my.salt");
 
-      const { wallet } = await session.createWallet('w0', 'mypassword');
+      const { wallet } = session.createWallet('w0', 'mypassword');
 
       const publicKey = wallet.importKey('5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n');
 
