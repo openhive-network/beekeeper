@@ -11,13 +11,14 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     /*
       ****creation of an instance of beekeeper****
       PARAMS:
-      wallet_dir      : a directory where keys are stored in particular wallets
+      save_fn         : JS callback (name: string, data: Uint8Array) => void
+      load_fn         : JS callback (name: string) => Uint8Array  (throws if not found)
       unlock_timeout  : timeout for an unlocked wallet in seconds. Default: `900`
 
       RESULT:
         an instance of a beekeeper (ready to use, no separate init() call needed)
     */
-    .constructor<std::string, uint32_t>()
+    .constructor<val, val, uint32_t>()
 
     /*
       ****creation of a session****

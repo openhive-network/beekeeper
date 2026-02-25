@@ -6,8 +6,13 @@ export declare class ExtractError extends Error {
   public parsed: object;
 }
 
+export interface IStorageFns {
+  save_fn: (name: string, data: Uint8Array) => void;
+  load_fn: (name: string) => Uint8Array;
+}
+
 export interface IBeekeeperInstanceHelperConstructorSimplified {
-  new(options: string[]): BeekeeperInstanceHelper;
+  new(options: string[], storageFns?: IStorageFns): BeekeeperInstanceHelper;
 }
 
 export declare class BeekeeperInstanceHelper {
@@ -17,9 +22,11 @@ export declare class BeekeeperInstanceHelper {
 
   public set setAcceptError(acceptError: boolean);
 
+  public static createInMemoryStorage(): IStorageFns & { store: Map<string, Uint8Array> };
+
   public static for(provider: MainModule): IBeekeeperInstanceHelperConstructorSimplified;
 
-  public constructor(provider: MainModule, options: string[]);
+  public constructor(provider: MainModule, options: string[], storageFns?: IStorageFns);
 
   public createSession(salt: string): string;
 

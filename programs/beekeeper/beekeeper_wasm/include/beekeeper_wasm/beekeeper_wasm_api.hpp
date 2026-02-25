@@ -3,28 +3,27 @@
 #include <core_minimal/beekeeper.hpp>
 #include <core_minimal/wallet_storage.hpp>
 
-#include <memory>
+#include <emscripten/val.h>
+
 #include <string>
 #include <vector>
 #include <functional>
 
 namespace beekeeper_wasm {
 
-/// wallet_storage implementation that uses Emscripten FS (stdio).
-/// In the Node target Emscripten mounts nodefs, so these become real
-/// filesystem operations; in the web target idbfs is used instead.
-class emscripten_fs_storage final : public beekeeper_minimal::wallet_storage
+/// wallet_storage implementation that delegates to JS-side save/load callbacks.
+/// The JS callbacks receive the wallet name and a Uint8Array buffer.
+class js_callback_storage final : public beekeeper_minimal::wallet_storage
 {
 public:
-  /// @param wallet_dir  Directory where wallet files are stored.
-  explicit emscripten_fs_storage(std::string wallet_dir);
+  js_callback_storage(emscripten::val save_fn, emscripten::val load_fn);
 
   void save(const std::string& name, const std::vector<char>& buffer) override;
   std::vector<char> load(const std::string& name) override;
 
 private:
-  std::string resolve(const std::string& name) const;
-  std::string wallet_dir_;
+  emscripten::val save_fn_;
+  emscripten::val load_fn_;
 };
 
 /// Thin embind-friendly API that wraps core_minimal::beekeeper.
@@ -34,9 +33,10 @@ private:
 class beekeeper_api final
 {
 public:
-  /// @param wallet_dir       Directory for wallet files (e.g. ".beekeeper")
-  /// @param unlock_timeout   Inactivity timeout in seconds (default 900)
-  beekeeper_api(const std::string& wallet_dir, uint32_t unlock_timeout);
+  /// @param save_fn         JS callback: (name: string, data: Uint8Array) => void
+  /// @param load_fn         JS callback: (name: string) => Uint8Array  (throws if not found)
+  /// @param unlock_timeout  Inactivity timeout in seconds (default 900)
+  beekeeper_api(emscripten::val save_fn, emscripten::val load_fn, uint32_t unlock_timeout);
 
   // ── session ──────────────────────────────────────────────
 
@@ -77,8 +77,8 @@ public:
 private:
   static constexpr const char* prefix_ = "STM";
 
-  emscripten_fs_storage  storage_;
-  beekeeper_minimal::beekeeper bk_;
+  js_callback_storage            storage_;
+  beekeeper_minimal::beekeeper   bk_;
 
   /// Runs fn() and wraps the result in {"result":...} / {"error":...}
   std::string wrap(std::function<std::string()> fn);

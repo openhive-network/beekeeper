@@ -1,40 +1,31 @@
 /**
- * This file tests only the web browser storage functionality of the beekeeper-wasm library.
+ * This file tests web browser storage functionality using IndexedDB-backed
+ * save/load callbacks passed to the beekeeper WASM module.
+ *
+ * createIdbStorage() is defined in globals.js and available via globalThis.
  */
 
 import { ChromiumBrowser, Page, chromium } from 'playwright';
 import { expect } from '@playwright/test';
 import { IBeekeeperTest, test } from '../assets/jest-helper';
 
-import { STORAGE_ROOT, WALLET_OPTIONS } from '../assets/data';
-
 let browser: ChromiumBrowser;
 let page1: Page, page2: Page, page3: Page;
 
-const saveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeeperWasmTestWebOnlyWithPage'], page: Page, options: { walletDir: string, args: string[], close: boolean }) =>
-  await beekeeperWasmTestWebOnlyWithPage(page, async({ provider, BeekeeperInstanceHelper }, { walletDir, args, close }) => {
-    const fs = provider.FS;
-    fs.mkdir(walletDir);
-    fs.mount(fs.filesystems.IDBFS, {}, walletDir);
+const DB_NAME = 'beekeeper_wallets';
 
-    const sync = (initFs = false) => new Promise((resolve, reject) => {
-      fs.syncfs(initFs, (err?: unknown) => {
-        if (err) reject(err);
+const saveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeeperWasmTestWebOnlyWithPage'], page: Page, options: { dbName: string, close: boolean }) =>
+  await beekeeperWasmTestWebOnlyWithPage(page, async({ provider, BeekeeperInstanceHelper }, { dbName, close }) => {
+    const storage = createIdbStorage(dbName);
 
-        resolve(undefined);
-      });
-    });
+    await storage.syncFromIdb();
 
-    await sync(true);
-
-    const helper = BeekeeperInstanceHelper.for(provider);
-
-    const api = new helper(args);
+    const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn });
 
     api.create_with_password(api.implicitSessionToken, "w0", "badf00d");
     api.importKey(api.implicitSessionToken, "w0", "5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT");
 
-    await sync();
+    await storage.syncToIdb();
 
     if(close) {
       api.close(api.implicitSessionToken, "w0");
@@ -42,30 +33,18 @@ const saveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeep
       api.deleteInstance();
     }
 
-    await sync();
+    await storage.syncToIdb();
 
-    return fs.readdir(walletDir);
+    return await storage.listKeys();
   }, options);
 
-const retrieveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeeperWasmTestWebOnlyWithPage'], page: Page, options: { walletDir: string, args: string[], close: boolean }) =>
-  await beekeeperWasmTestWebOnlyWithPage(page, async({ provider, BeekeeperInstanceHelper }, { walletDir, args, close }) => {
-    const fs = provider.FS;
-    fs.mkdir(walletDir);
-    fs.mount(fs.filesystems.IDBFS, {}, walletDir);
+const retrieveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeeperWasmTestWebOnlyWithPage'], page: Page, options: { dbName: string, close: boolean }) =>
+  await beekeeperWasmTestWebOnlyWithPage(page, async({ provider, BeekeeperInstanceHelper }, { dbName, close }) => {
+    const storage = createIdbStorage(dbName);
 
-    const sync = (initFs = false) => new Promise((resolve, reject) => {
-      fs.syncfs(initFs, (err?: unknown) => {
-        if (err) reject(err);
+    await storage.syncFromIdb();
 
-        resolve(undefined);
-      });
-    });
-
-    await sync(true);
-
-    const helper = BeekeeperInstanceHelper.for(provider);
-
-    const api = new helper(args);
+    const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn });
 
     api.open(api.implicitSessionToken, "w0");
     api.unlock(api.implicitSessionToken, "w0", "badf00d");
@@ -95,127 +74,64 @@ test.describe('WASM storage tests', () => {
     page3 = await context2.newPage();
   });
 
-  test('Should have filesystem in the provider', async ({ beekeeperWasmTestWebOnly }) => {
-    const fsType = await beekeeperWasmTestWebOnly(async ({ provider }) => {
-      return typeof provider.FS;
-    });
+  test('Should be able to persist data to IndexedDB and read it back', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
+    const result = await beekeeperWasmTestWebOnlyWithPage(page1, async ({ provider, BeekeeperInstanceHelper }, dbName) => {
+      const storage = createIdbStorage(dbName);
 
-    expect(fsType).toBe('object');
-  });
+      const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn });
 
-  test('Should be able to mount and sync the filesystem', async ({ beekeeperWasmTestWebOnly }) => {
-    await expect(beekeeperWasmTestWebOnly(async ({ provider }, walletDir) => {
-      const fs = provider.FS;
-      fs.mkdir(walletDir);
-      fs.mount(fs.filesystems.IDBFS, {}, walletDir);
+      api.create_with_password(api.implicitSessionToken, "test_wallet", "pass123");
 
-      return await new Promise((resolve, reject) => {
-        fs.syncfs(true, (err?: unknown) => {
-          if (err) reject(err);
+      await storage.syncToIdb();
 
-          resolve(true);
-        });
-      });
-    }, STORAGE_ROOT)).resolves.toBeTruthy();
-  });
+      return await storage.listKeys();
+    }, DB_NAME);
 
-  test('Should be able to create a directory and make it available in the same session', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
-    const dir = await beekeeperWasmTestWebOnlyWithPage(page1, async ({ provider }, walletDir) => {
-      const fs = provider.FS;
-      fs.mkdir(walletDir);
-      fs.mount(fs.filesystems.IDBFS, {}, walletDir);
-
-      const sync = (init = false) => new Promise((resolve, reject) => {
-        fs.syncfs(init, (err?: unknown) => {
-          if (err) reject(err);
-
-          resolve(undefined);
-        });
-      });
-
-      await sync(true);
-
-      fs.writeFile(`${walletDir}/beekeeper`, 'beekeeper');
-
-      await sync();
-
-      return fs.readdir(walletDir);
-    }, STORAGE_ROOT);
-
-    expect(dir).toStrictEqual([ '.', '..', 'beekeeper' ]);
+    expect(result).toStrictEqual(['test_wallet']);
   });
 
   test('Should not contain any data from the previous test in a new context', async ({ beekeeperWasmTestWebOnly }) => {
-    const dir = await beekeeperWasmTestWebOnly(async ({ provider }, walletDir) => {
-      const fs = provider.FS;
-      fs.mkdir(walletDir);
-      fs.mount(fs.filesystems.IDBFS, {}, walletDir);
+    const keys = await beekeeperWasmTestWebOnly(async ({ provider }, dbName) => {
+      const storage = createIdbStorage(dbName);
+      await storage.syncFromIdb();
 
-      await new Promise((resolve, reject) => {
-        fs.syncfs(true, (err?: unknown) => {
-          if (err) reject(err);
+      return await storage.listKeys();
+    }, DB_NAME);
 
-          resolve(undefined);
-        });
-      });
-
-      return fs.readdir(walletDir);
-    }, STORAGE_ROOT);
-
-    expect(dir).toStrictEqual([ '.', '..' ]);
+    // A fresh browser context has its own IndexedDB — should be empty
+    expect(keys).toStrictEqual([]);
   });
 
   test('Should contain data from the previous test in the same context', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
-    const dir = await beekeeperWasmTestWebOnlyWithPage(page2, async ({ provider }, walletDir) => {
-      const fs = provider.FS;
-      fs.mkdir(walletDir);
-      fs.mount(fs.filesystems.IDBFS, {}, walletDir);
+    const keys = await beekeeperWasmTestWebOnlyWithPage(page2, async ({ provider }, dbName) => {
+      const storage = createIdbStorage(dbName);
+      await storage.syncFromIdb();
 
-      await new Promise((resolve, reject) => {
-        fs.syncfs(true, (err?: unknown) => {
-          if (err) reject(err);
+      return await storage.listKeys();
+    }, DB_NAME);
 
-          resolve(undefined);
-        });
-      });
-
-      return fs.readdir(walletDir);
-    }, STORAGE_ROOT);
-
-    expect(dir).toStrictEqual([ '.', '..', 'beekeeper' ]);
+    // page2 shares context1 with page1 — should see the wallet from the first test
+    expect(keys).toStrictEqual(['test_wallet']);
   });
 
   test('Should be able to init beekeeper and save the wallet file with explicitly closing the instance of beekeeper', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
-    const dir = await saveKeys(beekeeperWasmTestWebOnlyWithPage, page1, { close: true, walletDir: STORAGE_ROOT, args: WALLET_OPTIONS });
+    const keys = await saveKeys(beekeeperWasmTestWebOnlyWithPage, page1, { close: true, dbName: DB_NAME });
 
-    expect(dir).toStrictEqual([ '.', '..', 'beekeeper', 'directory with spaces' ]);
+    expect(keys).toStrictEqual(['test_wallet', 'w0']);
   });
 
   test('Should be able to init beekeeper and save the wallet file without explicitly closing the instance of beekeeper', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
-    const dir = await saveKeys(beekeeperWasmTestWebOnlyWithPage, page3, { close: false, walletDir: STORAGE_ROOT, args: WALLET_OPTIONS });
+    const keys = await saveKeys(beekeeperWasmTestWebOnlyWithPage, page3, { close: false, dbName: DB_NAME });
 
-    expect(dir).toStrictEqual([ '.', '..', 'directory with spaces' ]);
+    expect(keys).toStrictEqual(['w0']);
   });
 
   test('Should not be able to access previously created wallet from other context', async ({ beekeeperWasmTestWebOnly }) => {
-    const hasNoWallets = await beekeeperWasmTestWebOnly(async ({ provider, BeekeeperInstanceHelper }, { walletDir, args }) => {
-      const fs = provider.FS;
-      fs.mkdir(walletDir);
-      fs.mount(fs.filesystems.IDBFS, {}, walletDir);
+    const hasNoWallets = await beekeeperWasmTestWebOnly(async ({ provider, BeekeeperInstanceHelper }, dbName) => {
+      const storage = createIdbStorage(dbName);
+      await storage.syncFromIdb();
 
-      const sync = (initFs = false) => new Promise((resolve, reject) => {
-        fs.syncfs(initFs, (err?: unknown) => {
-          if (err) reject(err);
-
-          resolve(undefined);
-        });
-      });
-
-      await sync(true);
-
-      const helper = BeekeeperInstanceHelper.for(provider);
-
-      const api = new helper(args);
+      const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn });
 
       // In a fresh context there should be no wallets — opening "w0" should fail
       try {
@@ -225,19 +141,19 @@ test.describe('WASM storage tests', () => {
       } catch {
         return true; // Expected — no wallet file exists
       }
-    }, { walletDir: STORAGE_ROOT, args: WALLET_OPTIONS });
+    }, DB_NAME);
 
     expect(hasNoWallets).toBeTruthy();
   });
 
   test('Should be able to list the previously imported key from another page with the same browser context with explicitly closing the instance of beekeeper', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
-    const keys = await retrieveKeys(beekeeperWasmTestWebOnlyWithPage, page2, { close: true, walletDir: STORAGE_ROOT, args: WALLET_OPTIONS });
+    const keys = await retrieveKeys(beekeeperWasmTestWebOnlyWithPage, page2, { close: true, dbName: DB_NAME });
 
     expect(keys).toStrictEqual({"keys": [{"public_key": "STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh"}]});
   });
 
   test('Should be able to list the previously imported key without explicitly closing the instance of beekeeper', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
-    const keys = await retrieveKeys(beekeeperWasmTestWebOnlyWithPage, page3, { close: false, walletDir: STORAGE_ROOT, args: WALLET_OPTIONS });
+    const keys = await retrieveKeys(beekeeperWasmTestWebOnlyWithPage, page3, { close: false, dbName: DB_NAME });
 
     expect(keys).toStrictEqual({"keys": [{"public_key": "STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh"}]});
   });

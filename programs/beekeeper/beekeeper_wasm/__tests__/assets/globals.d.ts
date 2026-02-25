@@ -15,12 +15,22 @@ export interface IBeekeeperGlobals {
 
 export interface IBeekeeperWasmGlobals {
   env: TEnvType;
-  provider: MainModule & { FS: any };
+  provider: MainModule;
   ExtractError: typeof ExtractError;
   BeekeeperInstanceHelper: typeof BeekeeperInstanceHelper;
+}
+
+export interface IIdbStorage {
+  save_fn: (name: string, data: Uint8Array) => void;
+  load_fn: (name: string) => Uint8Array;
+  syncToIdb: () => Promise<void>;
+  syncFromIdb: () => Promise<void>;
+  listKeys: () => Promise<string[]>;
+  cache: Map<string, Uint8Array>;
 }
 
 declare global {
   function createBeekeeperTestFor (env: TEnvType): Promise<IBeekeeperGlobals>;
   function createBeekeeperWasmTestFor (env: TEnvType): Promise<IBeekeeperWasmGlobals>;
+  function createIdbStorage (dbName: string): IIdbStorage;
 }

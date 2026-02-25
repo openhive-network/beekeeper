@@ -94,13 +94,25 @@ export class BeekeeperInstanceHelper {
     return BeekeeperInstanceHelper.bind(undefined, provider);
   }
 
-  constructor(provider, options) {
-    const { walletDir, unlockTimeout } = BeekeeperInstanceHelper.#parseOptions(options);
-    // Ensure the wallet directory exists (Emscripten FS or Node fs)
-    if (provider.FS && typeof provider.FS.mkdirTree === 'function') {
-      try { provider.FS.mkdirTree(walletDir); } catch { /* already exists */ }
-    }
-    this.#instance = new provider.beekeeper_api(walletDir, unlockTimeout);
+  /**
+   * Creates in-memory save/load callbacks backed by a Map.
+   * @returns {{ save_fn: Function, load_fn: Function }}
+   */
+  static createInMemoryStorage() {
+    const store = new Map();
+    const save_fn = (name, data) => { store.set(name, new Uint8Array(data)); };
+    const load_fn = (name) => {
+      const d = store.get(name);
+      if (!d) throw new Error("Wallet not found: " + name);
+      return d;
+    };
+    return { save_fn, load_fn, store };
+  }
+
+  constructor(provider, options, storageFns) {
+    const { unlockTimeout } = BeekeeperInstanceHelper.#parseOptions(options);
+    const { save_fn, load_fn } = storageFns || BeekeeperInstanceHelper.createInMemoryStorage();
+    this.#instance = new provider.beekeeper_api(save_fn, load_fn, unlockTimeout);
     this.#implicitSessionToken = this.createSessionWithoutSalt();
   }
 

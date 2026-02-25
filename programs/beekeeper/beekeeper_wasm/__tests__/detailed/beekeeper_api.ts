@@ -928,7 +928,7 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     ]);
   });
 
-  test('Should properly handle FS-backed wallet persistence (create, close, reopen, unlock)', async ({ beekeeperWasmTest }) => {
+  test('Should properly handle wallet persistence (create, close, reopen, unlock)', async ({ beekeeperWasmTest }) => {
     const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
       const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
 
@@ -943,7 +943,7 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
       // Close the wallet
       api.close(session, 'persistent_wallet');
 
-      // Reopen and unlock — the key should still be there (FS-backed persistence)
+      // Reopen and unlock — the key should still be there (storage-backed persistence)
       api.open(session, 'persistent_wallet');
       api.unlock(session, 'persistent_wallet', 'mypass');
 

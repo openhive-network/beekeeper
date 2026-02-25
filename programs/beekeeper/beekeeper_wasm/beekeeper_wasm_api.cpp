@@ -5,10 +5,10 @@
 #include <fc/io/json.hpp>
 #include <fc/crypto/hex.hpp>
 
-#include <cstdio>
+#include <emscripten/val.h>
+
 #include <sstream>
 #include <stdexcept>
-#include <sys/stat.h>   // mkdirs
 
 namespace beekeeper_wasm {
 
@@ -53,70 +53,42 @@ std::string error_json(const std::string& msg)
 
 } // anon
 
-// ── emscripten_fs_storage ──────────────────────────────────
+// ── js_callback_storage ───────────────────────────────────
 
-namespace {
-
-/// Recursively create directories (like mkdir -p).
-void mkdirs(const std::string& path)
+js_callback_storage::js_callback_storage(emscripten::val save_fn, emscripten::val load_fn)
+  : save_fn_(std::move(save_fn))
+  , load_fn_(std::move(load_fn))
 {
-  if (path.empty()) return;
-  std::string accumulated;
-  for (size_t i = 0; i < path.size(); ++i)
-  {
-    accumulated += path[i];
-    if (path[i] == '/' || i == path.size() - 1)
-      ::mkdir(accumulated.c_str(), 0755); // ignore errors — dir may already exist
-  }
 }
 
-} // anon
-
-emscripten_fs_storage::emscripten_fs_storage(std::string wallet_dir)
-  : wallet_dir_(std::move(wallet_dir))
+void js_callback_storage::save(const std::string& name, const std::vector<char>& buffer)
 {
-  // Ensure trailing separator
-  if (!wallet_dir_.empty() && wallet_dir_.back() != '/')
-    wallet_dir_ += '/';
+  // Create a JS Uint8Array copy of the C++ buffer
+  auto js_uint8 = emscripten::val::global("Uint8Array").new_(buffer.size());
+  // Copy data into the JS array
+  auto mem_view = emscripten::val(emscripten::typed_memory_view(buffer.size(),
+                    reinterpret_cast<const uint8_t*>(buffer.data())));
+  js_uint8.call<void>("set", mem_view);
 
-  // Ensure the wallet directory exists
-  mkdirs(wallet_dir_);
+  save_fn_(std::string(name), js_uint8);
 }
 
-std::string emscripten_fs_storage::resolve(const std::string& name) const
+std::vector<char> js_callback_storage::load(const std::string& name)
 {
-  return wallet_dir_ + name + ".wallet";
-}
+  emscripten::val result = load_fn_(std::string(name));
 
-void emscripten_fs_storage::save(const std::string& name, const std::vector<char>& buffer)
-{
-  auto path = resolve(name);
-  FILE* f = std::fopen(path.c_str(), "wb");
-  if (!f)
-    throw std::runtime_error("cannot open wallet file for writing: " + path);
-  std::fwrite(buffer.data(), 1, buffer.size(), f);
-  std::fclose(f);
-}
-
-std::vector<char> emscripten_fs_storage::load(const std::string& name)
-{
-  auto path = resolve(name);
-  FILE* f = std::fopen(path.c_str(), "rb");
-  if (!f)
-    throw std::runtime_error("Wallet not found: " + name);
-  std::fseek(f, 0, SEEK_END);
-  long sz = std::ftell(f);
-  std::fseek(f, 0, SEEK_SET);
-  std::vector<char> buf(sz);
-  std::fread(buf.data(), 1, sz, f);
-  std::fclose(f);
+  // Convert JS Uint8Array back to vector<char>
+  unsigned len = result["length"].as<unsigned>();
+  std::vector<char> buf(len);
+  for (unsigned i = 0; i < len; ++i)
+    buf[i] = static_cast<char>(result[i].as<uint8_t>());
   return buf;
 }
 
 // ── beekeeper_api ──────────────────────────────────────────
 
-beekeeper_api::beekeeper_api(const std::string& wallet_dir, uint32_t unlock_timeout)
-  : storage_(wallet_dir)
+beekeeper_api::beekeeper_api(emscripten::val save_fn, emscripten::val load_fn, uint32_t unlock_timeout)
+  : storage_(std::move(save_fn), std::move(load_fn))
   , bk_(storage_, unlock_timeout)
 {
 }
