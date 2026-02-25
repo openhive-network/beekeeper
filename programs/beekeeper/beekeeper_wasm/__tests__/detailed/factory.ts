@@ -111,6 +111,25 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     })).rejects.toThrow(/Wallet not found: w0/);
   });
 
+  test('Should be able to do a single inMemory sign', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ provider }) => {
+      const bk = await provider.default({ inMemory: true, enableLogs: false });
+
+      const session = bk.createSession("my.salt");
+      const { wallet } = await session.createWallet('tmp', 'mypassword');
+
+      const publicKey = wallet.importKey('5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n');
+
+      const signature = wallet.signDigest(publicKey, "390f34297cfcb8fa4b37353431ecbab05b8dc0c9c15fb9ca1a3d510c52177542");
+
+      await bk.delete();
+
+      return signature;
+    });
+
+    expect(retVal).toBe("1f17cc07f7c769073d39fac3385220b549e261fb33c5f619c5dced7f5b0fe9c0954f2684e703710840b7ea01ad7238b8db1d8a9309d03e93de212f86de38d66f21");
+  });
+
   test('Should be able to sign digest', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest(async ({ beekeeper }) => {
       const digestStr = "390f34297cfcb8fa4b37353431ecbab05b8dc0c9c15fb9ca1a3d510c52177542";

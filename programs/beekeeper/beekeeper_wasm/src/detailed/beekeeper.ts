@@ -8,7 +8,8 @@ import { safeAsyncWasmCall } from "./util/wasm_error.js";
 
 const DEFAULT_BEEKEEPER_OPTIONS: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'> = {
   enableLogs: false,
-  unlockTimeout: 900
+  unlockTimeout: 900,
+  inMemory: false
 };
 
 interface IOptionalModuleArgs {
@@ -24,7 +25,7 @@ const createBeekeeper = async(
   const { wasmLocation: _wl, storageRoot: _sr, ...otherOptions } = options;
   const mergedOptions = { ...DEFAULT_BEEKEEPER_OPTIONS, ...otherOptions };
 
-  const storage: IStorageCallbacks = mergedOptions.storage ?? createInMemoryStorage();
+  const storage: IStorageCallbacks = mergedOptions.inMemory ? createInMemoryStorage() : (mergedOptions.storage ?? createInMemoryStorage());
 
   const beekeeperProvider = await safeAsyncWasmCall(() => beekeeperContstructor(ModuleExt), "Beekeeper WASM module loading");
   const api = new BeekeeperApi(beekeeperProvider, mergedOptions, storage);

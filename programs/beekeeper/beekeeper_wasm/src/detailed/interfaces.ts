@@ -78,8 +78,20 @@ export interface IBeekeeperOptions {
   unlockTimeout: number;
 
   /**
+   * Uses in-memory storage regardless of the `storage` option.
+   * Useful for short-lived operations like a single key import + sign.
+   *
+   * When `true`, any provided `storage` callbacks are ignored and
+   * a fresh Map-backed in-memory store is used.
+   *
+   * @type {boolean}
+   * @default false
+   */
+  inMemory: boolean;
+
+  /**
    * Custom storage callbacks for wallet persistence.
-   * If not provided, an in-memory Map-backed storage is used.
+   * If not provided (and `inMemory` is not `true`), an in-memory Map-backed storage is used.
    *
    * @type {IStorageCallbacks}
    */
