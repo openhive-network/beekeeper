@@ -17,14 +17,6 @@ interface IBeekeeperKeys {
   }>;
 }
 
-interface IEncryptData {
-  encrypted_content: string;
-}
-
-interface IDecryptData {
-  decrypted_content: string;
-}
-
 interface IHasMatchingPrivateKey {
   exists: boolean;
 }
@@ -40,10 +32,6 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return this.locked.name;
   }
 
-  get isTemporary(): boolean {
-    return this.locked.isTemporary;
-  }
-
   public lock(): BeekeeperLockedWallet {
     this.api.extract(safeWasmCall(() => this.api.api.lock(this.session.token, this.locked.name) as string, `wallet '${this.locked.name}' locking`));
     this.locked.unlocked = undefined;
@@ -51,10 +39,8 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return this.locked;
   }
 
-  public async importKey(wifKey: string): Promise<TPublicKey> {
+  public importKey(wifKey: string): TPublicKey {
     const { public_key } = this.api.extract(safeWasmCall(() => this.api.api.import_key(this.session.token, this.locked.name, wifKey) as string, `importing key to wallet '${this.locked.name}'`)) as IImportKeyResponse;
-
-    await this.api.fs?.sync();
 
     return public_key;
   }
@@ -65,10 +51,8 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return result.exists;
   }
 
-  public async removeKey(publicKey: TPublicKey): Promise<void> {
+  public removeKey(publicKey: TPublicKey): void {
     this.api.extract(safeWasmCall(() => this.api.api.remove_key(this.session.token, this.locked.name, publicKey) as string, `removing key '${publicKey}' from wallet '${this.locked.name}'`));
-
-    await this.api.fs?.sync();
   }
 
   public signDigest(publicKey: string, sigDigest: string | Uint8Array): TSignature {
@@ -88,25 +72,6 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return result.keys.map(value => value.public_key);
   }
 
-  public encryptData(content: string, key: TPublicKey, anotherKey: TPublicKey, nonce?: number): string {
-    let call_result;
-
-    if(typeof nonce === 'number')
-      call_result = safeWasmCall(() => this.api.api.encrypt_data(this.session.token, key, anotherKey || key, this.locked.name, content, nonce), `data encryption using keys '${key}', '${anotherKey}' from wallet '${this.locked.name}'`);
-    else
-      call_result = safeWasmCall(() => this.api.api.encrypt_data(this.session.token, key, anotherKey || key, this.locked.name, content), `data encryption using keys '${key}', '${anotherKey}' from wallet '${this.locked.name}'`);
-
-    const result = this.api.extract(call_result) as IEncryptData;
-
-    return result.encrypted_content;
-  }
-
-  public decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): string {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.decrypt_data(this.session.token, key, anotherKey || key, this.locked.name, content), `data encryption using key${anotherKey === undefined ? ` '${key}'` : `s '${key}' and '${anotherKey}'`} from wallet '${this.locked.name}'`)) as IDecryptData;
-
-    return result.decrypted_content;
-  }
-
   public close(): IBeekeeperSession {
     return this.locked.close();
   }
@@ -118,8 +83,7 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
   public constructor(
     private readonly api: BeekeeperApi,
     private readonly session: BeekeeperSession,
-    public readonly name: string,
-    public readonly isTemporary: boolean
+    public readonly name: string
   ) {}
 
   public unlock(password: string): IBeekeeperUnlockedWallet {

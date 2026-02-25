@@ -1,26 +1,22 @@
 import type { MainModule, beekeeper_api } from "../build/beekeeper_wasm.common";
 
 import { BeekeeperError } from "./errors.js";
-import { BeekeeperFileSystem } from "./fs.js";
+import type { IStorageCallbacks } from "./fs.js";
 import { IBeekeeperInstance, IBeekeeperOptions, IBeekeeperSession } from "./interfaces.js";
 import { BeekeeperSession } from "./session.js";
 import { safeWasmCall } from './util/wasm_error.js';
 
 // We would like to expose our api using BeekeeperInstance interface, but we would not like to expose users a way of creating instance of BeekeeperApi
 export class BeekeeperApi implements IBeekeeperInstance {
-  public readonly fs?: BeekeeperFileSystem;
   public api!: Readonly<beekeeper_api>;
 
   public readonly sessions: Map<string, BeekeeperSession> = new Map();
 
   public constructor(
     private readonly provider: MainModule,
-    private readonly options: Omit<IBeekeeperOptions, 'wasmLocation'>,
-    isWebEnvironment: boolean
-  ) {
-    if (!this.options.inMemory)
-      this.fs = new BeekeeperFileSystem(this.provider.FS, isWebEnvironment);
-  }
+    private readonly options: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'>,
+    private readonly storage: IStorageCallbacks
+  ) {}
 
   public getVersion(): string {
     return process.env.npm_package_version as string;
@@ -45,18 +41,12 @@ export class BeekeeperApi implements IBeekeeperInstance {
     }
   }
 
-  public async init() {
-    await this.fs?.init(this.options.storageRoot);
-
-    const WALLET_OPTIONS = ['--wallet-dir', `${this.options.storageRoot}/.beekeeper`, '--enable-logs', Boolean(this.options.enableLogs).toString(), '--unlock-timeout', String(this.options.unlockTimeout)];
-
-    const beekeeperOptions = new this.provider.StringList();
-    WALLET_OPTIONS.forEach((opt) => void beekeeperOptions.push_back(opt));
-
-    this.api = new this.provider.beekeeper_api(beekeeperOptions);
-    safeWasmCall(() => beekeeperOptions.delete(), "StringList WASM object deletion");
-
-    this.extract(safeWasmCall(() => this.api.init() as string, "WASM api initialization"));
+  public init() {
+    this.api = new this.provider.beekeeper_api(
+      this.storage.save_fn,
+      this.storage.load_fn,
+      this.options.unlockTimeout
+    );
   }
 
   public createSession(salt: string): IBeekeeperSession {
@@ -80,7 +70,5 @@ export class BeekeeperApi implements IBeekeeperInstance {
       session.close();
 
     safeWasmCall(() => this.api.delete(), "WASM api deletion");
-
-    await this.fs?.sync();
   }
 }

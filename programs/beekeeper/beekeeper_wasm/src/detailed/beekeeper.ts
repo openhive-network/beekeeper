@@ -1,13 +1,14 @@
 import type Beekeeper from "../build/beekeeper_wasm.common";
 
 import { BeekeeperApi } from "./api.js";
+import type { IStorageCallbacks } from "./fs.js";
+import { createInMemoryStorage } from "./fs.js";
 import { IBeekeeperInstance, IBeekeeperOptions } from "./interfaces.js";
 import { safeAsyncWasmCall } from "./util/wasm_error.js";
 
-const DEFAULT_BEEKEEPER_OPTIONS: Omit<IBeekeeperOptions, 'storageRoot' | 'wasmLocation'> = {
+const DEFAULT_BEEKEEPER_OPTIONS: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'> = {
   enableLogs: false,
-  unlockTimeout: 900,
-  inMemory: false
+  unlockTimeout: 900
 };
 
 interface IOptionalModuleArgs {
@@ -17,15 +18,18 @@ interface IOptionalModuleArgs {
 
 const createBeekeeper = async(
   beekeeperContstructor: typeof Beekeeper,
-  storageRoot: string,
   ModuleExt: IOptionalModuleArgs = {},
-  isWebEnvironment: boolean,
   options: Partial<IBeekeeperOptions> = {}
 ): Promise<IBeekeeperInstance> => {
-  const beekeeperProvider = await safeAsyncWasmCall(() => beekeeperContstructor(ModuleExt), "Beekeeper WASM module loading");
-  const api = new BeekeeperApi(beekeeperProvider, { ...DEFAULT_BEEKEEPER_OPTIONS, storageRoot, ...options }, isWebEnvironment);
+  const { wasmLocation: _wl, storageRoot: _sr, ...otherOptions } = options;
+  const mergedOptions = { ...DEFAULT_BEEKEEPER_OPTIONS, ...otherOptions };
 
-  await api.init();
+  const storage: IStorageCallbacks = mergedOptions.storage ?? createInMemoryStorage();
+
+  const beekeeperProvider = await safeAsyncWasmCall(() => beekeeperContstructor(ModuleExt), "Beekeeper WASM module loading");
+  const api = new BeekeeperApi(beekeeperProvider, mergedOptions, storage);
+
+  api.init();
 
   return api;
 };

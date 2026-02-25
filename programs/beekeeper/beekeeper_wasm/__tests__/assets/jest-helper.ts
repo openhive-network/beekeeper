@@ -2,9 +2,6 @@ import { ConsoleMessage, Page, test as base, expect } from '@playwright/test';
 
 import './globals';
 import type { IBeekeeperGlobals, IBeekeeperWasmGlobals, TEnvType } from './globals';
-import { STORAGE_ROOT_NODE } from './data';
-// @ts-ignore
-import fs from 'fs';
 
 type TBeekeeperTestCallable<R, Args extends any[]> = (gloabls: IBeekeeperGlobals, ...args: Args) => (R | Promise<R>);
 type TBeekeeperWasmTestCallable<R, Args extends any[]> = (gloabls: IBeekeeperWasmGlobals, ...args: Args) => (R | Promise<R>);
@@ -75,9 +72,6 @@ const envTestFor = <GlobalType extends IBeekeeperGlobals | IBeekeeperWasmGlobals
     let nodeData: any, webData: any;
 
     if (forceEnv === undefined || forceEnv === 'node') {
-      if(fs.existsSync(STORAGE_ROOT_NODE))
-        fs.rmdirSync(STORAGE_ROOT_NODE, { recursive: true });
-
       nodeData = await fn(await (globalFunction as Function)('node'), ...args);
     }
 

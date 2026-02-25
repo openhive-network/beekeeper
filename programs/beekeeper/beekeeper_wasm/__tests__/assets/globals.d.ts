@@ -8,7 +8,6 @@ export type TEnvType = 'web' | 'node';
 
 export interface IBeekeeperGlobals {
   env: TEnvType;
-  storageRoot: string;
   provider: typeof BeekeeperModule;
   beekeeper: IBeekeeperInstance;
 }

@@ -7,9 +7,6 @@ import createBeekeeperBase, { type BeekeeperError, type IBeekeeperOptions, type 
 // Note: This import will be replaced with Web/Node.js version upon bundling
 import Beekeeper from "./build/beekeeper_wasm.common.js";
 
-// This variable will be replaced during bundling based on the environment
-export const DEFAULT_STORAGE_ROOT: string = process.env.DEFAULT_STORAGE_ROOT as string;
-
 export * from "./detailed/index.js";
 
 const getModuleExt = async(fileLocation?: string) => {
@@ -67,12 +64,12 @@ const getModuleExt = async(fileLocation?: string) => {
  *
  * @returns {Promise<IBeekeeperInstance>} Beekeeper API Instance
  *
- * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error, fs sync error etc.)
+ * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
  */
 const createBeekeeper = async(options?: Partial<IBeekeeperOptions>): Promise<IBeekeeperInstance> => {
   const { wasmLocation, ...otherOptions } = options || {};
 
-  return createBeekeeperBase(Beekeeper, DEFAULT_STORAGE_ROOT, await getModuleExt(wasmLocation), process.env.ROLLUP_TARGET_ENV === "web", otherOptions);
+  return createBeekeeperBase(Beekeeper, await getModuleExt(wasmLocation), otherOptions);
 };
 
 export default createBeekeeper;

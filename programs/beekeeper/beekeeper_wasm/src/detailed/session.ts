@@ -8,17 +8,6 @@ interface IBeekeeperWalletPassword {
   password: string;
 }
 
-interface IBeekeeperHasWallet {
-  exists: boolean;
-}
-
-interface IBeekeeperWallets {
-  wallets: Array<{
-    name: string;
-    unlocked: boolean;
-  }>;
-}
-
 interface IBeekeeperSessionInfo {
   now: string;
   timeout_time: string;
@@ -41,52 +30,15 @@ export class BeekeeperSession implements IBeekeeperSession {
     };
   }
 
-  public listWallets(): Array<IBeekeeperWallet> {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.list_wallets(this.token) as string, "listing wallets")) as IBeekeeperWallets;
-
-    const wallets: IBeekeeperWallet[] = [];
-
-    for(const value of result.wallets) {
-      const wallet = this.openWallet(value.name);
-
-      if(!value.unlocked)
-        (wallet as BeekeeperLockedWallet).unlocked = undefined;
-
-      wallets.push(wallet);
-    }
-
-    return wallets;
-  }
-
-  public hasWallet(name: string): boolean {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.has_wallet(this.token, name) as string, `checking if wallet '${name}' exists`)) as IBeekeeperHasWallet;
-
-    return result.exists;
-  }
-
-  public async createWallet(name: string, password: string | undefined, isTemporary?: boolean): Promise<IWalletCreated> {
-    // Prevent creating persistent wallets when no filesystem is available - when user explicitly requests it
-    if (isTemporary === false && this.api.fs === undefined)
-      throw new BeekeeperError(
-        "Trying to create persistent wallet without a filesystem (consider disabling the 'inMemory' Beekeeper option or setting 'isTemporary' function argument to true)."
-      );
-
-    // When no filesystem is available, all wallets must be temporary
-    if (this.api.fs === undefined)
-      isTemporary = true;
-    else
-      isTemporary = isTemporary ?? false;
-
+  public async createWallet(name: string, password?: string): Promise<IWalletCreated> {
     if(typeof password === 'string')
-      this.api.extract(safeWasmCall(() => this.api.api.create(this.token, name, isTemporary, password as string) as string, `${isTemporary ? 'temporary ' : ''}wallet '${name}' creation`));
+      this.api.extract(safeWasmCall(() => this.api.api.create(this.token, name, password as string) as string, `wallet '${name}' creation`));
     else {
-      const result = this.api.extract(safeWasmCall(() => this.api.api.create(this.token, name) as string, `wallet '${name} creation'`)) as IBeekeeperWalletPassword;
+      const result = this.api.extract(safeWasmCall(() => this.api.api.create(this.token, name) as string, `wallet '${name}' creation`)) as IBeekeeperWalletPassword;
       ({ password } = result);
     }
 
-    await this.api.fs?.sync();
-
-    const wallet = new BeekeeperLockedWallet(this.api, this, name, isTemporary);
+    const wallet = new BeekeeperLockedWallet(this.api, this, name);
     wallet.unlocked = new BeekeeperUnlockedWallet(this.api, this, wallet);
 
     this.wallets.set(name, wallet);
@@ -102,7 +54,7 @@ export class BeekeeperSession implements IBeekeeperSession {
       return this.wallets.get(name) as IBeekeeperWallet;
 
     this.api.extract(safeWasmCall(() => this.api.api.open(this.token, name) as string, `wallet '${name}' opening`));
-    const wallet = new BeekeeperLockedWallet(this.api, this, name, false);
+    const wallet = new BeekeeperLockedWallet(this.api, this, name);
 
     this.wallets.set(name, wallet);
 
