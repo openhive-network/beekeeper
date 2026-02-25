@@ -204,6 +204,40 @@ export class BeekeeperInstanceHelper {
     return this.#extract(returnedValue);
   }
 
+  encryptData(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce) {
+    let returnedValue;
+    if (nonce !== undefined)
+      returnedValue = this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce);
+    else
+      returnedValue = this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content);
+
+    if( this.#acceptError )
+    {
+      return this.#extract(returnedValue);
+    }
+    else
+    {
+      const value = this.#extract(returnedValue);
+
+      return value.encrypted_content;
+    }
+  }
+
+  decryptData(sessionToken, walletName, fromPublicKey, toPublicKey, encryptedContent) {
+    const returnedValue = this.instance.decrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, encryptedContent);
+
+    if( this.#acceptError )
+    {
+      return this.#extract(returnedValue);
+    }
+    else
+    {
+      const value = this.#extract(returnedValue);
+
+      return value.decrypted_content;
+    }
+  }
+
   signDigest(sessionToken, sigDigest, publicKey) {
     const returnedValue = this.instance.sign_digest(sessionToken, sigDigest, publicKey);
 

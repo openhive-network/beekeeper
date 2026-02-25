@@ -256,6 +256,24 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     expect(retVal.encrypted1).toBe(retVal.encrypted2);
   });
 
+  test('Should be able to create a beekeeper instance with custom unlockTimeout', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const bk = await provider.default({ unlockTimeout: 5 });
+
+      const session = bk.createSession("my.salt");
+      const info = session.getInfo();
+
+      await bk.delete();
+
+      return info;
+    });
+
+    expect(retVal).toHaveProperty('now');
+    expect(retVal).toHaveProperty('timeoutTime');
+    expect(retVal.now).toBeInstanceOf(Date);
+    expect(retVal.timeoutTime).toBeInstanceOf(Date);
+  });
+
   test('Should be able to sign digest', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest(({ beekeeper }) => {
       const digestStr = "390f34297cfcb8fa4b37353431ecbab05b8dc0c9c15fb9ca1a3d510c52177542";

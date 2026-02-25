@@ -906,6 +906,70 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     expect(retVal.hasAfterImport).toBeTruthy();
   });
 
+  test('Should be able to encrypt and decrypt data via low-level API (round-trip)', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+
+      const session = api.createSession('pear');
+
+      api.create_with_password(session, 'w0', 'pass');
+      const pubKey = api.importKey(session, 'w0', keys[7][0]);
+
+      const encrypted = api.encryptData(session, 'w0', pubKey, pubKey, 'hello low-level', 12345);
+      const decrypted = api.decryptData(session, 'w0', pubKey, pubKey, encrypted);
+
+      return { encrypted, decrypted };
+    }, WALLET_OPTIONS_NODE, keys);
+
+    expect(retVal.decrypted).toBe('hello low-level');
+    expect(typeof retVal.encrypted).toBe('string');
+    expect(retVal.encrypted.length).toBeGreaterThan(0);
+  });
+
+  test('Should be able to encrypt from one key to another via low-level API', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+
+      const session = api.createSession('pear');
+
+      api.create_with_password(session, 'w0', 'pass');
+      const key1 = api.importKey(session, 'w0', keys[7][0]);
+      const key2 = api.importKey(session, 'w0', keys[3][0]);
+
+      const encrypted = api.encryptData(session, 'w0', key1, key2, 'cross-key message', 54321);
+      const decrypted = api.decryptData(session, 'w0', key1, key2, encrypted);
+
+      return decrypted;
+    }, WALLET_OPTIONS_NODE, keys);
+
+    expect(retVal).toBe('cross-key message');
+  });
+
+  test('Should throw when encrypting with a key not in the wallet', async ({ beekeeperWasmTest }) => {
+    await expect(beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+
+      const session = api.createSession('pear');
+
+      api.create_with_password(session, 'w0', 'pass');
+      // Do NOT import any key — encrypt should fail
+      api.encryptData(session, 'w0', keys[7][1], keys[3][1], 'should fail');
+    }, WALLET_OPTIONS_NODE, keys)).rejects.toThrow(/not found/);
+  });
+
+  test('Should throw when decrypting with invalid encrypted content', async ({ beekeeperWasmTest }) => {
+    await expect(beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+
+      const session = api.createSession('pear');
+
+      api.create_with_password(session, 'w0', 'pass');
+      api.importKey(session, 'w0', keys[7][0]);
+
+      api.decryptData(session, 'w0', keys[7][1], keys[7][1], 'not-valid-base58-encrypted-content');
+    }, WALLET_OPTIONS_NODE, keys)).rejects.toThrow();
+  });
+
   test('Should get all keys from multiple wallets (merged)', async ({ beekeeperWasmTest }) => {
     const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, walletNames, keys) => {
       const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);

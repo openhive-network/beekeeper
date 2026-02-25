@@ -44,6 +44,10 @@ export declare class BeekeeperInstanceHelper {
 
   public removeKey(sessionToken: string, walletName: string, key: string): string;
 
+  public encryptData(sessionToken: string, walletName: string, fromPublicKey: string, toPublicKey: string, content: string, nonce?: number): string;
+
+  public decryptData(sessionToken: string, walletName: string, fromPublicKey: string, toPublicKey: string, encryptedContent: string): string;
+
   public signDigest(sessionToken: string, sigDigest: string, publicKey: string): string;
 
   public getPublicKeys(sessionToken: string): { keys: Array<{ public_key: string }> };
