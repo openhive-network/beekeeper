@@ -22,6 +22,7 @@ set( SOURCES
       wasm_crypto_primitives.cpp
       standalone_ripemd160.cpp
       standalone_base58.cpp
+      cxa_demangle_stub.cpp
 )
 
 set( INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/include )
