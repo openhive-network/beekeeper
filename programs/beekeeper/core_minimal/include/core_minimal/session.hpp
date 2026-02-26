@@ -6,8 +6,15 @@
 #include <chrono>
 #include <map>
 #include <memory>
+#include <vector>
 
 namespace beekeeper_minimal {
+
+struct wallet_details
+{
+  std::string name;
+  bool unlocked = false;
+};
 
 /// A session owns a set of wallets and auto-locks them on timeout.
 class session
@@ -26,6 +33,14 @@ public:
 
   /// Call periodically (or before each operation) to enforce auto-lock.
   void check_timeout();
+
+  // ── wallet queries ────────────────────────────────────────
+
+  /// Check if a wallet exists (in-memory or in storage).
+  bool has_wallet(const std::string& wallet_name) const;
+
+  /// List wallets: merges in-memory (with unlock status) + storage-only (as locked).
+  std::vector<wallet_details> list_wallets() const;
 
   // ── wallet operations ──────────────────────────────────────
 

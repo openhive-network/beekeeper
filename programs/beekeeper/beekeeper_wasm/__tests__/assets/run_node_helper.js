@@ -98,8 +98,8 @@ export class BeekeeperInstanceHelper {
   }
 
   /**
-   * Creates in-memory save/load callbacks backed by a Map.
-   * @returns {{ save_fn: Function, load_fn: Function }}
+   * Creates in-memory save/load/list_dir callbacks backed by a Map.
+   * @returns {{ save_fn: Function, load_fn: Function, list_dir_fn: Function }}
    */
   static createInMemoryStorage() {
     const store = new Map();
@@ -109,17 +109,18 @@ export class BeekeeperInstanceHelper {
       if (!d) throw new Error("Wallet not found: " + name);
       return d;
     };
-    return { save_fn, load_fn, store };
+    const list_dir_fn = () => Array.from(store.keys());
+    return { save_fn, load_fn, list_dir_fn, store };
   }
 
   constructor(provider, options, storageFns) {
     const { unlockTimeout } = BeekeeperInstanceHelper.#parseOptions(options);
-    const { save_fn, load_fn } = storageFns || BeekeeperInstanceHelper.createInMemoryStorage();
+    const storage = storageFns || BeekeeperInstanceHelper.createInMemoryStorage();
     const crypto = BeekeeperInstanceHelper.cryptoCallbacks;
     if (crypto)
-      this.#instance = new provider.beekeeper_api(save_fn, load_fn, crypto, unlockTimeout);
+      this.#instance = new provider.beekeeper_api(storage, crypto, unlockTimeout);
     else
-      this.#instance = new provider.beekeeper_api(save_fn, load_fn, unlockTimeout);
+      this.#instance = new provider.beekeeper_api(storage, unlockTimeout);
     this.#implicitSessionToken = this.createSessionWithoutSalt();
   }
 
@@ -151,6 +152,19 @@ export class BeekeeperInstanceHelper {
     const value = this.#extract(returnedValue);
 
     return value.exists;
+  }
+
+  hasWallet(token, walletName) {
+    const returnedValue = this.instance.has_wallet(token, walletName);
+    const value = this.#extract(returnedValue);
+
+    return value.exists;
+  }
+
+  listWallets(token) {
+    const returnedValue = this.instance.list_wallets(token);
+
+    return this.#extract(returnedValue);
   }
 
   async create(sessionToken, walletName) {

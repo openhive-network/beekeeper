@@ -11,8 +11,10 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     /*
       ****creation of an instance of beekeeper****
       PARAMS:
-      save_fn         : JS callback (name: string, data: Uint8Array) => void
-      load_fn         : JS callback (name: string) => Uint8Array  (throws if not found)
+      storage         : JS object with storage callbacks:
+                        save_fn(name: string, data: Uint8Array) => void,
+                        load_fn(name: string) => Uint8Array  (throws if not found),
+                        list_dir_fn() => string[]  (returns all stored wallet names)
       crypto          : JS object with async hash/AES methods:
                         sha256(Uint8Array) => Promise<Uint8Array>,
                         sha512(Uint8Array) => Promise<Uint8Array>,
@@ -24,7 +26,7 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
       RESULT:
         an instance of a beekeeper (ready to use, no separate init() call needed)
     */
-    .constructor<val, val, val, uint32_t>()
+    .constructor<val, val, uint32_t>()
 
     /*
       ****creation of a session****
@@ -144,6 +146,20 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
       ****testing if a private key corresponding to a public key exists in a wallet****
     */
     .function("has_matching_private_key(token, wallet_name, public_key)", &beekeeper_api::has_matching_private_key)
+
+    /*
+      ****testing if a wallet with given name exists (in-memory or in storage)****
+      RESULT:
+        {"exists":true} or {"exists":false}
+    */
+    .function("has_wallet(token, wallet_name)", &beekeeper_api::has_wallet)
+
+    /*
+      ****listing all wallets (in-memory + storage)****
+      RESULT:
+        {"wallets":[{"name":"w0","unlocked":true},{"name":"w1","unlocked":false}]}
+    */
+    .function("list_wallets(token)", &beekeeper_api::list_wallets)
     ;
 }
 

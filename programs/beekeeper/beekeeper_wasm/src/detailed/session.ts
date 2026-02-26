@@ -31,15 +31,10 @@ export class BeekeeperSession implements IBeekeeperSession {
   }
 
   public hasWallet(name: string): boolean {
-    if (this.wallets.has(name))
-      return true;
-
-    try {
-      this.api.storageCallbacks.load_fn(name);
-      return true;
-    } catch {
-      return false;
-    }
+    const result = this.api.extract(
+      safeWasmCall(() => this.api.api.has_wallet(this.token, name) as string, `wallet '${name}' existence check`)
+    ) as { exists: boolean };
+    return result.exists;
   }
 
   public listWallets(): Array<IBeekeeperWallet> {

@@ -44,9 +44,10 @@ std::string ok_empty()
 
 // ── js_callback_storage ───────────────────────────────────
 
-js_callback_storage::js_callback_storage(emscripten::val save_fn, emscripten::val load_fn)
-  : save_fn_(std::move(save_fn))
-  , load_fn_(std::move(load_fn))
+js_callback_storage::js_callback_storage(emscripten::val storage)
+  : save_fn_(storage["save_fn"])
+  , load_fn_(storage["load_fn"])
+  , list_dir_fn_(storage["list_dir_fn"])
 {
 }
 
@@ -74,12 +75,23 @@ std::vector<char> js_callback_storage::load(const std::string& name)
   return buf;
 }
 
+std::vector<std::string> js_callback_storage::list_dir()
+{
+  emscripten::val result = list_dir_fn_();
+
+  unsigned len = result["length"].as<unsigned>();
+  std::vector<std::string> names;
+  names.reserve(len);
+  for (unsigned i = 0; i < len; ++i)
+    names.push_back(result[i].as<std::string>());
+  return names;
+}
+
 // ── beekeeper_api ──────────────────────────────────────────
 
-beekeeper_api::beekeeper_api(emscripten::val save_fn, emscripten::val load_fn,
-                             emscripten::val crypto, uint32_t unlock_timeout)
+beekeeper_api::beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout)
   : crypto_(std::move(crypto))
-  , storage_(std::move(save_fn), std::move(load_fn))
+  , storage_(std::move(storage))
   , bk_(crypto_, storage_, unlock_timeout)
 {
 }
@@ -314,6 +326,33 @@ std::string beekeeper_api::has_matching_private_key(const std::string& token, co
     auto pk = crypto_.public_key_from_string(public_key, prefix_);
     bool found = keys.find(pk) != keys.end();
     return ok_json(std::string("{\"exists\":") + (found ? "true" : "false") + "}");
+  });
+}
+
+std::string beekeeper_api::has_wallet(const std::string& token, const std::string& wallet_name)
+{
+  return wrap([&]() {
+    auto& ses = bk_.get_session(token);
+    bool found = ses.has_wallet(wallet_name);
+    return ok_json(std::string("{\"exists\":") + (found ? "true" : "false") + "}");
+  });
+}
+
+std::string beekeeper_api::list_wallets(const std::string& token)
+{
+  return wrap([&]() {
+    auto& ses = bk_.get_session(token);
+    auto wallets = ses.list_wallets();
+    std::string arr = "[";
+    bool first = true;
+    for (auto& wd : wallets)
+    {
+      if (!first) arr += ",";
+      first = false;
+      arr += "{\"name\":\"" + json_escape(wd.name) + "\",\"unlocked\":" + (wd.unlocked ? "true" : "false") + "}";
+    }
+    arr += "]";
+    return ok_json("{\"wallets\":" + arr + "}");
   });
 }
 

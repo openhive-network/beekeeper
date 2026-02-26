@@ -54,8 +54,7 @@ export class BeekeeperApi implements IBeekeeperInstance {
 
   public init() {
     this.api = new this.provider.beekeeper_api(
-      this.storageCallbacks.save_fn,
-      this.storageCallbacks.load_fn,
+      this.storageCallbacks,
       this.crypto,
       this.options.unlockTimeout
     );

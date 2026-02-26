@@ -1,6 +1,7 @@
 export interface IStorageCallbacks {
   save_fn: (name: string, data: Uint8Array) => void;
   load_fn: (name: string) => Uint8Array;
+  list_dir_fn: () => string[];
 }
 
 export function createInMemoryStorage(): IStorageCallbacks & { store: Map<string, Uint8Array> } {
@@ -11,5 +12,6 @@ export function createInMemoryStorage(): IStorageCallbacks & { store: Map<string
     if (!d) throw new Error("Wallet not found: " + name);
     return d;
   };
-  return { save_fn, load_fn, store };
+  const list_dir_fn = (): string[] => Array.from(store.keys());
+  return { save_fn, load_fn, list_dir_fn, store };
 }

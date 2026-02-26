@@ -6,7 +6,6 @@
 namespace beekeeper_minimal {
 
 /// Abstract filesystem hooks. The consumer provides the implementation.
-/// These are the ONLY two I/O operations the minimal beekeeper ever needs.
 struct wallet_storage
 {
   virtual ~wallet_storage() = default;
@@ -16,6 +15,9 @@ struct wallet_storage
 
   /// Retrieve a previously-persisted wallet blob. Throws if not found.
   virtual std::vector<char> load(const std::string& path) = 0;
+
+  /// Return names of all wallets currently in storage.
+  virtual std::vector<std::string> list_dir() = 0;
 };
 
 } // namespace beekeeper_minimal

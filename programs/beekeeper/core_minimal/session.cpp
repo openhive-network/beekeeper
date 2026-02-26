@@ -1,5 +1,6 @@
 #include <core_minimal/session.hpp>
 
+#include <algorithm>
 #include <stdexcept>
 
 namespace beekeeper_minimal {
@@ -50,6 +51,44 @@ const wallet& session::get_wallet(const std::string& wallet_name) const
   if (it == wallets_.end())
     throw std::runtime_error("Wallet not found: " + wallet_name);
   return it->second;
+}
+
+// ── wallet queries ──────────────────────────────────────────
+
+bool session::has_wallet(const std::string& wallet_name) const
+{
+  if (wallets_.count(wallet_name))
+    return true;
+
+  if (storage_)
+  {
+    auto names = storage_->list_dir();
+    return std::find(names.begin(), names.end(), wallet_name) != names.end();
+  }
+
+  return false;
+}
+
+std::vector<wallet_details> session::list_wallets() const
+{
+  std::vector<wallet_details> result;
+
+  // Add in-memory wallets with their unlock status
+  for (const auto& [name, w] : wallets_)
+    result.push_back({ name, !w.is_locked() });
+
+  // Merge storage-only wallets (not yet opened in this session)
+  if (storage_)
+  {
+    auto names = storage_->list_dir();
+    for (auto& name : names)
+    {
+      if (!wallets_.count(name))
+        result.push_back({ name, false });
+    }
+  }
+
+  return result;
 }
 
 // ── wallet operations ────────────────────────────────────────

@@ -12,19 +12,22 @@
 
 namespace beekeeper_wasm {
 
-/// wallet_storage implementation that delegates to JS-side save/load callbacks.
-/// The JS callbacks receive the wallet name and a Uint8Array buffer.
+/// wallet_storage implementation that delegates to a JS storage object.
+/// The JS object must provide: save_fn, load_fn, list_dir_fn callbacks.
 class js_callback_storage final : public beekeeper_minimal::wallet_storage
 {
 public:
-  js_callback_storage(emscripten::val save_fn, emscripten::val load_fn);
+  /// @param storage  JS object: { save_fn, load_fn, list_dir_fn }
+  explicit js_callback_storage(emscripten::val storage);
 
   void save(const std::string& name, const std::vector<char>& buffer) override;
   std::vector<char> load(const std::string& name) override;
+  std::vector<std::string> list_dir() override;
 
 private:
   emscripten::val save_fn_;
   emscripten::val load_fn_;
+  emscripten::val list_dir_fn_;
 };
 
 /// Thin embind-friendly API that wraps core_minimal::beekeeper.
@@ -34,12 +37,10 @@ private:
 class beekeeper_api final
 {
 public:
-  /// @param save_fn         JS callback: (name: string, data: Uint8Array) => void
-  /// @param load_fn         JS callback: (name: string) => Uint8Array  (throws if not found)
+  /// @param storage         JS object: { save_fn, load_fn, list_dir_fn }
   /// @param crypto          JS object with async hash/AES methods (sha256, sha512, aes256CbcEncrypt/Decrypt)
   /// @param unlock_timeout  Inactivity timeout in seconds (default 900)
-  beekeeper_api(emscripten::val save_fn, emscripten::val load_fn,
-                emscripten::val crypto, uint32_t unlock_timeout);
+  beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout);
 
   // ── session ──────────────────────────────────────────────
 
@@ -87,6 +88,8 @@ public:
   // ── query ────────────────────────────────────────────────
 
   std::string has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
+  std::string has_wallet(const std::string& token, const std::string& wallet_name);
+  std::string list_wallets(const std::string& token);
   std::string get_info(const std::string& token);
 
 private:

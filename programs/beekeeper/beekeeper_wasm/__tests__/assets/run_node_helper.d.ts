@@ -10,6 +10,7 @@ export declare class ExtractError extends Error {
 export interface IStorageFns {
   save_fn: (name: string, data: Uint8Array) => void;
   load_fn: (name: string) => Uint8Array;
+  list_dir_fn: () => string[];
 }
 
 export interface IBeekeeperInstanceHelperConstructorSimplified {
@@ -38,6 +39,10 @@ export declare class BeekeeperInstanceHelper {
   public closeSession(token: string): string;
 
   public hasMatchingPrivateKey(token: string, walletName: string, publicKey: string): boolean;
+
+  public hasWallet(token: string, walletName: string): boolean;
+
+  public listWallets(token: string): { wallets: Array<{ name: string; unlocked: boolean }> };
 
   public create(sessionToken: string, walletName: string): Promise<string>;
 

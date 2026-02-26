@@ -24,6 +24,7 @@ export interface IBeekeeperWasmGlobals {
 export interface IIdbStorage {
   save_fn: (name: string, data: Uint8Array) => void;
   load_fn: (name: string) => Uint8Array;
+  list_dir_fn: () => string[];
   syncToIdb: () => Promise<void>;
   syncFromIdb: () => Promise<void>;
   listKeys: () => Promise<string[]>;

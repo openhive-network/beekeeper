@@ -89,8 +89,9 @@ globalThis.createIdbStorage = function createIdbStorage(dbName) {
     if (!d) throw new Error("Wallet not found: " + name);
     return d;
   };
+  const list_dir_fn = () => Array.from(cache.keys());
 
-  return { save_fn, load_fn, syncToIdb, syncFromIdb, listKeys, cache };
+  return { save_fn, load_fn, list_dir_fn, syncToIdb, syncFromIdb, listKeys, cache };
 };
 
 export {};

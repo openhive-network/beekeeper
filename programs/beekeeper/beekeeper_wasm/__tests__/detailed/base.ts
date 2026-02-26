@@ -13,11 +13,14 @@ test.describe('WASM Base tests', () => {
 
   test('Should be able to create instance of beekeeper_api', async ({ beekeeperWasmTest }) => {
     const retVal = await beekeeperWasmTest(async ({ provider, cryptoCallbacks }) => {
-      // core_minimal constructor: (save_fn, load_fn, crypto, unlockTimeout)
+      // core_minimal constructor: (storage, crypto, unlockTimeout)
       const store = new Map();
-      const save_fn = (name, data) => { store.set(name, new Uint8Array(data)); };
-      const load_fn = (name) => { const d = store.get(name); if (!d) throw new Error("Wallet not found: " + name); return d; };
-      return typeof new provider.beekeeper_api(save_fn, load_fn, cryptoCallbacks, 900);
+      const storage = {
+        save_fn: (name, data) => { store.set(name, new Uint8Array(data)); },
+        load_fn: (name) => { const d = store.get(name); if (!d) throw new Error("Wallet not found: " + name); return d; },
+        list_dir_fn: () => Array.from(store.keys())
+      };
+      return typeof new provider.beekeeper_api(storage, cryptoCallbacks, 900);
     });
 
     expect(retVal).toBe('object');
