@@ -34,26 +34,26 @@ build() {
     -B "${BUILD_DIR}"
   ninja -v -j8 2>&1 | tee -i "${BUILD_DIR}/build.log"
 
-  cmake --install "${BUILD_DIR}" --component wasm_runtime_components --prefix "${BUILD_DIR}/"
+  GLUE="${BUILD_DIR}/beekeeper_wasm.common.js"
 
-  # Emscripten still uses redundant createRequire for legacy CJS support - remove it so we have proper bundlers support
-  # Emscripten 5.x uses "node:module" prefix, 4.x used "module"
-  sed -i "s#var require = createRequire(import.meta.url);##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#const {createRequire} = await import(\"module\");##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#const {createRequire} = await import(\"node:module\");##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
+  # Strip node: prefix from all module specifiers so bundlers (Parcel/Webpack) can
+  # resolve them. Emscripten 5.x generates "node:fs" etc.; 4.x used plain names.
+  # We keep createRequire + require() intact — Parcel ignores require() calls,
+  # but statically resolves import(), so do NOT replace require with import here.
+  sed -i 's#"node:module"#"module"#g' "${GLUE}"
+  sed -i 's#"node:fs"#"fs"#g' "${GLUE}"
+  sed -i 's#"node:path"#"path"#g' "${GLUE}"
+  sed -i 's#"node:url"#"url"#g' "${GLUE}"
+  sed -i 's#"node:crypto"#"crypto"#g' "${GLUE}"
 
-  # Replace requires with our await import-s (Emscripten 5.x uses node: prefix)
-  sed -i "s#require(\"fs\");#(await import(\"fs\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#require(\"node:fs\");#(await import(\"node:fs\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#require(\"path\")#(await import(\"path\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#require(\"node:path\")#(await import(\"node:path\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#require(\"url\")#(await import(\"url\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#require(\"node:url\")#(await import(\"node:url\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-
-  # Remove Node.js "crypto" module import, as we already have crypto API support in Node.js 19+
-  sed -i "s#var nodeCrypto = require(\"crypto\");##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#var nodeCrypto = require(\"node:crypto\");##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
-  sed -i "s#return view => nodeCrypto.randomFillSync(view);##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
+  # Replace bare process.* with globalThis.process.* so Parcel does not try to
+  # polyfill the "process" Node.js builtin in browser bundles.
+  # Only match process not preceded by a dot (avoids double-replacing globalThis.process).
+  sed -i 's#\([^.]\)process\.argv#\1globalThis.process.argv#g' "${GLUE}"
+  sed -i 's#\([^.]\)process\.exitCode#\1globalThis.process.exitCode#g' "${GLUE}"
+  # Handle process at start of line
+  sed -i 's#^process\.argv#globalThis.process.argv#g' "${GLUE}"
+  sed -i 's#^process\.exitCode#globalThis.process.exitCode#g' "${GLUE}"
 }
 
 if [ "${DIRECT_EXECUTION}" -eq 0 ]; then

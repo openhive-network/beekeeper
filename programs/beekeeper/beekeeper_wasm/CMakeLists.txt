@@ -27,12 +27,6 @@ set( SOURCES
 
 set( INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/include )
 
-DEFINE_WASM_TARGET_FOR( beekeeper_wasm
-      TARGET_ENVIRONMENT "web"
-      LINK_LIBRARIES beekeeper_core_minimal secp256k1_wasm
-)
-
-DEFINE_WASM_TARGET_FOR( beekeeper_wasm
-      TARGET_ENVIRONMENT "node"
+DEFINE_WASM_TARGET( beekeeper_wasm
       LINK_LIBRARIES beekeeper_core_minimal secp256k1_wasm
 )

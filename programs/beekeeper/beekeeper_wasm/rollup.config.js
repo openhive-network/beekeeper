@@ -29,17 +29,10 @@ export default [
       file: 'dist/bundle/web.js'
     },
     external: [
-      './build/beekeeper_wasm.web.js',
+      './build/beekeeper_wasm.common.js',
       './detailed/index.js'
     ],
     plugins: [
-      replace({
-        delimiters: ['[\'"]','[\'"]'],
-        values: {
-          './build/beekeeper_wasm.common.js': '"./build/beekeeper_wasm.web.js"'
-        },
-        preventAssignment: true
-      }),
       replace({
         values: {
           'process.env.DEFAULT_STORAGE_ROOT': `"/storage_root"`,
@@ -57,22 +50,15 @@ export default [
       file: 'dist/bundle/node.js'
     },
     external: [
-      './build/beekeeper_wasm.node.js',
+      './build/beekeeper_wasm.common.js',
       './detailed/index.js'
     ],
     plugins: [
       copy({
         targets: [
-          { src: ['src/build/beekeeper_wasm.common.wasm', 'src/build/beekeeper_wasm.*.js'], dest: 'dist/bundle/build' },
+          { src: ['src/build/beekeeper_wasm.common.wasm', 'src/build/beekeeper_wasm.common.js'], dest: 'dist/bundle/build' },
           { src: ['src/build/beekeeper_wasm.common.d.ts'], dest: 'dist/build' }
         ]
-      }),
-      replace({
-        delimiters: ['[\'"]', '[\'"]'],
-        values: {
-          './build/beekeeper_wasm.common.js': '"./build/beekeeper_wasm.node.js"'
-        },
-        preventAssignment: true
       }),
       replace({
         values: {

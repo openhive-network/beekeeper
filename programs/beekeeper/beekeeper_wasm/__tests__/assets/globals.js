@@ -20,9 +20,7 @@ globalThis.createBeekeeperTestFor = async function createBeekeeperTestFor (env) 
 };
 
 globalThis.createBeekeeperWasmTestFor = async function createBeekeeperWasmTestFor (env) {
-  const locBeekeeperWasm = env === 'web' ? '../../dist/bundle/build/beekeeper_wasm.web' : '../../dist/bundle/build/beekeeper_wasm.node';
-
-  const wasm = await import(locBeekeeperWasm);
+  const wasm = await import('../../dist/bundle/build/beekeeper_wasm.common');
 
   const provider = await wasm.default();
   const cryptoCallbacks = await loadCryptoCallbacks();

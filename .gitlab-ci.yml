@@ -146,8 +146,6 @@ beekeeper_wasm_build:
       - "${SOURCE_DIR}/src/build/*.wasm"
       - "${SOURCE_DIR}/src/build/*.js"
       - "${SOURCE_DIR}/src/build/*.d.ts"
-      - "${SOURCE_DIR}/src/build/node"
-      - "${SOURCE_DIR}/src/build/web"
     expire_in: 1 week
 
 beekeeper_wasm_test:
