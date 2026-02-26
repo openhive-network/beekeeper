@@ -1,7 +1,7 @@
 import { BeekeeperApi } from "./api.js";
 import { BeekeeperSession } from "./session.js";
 import { IBeekeeperUnlockedWallet, IBeekeeperSession, TPublicKey, IBeekeeperWallet, TSignature } from "./interfaces.js";
-import { safeAsyncWasmCall, safeWasmCall } from './util/wasm_error.js';
+import { safeAsyncWasmCall } from './util/wasm_error.js';
 
 interface IImportKeyResponse {
   public_key: string;
@@ -59,8 +59,9 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return public_key;
   }
 
-  public hasMatchingPrivateKey(publicKey: TPublicKey): boolean {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.has_matching_private_key(this.session.token, this.locked.name, publicKey) as string, `checking for matching key '${publicKey}' in wallet '${this.locked.name}'`)) as IHasMatchingPrivateKey;
+  public async hasMatchingPrivateKey(publicKey: TPublicKey): Promise<boolean> {
+    const json = await safeAsyncWasmCall(() => this.api.api.has_matching_private_key(this.session.token, this.locked.name, publicKey) as string, `checking for matching key '${publicKey}' in wallet '${this.locked.name}'`);
+    const result = this.api.extract(json) as IHasMatchingPrivateKey;
 
     return result.exists;
   }
@@ -70,19 +71,21 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     this.api.extract(json);
   }
 
-  public signDigest(publicKey: string, sigDigest: string | Uint8Array): TSignature {
+  public async signDigest(publicKey: string, sigDigest: string | Uint8Array): Promise<TSignature> {
     if (sigDigest instanceof Uint8Array) {
       // Convert Uint8Array to hex string
       sigDigest = Array.from(sigDigest).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    const result = this.api.extract(safeWasmCall(() => this.api.api.sign_digest(this.session.token, sigDigest, publicKey) as string, `signing digest with key '${publicKey}' using wallet '${this.locked.name}'`)) as IBeekeeperSignature;
+    const json = await safeAsyncWasmCall(() => this.api.api.sign_digest(this.session.token, sigDigest, publicKey) as string, `signing digest with key '${publicKey}' using wallet '${this.locked.name}'`);
+    const result = this.api.extract(json) as IBeekeeperSignature;
 
     return result.signature;
   }
 
-  public getPublicKeys(): TPublicKey[] {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.get_public_keys(this.session.token, this.locked.name) as string, `public keys retrieval from wallet '${this.locked.name}'`)) as IBeekeeperKeys;
+  public async getPublicKeys(): Promise<TPublicKey[]> {
+    const json = await safeAsyncWasmCall(() => this.api.api.get_public_keys(this.session.token, this.locked.name) as string, `public keys retrieval from wallet '${this.locked.name}'`);
+    const result = this.api.extract(json) as IBeekeeperKeys;
 
     return result.keys.map(value => value.public_key);
   }
@@ -136,7 +139,7 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
     if(typeof this.unlocked !== 'undefined')
       await this.unlocked.lock();
 
-    this.session.closeWallet(this.name);
+    await this.session.closeWallet(this.name);
 
     return this.session;
   }

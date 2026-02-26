@@ -9,14 +9,11 @@ import { safeWasmCall } from './util/wasm_error.js';
 
 // We would like to expose our api using BeekeeperInstance interface, but we would not like to expose users a way of creating instance of BeekeeperApi
 export class BeekeeperApi implements IBeekeeperInstance {
-  public api!: Readonly<beekeeper_api>;
+  public readonly api!: Readonly<beekeeper_api>;
 
   public readonly sessions: Map<string, BeekeeperSession> = new Map();
 
   public readonly isInMemory: boolean;
-  public readonly storageCallbacks: IStorageCallbacks;
-
-  private readonly crypto: ICryptoCallbacks;
 
   public constructor(
     private readonly provider: MainModule,
@@ -25,8 +22,12 @@ export class BeekeeperApi implements IBeekeeperInstance {
     crypto: ICryptoCallbacks
   ) {
     this.isInMemory = Boolean(options.inMemory);
-    this.storageCallbacks = storage;
-    this.crypto = crypto;
+
+    this.api = new this.provider.beekeeper_api(
+      storage,
+      crypto,
+      this.options.unlockTimeout
+    );
   }
 
   public getVersion(): string {
@@ -50,14 +51,6 @@ export class BeekeeperApi implements IBeekeeperInstance {
 
       throw error;
     }
-  }
-
-  public init() {
-    this.api = new this.provider.beekeeper_api(
-      this.storageCallbacks,
-      this.crypto,
-      this.options.unlockTimeout
-    );
   }
 
   public createSession(salt: string): IBeekeeperSession {

@@ -41,10 +41,7 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*wasm_crypto_primitives::aes256_cbc_encrypt*"
     "*wasm_crypto_primitives::aes256_cbc_decrypt*"
     "*wasm_crypto_primitives::ecdh_shared_secret*"
-    # crypto_provider_impl — calls async primitives
-    "*crypto_provider_impl::aes_encrypt*"
-    "*crypto_provider_impl::aes_decrypt*"
-    "*crypto_provider_impl::generate_encrypted_key*"
+    # crypto_provider_impl — calls async primitives (some inlined by -Oz)
     "*crypto_provider_impl::encrypt_wallet_data*"
     "*crypto_provider_impl::decrypt_wallet_data*"
     "*crypto_provider_impl::validate_password*"
@@ -52,31 +49,16 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*crypto_provider_impl::ecdh_decrypt*"
     "*crypto_provider_impl::wif_to_key*"
     "*crypto_provider_impl::key_to_wif*"
-    # wallet — calls crypto_provider_impl
-    "*wallet::create*"
-    "*wallet::open*"
-    "*wallet::unlock*"
+    # wallet — calls crypto_provider_impl and storage (most inlined by -Oz)
     "*wallet::lock*"
     "*wallet::encrypt_and_save*"
-    "*wallet::import_key*"
-    "*wallet::remove_key*"
-    "*wallet::check_password*"
-    # session — calls wallet
+    # session — calls wallet and storage (most inlined by -Oz)
     "*session::create_wallet*"
     "*session::open_wallet*"
-    "*session::unlock*"
-    "*session::lock*"
-    "*session::lock_all*"
-    "*session::check_timeout*"
-    "*session::import_key*"
-    "*session::remove_key*"
     "*session::encrypt_data*"
     "*session::decrypt_data*"
-    "*session::gen_password*"
-    # beekeeper — check_timeouts can trigger lock_all → encrypt_and_save
-    "*beekeeper::check_timeouts*"
+    # beekeeper — create_session survives, rest inlined
     "*beekeeper::create_session*"
-    "*beekeeper::close_session*"
     # beekeeper_api — embind entry points (wrap() is inlined into each)
     "*beekeeper_api::create*"
     "*beekeeper_api::open*"
@@ -91,16 +73,18 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*beekeeper_api::decrypt_data*"
     "*beekeeper_api::get_info*"
     "*beekeeper_api::has_matching_private_key*"
+    "*beekeeper_api::has_wallet*"
+    "*beekeeper_api::list_wallets*"
     "*beekeeper_api::get_public_keys*"
     "*beekeeper_api::create_session*"
     "*beekeeper_api::close_session*"
-    # JS callback storage — called during wallet save/load in async context
+    # JS callback storage — called during wallet save/load/list_dir in async context
     "*js_callback_storage::save*"
     "*js_callback_storage::load*"
+    "*js_callback_storage::list_dir*"
     # Embind dispatch layer (MethodInvoker/Invoker call beekeeper_api methods)
-    "*MethodInvoker*beekeeper_api*"
-    "*Invoker*beekeeper_api*"
-    "*operator_new*beekeeper_api*"
+    "*MethodInvoker*"
+    "*Invoker*"
     # emscripten::val — await, call, and internalCall are in the async path
     "*emscripten::val*"
     # wasm_crypto_primitives helpers called around val::await
@@ -108,9 +92,7 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*wasm_crypto_primitives::to_js*"
     # std::function wrappers for key_finder lambdas in decrypt_data
     "*__func*session::decrypt_data*"
-    "*__func*session::encrypt_data*"
-    # Emscripten invoke/dynCall trampolines (exception-safe indirect calls)
-    "*__invoke*"
+    # Emscripten dynCall trampolines (exception-safe indirect calls)
     "*dynCall*"
   )
   list(JOIN ASYNCIFY_FUNCS "','" ASYNCIFY_FUNCS_STR)

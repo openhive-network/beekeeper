@@ -5,6 +5,7 @@ add_library( beekeeper_core_minimal
              session.cpp
              beekeeper.cpp
              crypto_provider_impl.cpp
+             memory_storage.cpp
              ${HEADERS}
            )
 

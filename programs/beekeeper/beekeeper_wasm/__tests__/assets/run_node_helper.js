@@ -142,27 +142,27 @@ export class BeekeeperInstanceHelper {
     return value.token;
   }
 
-  closeSession(token) {
-    const returnedValue = this.instance.close_session(token);
+  async closeSession(token) {
+    const returnedValue = await this.instance.close_session(token);
     return this.#extract(returnedValue);
   }
 
-  hasMatchingPrivateKey(token, walletName, publicKey) {
-    const returnedValue = this.instance.has_matching_private_key(token, walletName, publicKey);
+  async hasMatchingPrivateKey(token, walletName, publicKey) {
+    const returnedValue = await this.instance.has_matching_private_key(token, walletName, publicKey);
     const value = this.#extract(returnedValue);
 
     return value.exists;
   }
 
-  hasWallet(token, walletName) {
-    const returnedValue = this.instance.has_wallet(token, walletName);
+  async hasWallet(token, walletName) {
+    const returnedValue = await this.instance.has_wallet(token, walletName);
     const value = this.#extract(returnedValue);
 
     return value.exists;
   }
 
-  listWallets(token) {
-    const returnedValue = this.instance.list_wallets(token);
+  async listWallets(token) {
+    const returnedValue = await this.instance.list_wallets(token);
 
     return this.#extract(returnedValue);
   }
@@ -259,8 +259,8 @@ export class BeekeeperInstanceHelper {
     }
   }
 
-  signDigest(sessionToken, sigDigest, publicKey) {
-    const returnedValue = this.instance.sign_digest(sessionToken, sigDigest, publicKey);
+  async signDigest(sessionToken, sigDigest, publicKey) {
+    const returnedValue = await this.instance.sign_digest(sessionToken, sigDigest, publicKey);
 
     if( this.#acceptError )
     {
@@ -274,26 +274,26 @@ export class BeekeeperInstanceHelper {
     }
   }
 
-  getPublicKeys(sessionToken) {
-    const returnedValue = this.instance.get_public_keys(sessionToken);
+  async getPublicKeys(sessionToken) {
+    const returnedValue = await this.instance.get_public_keys(sessionToken);
 
     return this.#extract(returnedValue);
   }
 
-  getInfo(sessionToken) {
-    const returnedValue = this.instance.get_info(sessionToken);
+  async getInfo(sessionToken) {
+    const returnedValue = await this.instance.get_info(sessionToken);
 
     return this.#extract(returnedValue);
   }
 
-  open(sessionToken, walletName) {
-    const returnedValue = this.instance.open(sessionToken, walletName);
+  async open(sessionToken, walletName) {
+    const returnedValue = await this.instance.open(sessionToken, walletName);
 
     return this.#extract(returnedValue);
   }
 
-  close(sessionToken, walletName) {
-    const returnedValue = this.instance.close(sessionToken, walletName);
+  async close(sessionToken, walletName) {
+    const returnedValue = await this.instance.close(sessionToken, walletName);
 
     return this.#extract(returnedValue);
   }

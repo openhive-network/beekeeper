@@ -2,6 +2,7 @@
 
 #include <core_minimal/wallet.hpp>
 #include <core_minimal/crypto_provider.hpp>
+#include <core_minimal/memory_storage.hpp>
 
 #include <chrono>
 #include <map>
@@ -46,8 +47,11 @@ public:
 
   /// Create a new wallet with the given name and password.
   /// If password is empty, one is generated and returned.
+  /// @param is_temporary  When true, the wallet uses an in-memory store
+  ///                      (bypasses the session's persistent storage callbacks).
   std::string create_wallet(const std::string& wallet_name,
-                            const std::string& password);
+                            const std::string& password,
+                            bool is_temporary = false);
 
   /// Open an existing wallet from storage (locked).
   void open_wallet(const std::string& wallet_name);
@@ -106,6 +110,7 @@ private:
   std::string                              token_;
   crypto_provider&                         crypto_;
   wallet_storage*                          storage_;
+  memory_storage                           mem_storage_;
   std::map<std::string, wallet>            wallets_;
 
   std::chrono::seconds                     timeout_;

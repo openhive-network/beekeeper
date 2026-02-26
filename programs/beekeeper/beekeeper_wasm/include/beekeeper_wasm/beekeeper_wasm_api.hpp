@@ -52,6 +52,7 @@ public:
 
   std::string create(const std::string& token, const std::string& wallet_name);
   std::string create(const std::string& token, const std::string& wallet_name, const std::string& password);
+  std::string create(const std::string& token, const std::string& wallet_name, const std::string& password, bool is_temporary);
 
   std::string open(const std::string& token, const std::string& wallet_name);
   std::string close(const std::string& token, const std::string& wallet_name);

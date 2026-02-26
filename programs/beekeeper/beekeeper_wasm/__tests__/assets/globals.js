@@ -10,7 +10,7 @@ globalThis.createBeekeeperTestFor = async function createBeekeeperTestFor (env) 
 
   const beekeeper = await import(locBeekeeper);
 
-  const bk = await beekeeper.default({ enableLogs: false });
+  const bk = await beekeeper.default();
 
   return {
     env,

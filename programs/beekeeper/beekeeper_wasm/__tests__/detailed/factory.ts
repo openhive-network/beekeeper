@@ -30,7 +30,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     const retVal = await beekeeperTest.dynamic(async ({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");
 
-      return session.getInfo();
+      return await session.getInfo();
     });
 
     expect(retVal).toHaveProperty('now');
@@ -63,7 +63,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
       await unlocked.removeKey('STM6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa');
 
-      return unlocked.getPublicKeys();
+      return await unlocked.getPublicKeys();
     });
 
     expect(retVal).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
@@ -79,7 +79,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       await unlocked1.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
       await unlocked2.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
 
-      return unlocked1.getPublicKeys();
+      return await unlocked1.getPublicKeys();
     });
 
     expect(retVal).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
@@ -93,7 +93,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
       await unlocked.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
 
-      return unlocked.hasMatchingPrivateKey('STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh');
+      return await unlocked.hasMatchingPrivateKey('STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh');
     });
 
     expect(retVal).toBeTruthy();
@@ -113,14 +113,14 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
   test('Should be able to do a single inMemory sign', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest(async ({ provider }) => {
-      const bk = await provider.default({ inMemory: true, enableLogs: false });
+      const bk = await provider.default({ inMemory: true });
 
       const session = bk.createSession("my.salt");
       const { wallet } = await session.createWallet('tmp', 'mypassword');
 
       const publicKey = await wallet.importKey('5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n');
 
-      const signature = wallet.signDigest(publicKey, "390f34297cfcb8fa4b37353431ecbab05b8dc0c9c15fb9ca1a3d510c52177542");
+      const signature = await wallet.signDigest(publicKey, "390f34297cfcb8fa4b37353431ecbab05b8dc0c9c15fb9ca1a3d510c52177542");
 
       await bk.delete();
 
@@ -132,7 +132,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
   test('Should wallet be a temporary wallet when inMemory is true', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest(async ({ provider }) => {
-      const bk = await provider.default({ inMemory: true, enableLogs: false });
+      const bk = await provider.default({ inMemory: true });
       const session = bk.createSession("my.salt");
 
       const { wallet: unlocked } = await session.createWallet('w0', 'mypassword');
@@ -261,7 +261,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       const bk = await provider.default({ unlockTimeout: 5 });
 
       const session = bk.createSession("my.salt");
-      const info = session.getInfo();
+      const info = await session.getInfo();
 
       await bk.delete();
 
@@ -286,8 +286,8 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
       const publicKey = await wallet.importKey('5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n');
 
-      const signatureStr = wallet.signDigest(publicKey, digestStr);
-      const signatureHex = wallet.signDigest(publicKey, uint8Array);
+      const signatureStr = await wallet.signDigest(publicKey, digestStr);
+      const signatureHex = await wallet.signDigest(publicKey, uint8Array);
 
       return {
         fromString: signatureStr,

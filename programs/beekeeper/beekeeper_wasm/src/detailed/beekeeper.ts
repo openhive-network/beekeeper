@@ -3,15 +3,8 @@ import type Beekeeper from "../build/beekeeper_wasm.common";
 import { BeekeeperApi } from "./api.js";
 import { createCryptoCallbacks } from "./crypto.js";
 import type { IStorageCallbacks } from "./fs.js";
-import { createInMemoryStorage } from "./fs.js";
 import { IBeekeeperInstance, IBeekeeperOptions } from "./interfaces.js";
 import { safeAsyncWasmCall } from "./util/wasm_error.js";
-
-const DEFAULT_BEEKEEPER_OPTIONS: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'> = {
-  enableLogs: false,
-  unlockTimeout: 900,
-  inMemory: false
-};
 
 interface IOptionalModuleArgs {
   wasmBinary?: Uint8Array;
@@ -21,19 +14,22 @@ interface IOptionalModuleArgs {
 const createBeekeeper = async(
   beekeeperContstructor: typeof Beekeeper,
   ModuleExt: IOptionalModuleArgs = {},
-  options: Partial<IBeekeeperOptions> = {}
+  options: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'>,
+  storage?: IStorageCallbacks
 ): Promise<IBeekeeperInstance> => {
-  const { wasmLocation: _wl, storageRoot: _sr, ...otherOptions } = options;
-  const mergedOptions = { ...DEFAULT_BEEKEEPER_OPTIONS, ...otherOptions };
-
-  const storage: IStorageCallbacks = mergedOptions.inMemory ? createInMemoryStorage() : (mergedOptions.storage ?? createInMemoryStorage());
-
   const crypto = createCryptoCallbacks();
 
-  const beekeeperProvider = await safeAsyncWasmCall(() => beekeeperContstructor(ModuleExt), "Beekeeper WASM module loading");
-  const api = new BeekeeperApi(beekeeperProvider, mergedOptions, storage, crypto);
+  // When inMemory mode is active, no persistent storage is needed.
+  // C++ still requires a valid storage object for js_callback_storage construction,
+  // but temporary wallets will use the C++ in-memory store (mem_storage_) instead.
+  storage ??= {
+    save_fn: () => {},
+    load_fn: (name) => { throw new Error("No persistent storage: " + name); },
+    list_dir_fn: () => []
+  };
 
-  api.init();
+  const beekeeperProvider = await safeAsyncWasmCall(() => beekeeperContstructor(ModuleExt), "Beekeeper WASM module loading");
+  const api = new BeekeeperApi(beekeeperProvider, options, storage, crypto);
 
   return api;
 };

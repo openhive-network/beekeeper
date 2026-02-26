@@ -14,7 +14,7 @@ self.onconnect = event => {
       try { // We import here asyncronously to retrieve any potential loading errors
         isBkInitialized = true;
         const { default: createBeekeeper } = await import('@hiveio/beekeeper');
-        const instance = await createBeekeeper({ inMemory: true, enableLogs: false });
+        const instance = await createBeekeeper({ inMemory: true });
         bkResolve(instance);
       } catch (error) {
         isBkInitialized = false;

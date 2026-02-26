@@ -60,12 +60,15 @@ void js_callback_storage::save(const std::string& name, const std::vector<char>&
                     reinterpret_cast<const uint8_t*>(buffer.data())));
   js_uint8.call<void>("set", mem_view);
 
-  save_fn_(std::string(name), js_uint8);
+  // .await() handles both sync and async (Promise) callbacks via Asyncify.
+  // Sync callbacks return a non-thenable value — await() returns it immediately.
+  save_fn_(std::string(name), js_uint8).await();
 }
 
 std::vector<char> js_callback_storage::load(const std::string& name)
 {
-  emscripten::val result = load_fn_(std::string(name));
+  // .await() handles both sync and async (Promise) callbacks via Asyncify.
+  emscripten::val result = load_fn_(std::string(name)).await();
 
   // Convert JS Uint8Array back to vector<char>
   unsigned len = result["length"].as<unsigned>();
@@ -77,7 +80,8 @@ std::vector<char> js_callback_storage::load(const std::string& name)
 
 std::vector<std::string> js_callback_storage::list_dir()
 {
-  emscripten::val result = list_dir_fn_();
+  // .await() handles both sync and async (Promise) callbacks via Asyncify.
+  emscripten::val result = list_dir_fn_().await();
 
   unsigned len = result["length"].as<unsigned>();
   std::vector<std::string> names;
@@ -143,6 +147,15 @@ std::string beekeeper_api::create(const std::string& token, const std::string& w
   return wrap([&]() {
     auto& ses = bk_.get_session(token);
     auto pw = ses.create_wallet(wallet_name, password);
+    return ok_json("{\"password\":\"" + json_escape(pw) + "\"}");
+  });
+}
+
+std::string beekeeper_api::create(const std::string& token, const std::string& wallet_name, const std::string& password, bool is_temporary)
+{
+  return wrap([&]() {
+    auto& ses = bk_.get_session(token);
+    auto pw = ses.create_wallet(wallet_name, password, is_temporary);
     return ok_json("{\"password\":\"" + json_escape(pw) + "\"}");
   });
 }

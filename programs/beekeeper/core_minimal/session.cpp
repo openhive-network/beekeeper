@@ -94,7 +94,8 @@ std::vector<wallet_details> session::list_wallets() const
 // ── wallet operations ────────────────────────────────────────
 
 std::string session::create_wallet(const std::string& wallet_name,
-                                   const std::string& password)
+                                   const std::string& password,
+                                   bool is_temporary)
 {
   refresh_timeout();
 
@@ -103,7 +104,8 @@ std::string session::create_wallet(const std::string& wallet_name,
 
   std::string pw = password.empty() ? gen_password() : password;
 
-  auto [it, _] = wallets_.emplace(wallet_name, wallet(crypto_, storage_, wallet_name));
+  wallet_storage* ws = is_temporary ? &mem_storage_ : storage_;
+  auto [it, _] = wallets_.emplace(wallet_name, wallet(crypto_, ws, wallet_name));
   it->second.create(pw);
 
   return pw;

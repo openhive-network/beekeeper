@@ -51,7 +51,10 @@ export default [
     },
     external: [
       './build/beekeeper_wasm.common.js',
-      './detailed/index.js'
+      './detailed/index.js',
+      'node:fs/promises',
+      'node:fs',
+      'node:path'
     ],
     plugins: [
       copy({
@@ -61,13 +64,19 @@ export default [
         ]
       }),
       replace({
+        delimiters: ['[\'"]','[\'"]'],
+        values: {
+          './storage-web.js': '"./storage-node.js"'
+        },
+        preventAssignment: true
+      }),
+      replace({
         values: {
           'process.env.DEFAULT_STORAGE_ROOT': `"./storage_root-node"`,
           'process.env.ROLLUP_TARGET_ENV': `"node"`
         },
         preventAssignment: true
       })
-
     ]
   },
   {

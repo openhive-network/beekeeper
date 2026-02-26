@@ -2,7 +2,7 @@ import { BeekeeperError } from "./errors.js";
 import { BeekeeperApi } from "./api.js";
 import { IBeekeeperInfo, IBeekeeperInstance, IBeekeeperSession, IBeekeeperWallet, IWalletCreated } from "./interfaces.js";
 import { BeekeeperLockedWallet, BeekeeperUnlockedWallet } from "./wallet.js";
-import { safeAsyncWasmCall, safeWasmCall } from './util/wasm_error.js';
+import { safeAsyncWasmCall } from './util/wasm_error.js';
 
 interface IBeekeeperWalletPassword {
   password: string;
@@ -21,8 +21,9 @@ export class BeekeeperSession implements IBeekeeperSession {
 
   public readonly wallets: Map<string, BeekeeperLockedWallet> = new Map();
 
-  public getInfo(): IBeekeeperInfo {
-    const result = this.api.extract(safeWasmCall(() => this.api.api.get_info(this.token) as string, "session info retrieval")) as IBeekeeperSessionInfo;
+  public async getInfo(): Promise<IBeekeeperInfo> {
+    const json = await safeAsyncWasmCall(() => this.api.api.get_info(this.token) as string, "session info retrieval");
+    const result = this.api.extract(json) as IBeekeeperSessionInfo;
 
     return {
       now: new Date(`${result.now}Z`),
@@ -30,10 +31,11 @@ export class BeekeeperSession implements IBeekeeperSession {
     };
   }
 
-  public hasWallet(name: string): boolean {
-    const result = this.api.extract(
-      safeWasmCall(() => this.api.api.has_wallet(this.token, name) as string, `wallet '${name}' existence check`)
-    ) as { exists: boolean };
+  public async hasWallet(name: string): Promise<boolean> {
+    const json = await safeAsyncWasmCall(
+      () => this.api.api.has_wallet(this.token, name) as string, `wallet '${name}' existence check`
+    );
+    const result = this.api.extract(json) as { exists: boolean };
     return result.exists;
   }
 
@@ -45,14 +47,13 @@ export class BeekeeperSession implements IBeekeeperSession {
     if (isTemporary === undefined)
       isTemporary = this.api.isInMemory;
 
-    if(typeof password === 'string') {
-      const json = await safeAsyncWasmCall(() => this.api.api.create(this.token, name, password as string) as string, `wallet '${name}' creation`);
-      this.api.extract(json);
-    } else {
-      const json = await safeAsyncWasmCall(() => this.api.api.create(this.token, name) as string, `wallet '${name}' creation`);
-      const result = this.api.extract(json) as IBeekeeperWalletPassword;
+    const json = await safeAsyncWasmCall(
+      () => this.api.api.create(this.token, name, password ?? "", isTemporary) as string,
+      `wallet '${name}' creation`
+    );
+    const result = this.api.extract(json) as IBeekeeperWalletPassword;
+    if (typeof password !== 'string')
       ({ password } = result);
-    }
 
     const wallet = new BeekeeperLockedWallet(this.api, this, name, isTemporary);
     wallet.unlocked = new BeekeeperUnlockedWallet(this.api, this, wallet);
@@ -65,11 +66,12 @@ export class BeekeeperSession implements IBeekeeperSession {
     };
   }
 
-  public openWallet(name: string): IBeekeeperWallet {
+  public async openWallet(name: string): Promise<IBeekeeperWallet> {
     if(this.wallets.has(name))
       return this.wallets.get(name) as IBeekeeperWallet;
 
-    this.api.extract(safeWasmCall(() => this.api.api.open(this.token, name) as string, `wallet '${name}' opening`));
+    const json = await safeAsyncWasmCall(() => this.api.api.open(this.token, name) as string, `wallet '${name}' opening`);
+    this.api.extract(json);
     const wallet = new BeekeeperLockedWallet(this.api, this, name, false);
 
     this.wallets.set(name, wallet);
@@ -77,11 +79,12 @@ export class BeekeeperSession implements IBeekeeperSession {
     return wallet;
   }
 
-  public closeWallet(name: string): void {
+  public async closeWallet(name: string): Promise<void> {
     if(!this.wallets.delete(name))
       throw new BeekeeperError(`This Beekeeper API session is not the owner of wallet identified by name: "${name}"`);
 
-    this.api.extract(safeWasmCall(() => this.api.api.close(this.token, name) as string, `wallet '${name}' closing`));
+    const json = await safeAsyncWasmCall(() => this.api.api.close(this.token, name) as string, `wallet '${name}' closing`);
+    this.api.extract(json);
   }
 
   public async lockAll(): Promise<Array<IBeekeeperWallet>> {

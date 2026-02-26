@@ -1,6 +1,5 @@
 // @ts-expect-error ts(6133) Type BeekeeperError is used in JSDoc
 import type { BeekeeperError } from "./errors";
-import type { IStorageCallbacks } from "./fs";
 
 export type TPublicKey = string;
 export type TSignature = string;
@@ -53,7 +52,9 @@ export interface IBeekeeperInfo {
 
 export interface IBeekeeperOptions {
   /**
-   * @deprecated No longer used. Storage is controlled via the `storage` option.
+   * The path of the wallet files (absolute path or relative to application data dir). Parent of the `.beekeeper` directory
+   *
+   * Defaults to "/storage_root" for web and "./storage_root-node" for Node.js
    *
    * @type {string}
    */
@@ -68,15 +69,6 @@ export interface IBeekeeperOptions {
    * @type {string}
    */
   wasmLocation: string;
-
-  /**
-   * Whether internal Beekeeper core logs can be written. By default verbose Beekeeper core logs are disabled.
-   *
-   * Having this option disabled doesn't prevent you from seeing logs or catching detailed Beekeeper errors in your application.
-   *
-   * @default false
-   */
-  enableLogs: boolean;
 
   /**
    * Timeout for unlocked wallet in seconds (default 900 - 15 minutes).
@@ -99,14 +91,6 @@ export interface IBeekeeperOptions {
    * @default false
    */
   inMemory: boolean;
-
-  /**
-   * Custom storage callbacks for wallet persistence.
-   * If not provided (and `inMemory` is not `true`), an in-memory Map-backed storage is used.
-   *
-   * @type {IStorageCallbacks}
-   */
-  storage?: IStorageCallbacks;
 }
 
 export interface IBeekeeperUnlockedWallet extends IWallet {
@@ -144,11 +128,11 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    *
    * @param {TPublicKey} publicKey public key in WIF format to match the private key in the wallet
    *
-   * @returns {boolean} `true` if a matching private key is found otherwise `false`
+   * @returns {Promise<boolean>} `true` if a matching private key is found otherwise `false`
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  hasMatchingPrivateKey(publicKey: TPublicKey): boolean;
+  hasMatchingPrivateKey(publicKey: TPublicKey): Promise<boolean>;
 
   /**
    * Signs a transaction by signing a digest of the transaction
@@ -156,20 +140,20 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    * @param {TPublicKey} publicKey public key in WIF format to match the private key in the wallet. It will be used to sign the provided data
    * @param {string | Uint8Array} sigDigest digest of a transaction in hex format or as an array of bytes to be signed
    *
-   * @returns {TSignature} signed data in hex format
+   * @returns {Promise<TSignature>} signed data in hex format
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  signDigest(publicKey: TPublicKey, sigDigest: string | Uint8Array): TSignature;
+  signDigest(publicKey: TPublicKey, sigDigest: string | Uint8Array): Promise<TSignature>;
 
   /**
    * Lists all of the public keys inside this wallet
    *
-   * @returns {TPublicKey[]} a set of all keys for this wallet
+   * @returns {Promise<TPublicKey[]>} a set of all keys for this wallet
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  getPublicKeys(): TPublicKey[];
+  getPublicKeys(): Promise<TPublicKey[]>;
 
   /**
    * Encrypts given data for a specific entity and returns the encrypted message
@@ -239,22 +223,22 @@ export interface IBeekeeperSession {
   /**
    * Retrieves the current session info
    *
-   * @returns {IBeekeeperInfo} Current session information
+   * @returns {Promise<IBeekeeperInfo>} Current session information
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  getInfo(): IBeekeeperInfo;
+  getInfo(): Promise<IBeekeeperInfo>;
 
   /**
    * Checks if wallet with given name exists
    *
    * @param {string} name name of the wallet
    *
-   * @returns {boolean} `true` if a wallet exists otherwise `false`
+   * @returns {Promise<boolean>} `true` if a wallet exists otherwise `false`
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  hasWallet(name: string): boolean;
+  hasWallet(name: string): Promise<boolean>;
 
   /**
    * Lists all of the opened wallets
@@ -298,11 +282,11 @@ export interface IBeekeeperSession {
    *
    * @param {string} name name of wallet
    *
-   * @returns {IBeekeeperWallet} the opened Beekeeper wallet object (may be unlocked if it has been previously unlocked)
+   * @returns {Promise<IBeekeeperWallet>} the opened Beekeeper wallet object (may be unlocked if it has been previously unlocked)
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  openWallet(name: string): IBeekeeperWallet;
+  openWallet(name: string): Promise<IBeekeeperWallet>;
 
   /**
    * Locks all of the unlocked wallets owned by this session

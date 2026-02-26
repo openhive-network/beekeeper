@@ -2,12 +2,20 @@
 // We want to skip minification for this file to preserve string concatination hacks used for WASM loading specifically in Vite environment
 
 // @ts-expect-error ts(6133) Types used in JSDoc generation
-import createBeekeeperBase, { type BeekeeperError, type IBeekeeperOptions, type IBeekeeperInstance } from "./detailed/index.js";
+import createBeekeeperBase, { type BeekeeperError, type IBeekeeperOptions, type IBeekeeperInstance, type IStorageCallbacks } from "./detailed/index.js";
 
 // Universal Emscripten glue — works in web, worker, and Node.js environments
 import Beekeeper from "./build/beekeeper_wasm.common.js";
 
+// This import will be auto-detected based on the environment you run this file (see rollup.config.js for details)
+import createStorage from "./storage-web.js";
+
 export * from "./detailed/index.js";
+
+export const DEFAULT_BEEKEEPER_OPTIONS: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'> = {
+  unlockTimeout: 900,
+  inMemory: false
+} as const;
 
 const getModuleExt = async(fileLocation?: string) => {
   if ((import.meta as any).client || (!(import.meta as any).client && typeof (import.meta as any).env === "object" && !(import.meta as any).env?.SSR)) {
@@ -67,9 +75,19 @@ const getModuleExt = async(fileLocation?: string) => {
  * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
  */
 const createBeekeeper = async(options?: Partial<IBeekeeperOptions>): Promise<IBeekeeperInstance> => {
-  const { wasmLocation, ...otherOptions } = options || {};
+  const { wasmLocation, storageRoot, ...otherOptions } = options || {};
 
-  return createBeekeeperBase(Beekeeper, await getModuleExt(wasmLocation), otherOptions);
+  const [module, storage] = await Promise.all([
+    getModuleExt(wasmLocation),
+    otherOptions.inMemory ? Promise.resolve(undefined) : createStorage(storageRoot ?? process.env.DEFAULT_STORAGE_ROOT as string)
+  ]);
+
+  const mergedOptions = {
+    ...DEFAULT_BEEKEEPER_OPTIONS,
+    ...otherOptions
+  };
+
+  return createBeekeeperBase(Beekeeper, module, mergedOptions, storage);
 };
 
 export default createBeekeeper;
