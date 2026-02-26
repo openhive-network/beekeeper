@@ -6,7 +6,7 @@
     "@rollup/plugin-node-resolve": "catalog:rollup-toolset",
     "@rollup/plugin-replace": "catalog:rollup-toolset",
     "@size-limit/file": "catalog:size-limit-toolset",
-    "@types/node": "^22.10.6",
+    "@types/node": "^24.0.0",
     "http-server": "catalog:playwright-toolset",
     "husky": "catalog:husky",
     "playwright": "catalog:playwright-toolset",
