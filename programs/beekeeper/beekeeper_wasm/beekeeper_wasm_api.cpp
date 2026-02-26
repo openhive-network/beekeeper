@@ -2,7 +2,6 @@
 
 #include <emscripten/val.h>
 
-#include <sstream>
 #include <stdexcept>
 
 namespace beekeeper_wasm {

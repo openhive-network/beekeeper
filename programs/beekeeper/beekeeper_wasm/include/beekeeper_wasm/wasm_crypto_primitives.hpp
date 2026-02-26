@@ -59,6 +59,10 @@ public:
   std::string base58_encode(const uint8_t* data, size_t len) override;
   std::vector<uint8_t> base58_decode(const std::string& str) override;
 
+  // ── Random (synchronous JS crypto.getRandomValues) ─────────
+
+  void get_random_bytes(uint8_t* buf, size_t len) override;
+
 private:
   emscripten::val to_js_array(const uint8_t* data, size_t len) const;
 

@@ -321,4 +321,9 @@ std::string crypto_provider_impl::ecdh_decrypt(
   return unpack_string(decrypted);
 }
 
+void crypto_provider_impl::get_random_bytes(uint8_t* buf, size_t len)
+{
+  prims_.get_random_bytes(buf, len);
+}
+
 } // namespace beekeeper_minimal

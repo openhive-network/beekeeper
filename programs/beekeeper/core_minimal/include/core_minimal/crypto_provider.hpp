@@ -86,6 +86,11 @@ struct crypto_provider
       const std::string& content,
       std::optional<uint64_t> nonce = {}) = 0;
 
+  // ── Random ────────────────────────────────────────────────
+
+  /// Fill buffer with cryptographically secure random bytes.
+  virtual void get_random_bytes(uint8_t* buf, size_t len) = 0;
+
   /// Callback type: given a public key, return the corresponding private key (or nullopt).
   using key_finder_type = std::function<std::optional<private_key_type>(const public_key_type&)>;
 

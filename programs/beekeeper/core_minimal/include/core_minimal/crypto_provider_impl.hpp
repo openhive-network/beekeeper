@@ -46,6 +46,8 @@ public:
       key_finder_type key_finder, const public_key_type& from_key,
       const public_key_type& to_key, const std::string& encrypted_content) override;
 
+  void get_random_bytes(uint8_t* buf, size_t len) override;
+
 protected:
   crypto_primitives& prims_;
 

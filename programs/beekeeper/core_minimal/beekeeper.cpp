@@ -1,8 +1,5 @@
 #include <core_minimal/beekeeper.hpp>
 
-#include <random>
-#include <sstream>
-
 namespace beekeeper_minimal {
 
 beekeeper::beekeeper(crypto_provider& crypto, wallet_storage& storage,
@@ -13,29 +10,22 @@ beekeeper::beekeeper(crypto_provider& crypto, wallet_storage& storage,
 {
 }
 
-std::string beekeeper::generate_token(const std::string& salt) const
+std::string beekeeper::generate_token(const std::string& salt)
 {
+  static constexpr char hex_chars[] = "0123456789abcdef";
   constexpr unsigned int token_length = 32;
 
-  std::random_device rd;
-  std::string seed_str = salt + std::to_string(rd());
-  std::seed_seq seq(seed_str.begin(), seed_str.end());
+  uint8_t buf[token_length];
+  crypto_.get_random_bytes(buf, token_length);
 
-  std::mt19937 gen;
-  gen.seed(seq);
-
-  std::uniform_int_distribution<> dis(0, 255);
-
-  std::stringstream ss;
+  std::string result;
+  result.reserve(token_length * 2);
   for (unsigned int i = 0; i < token_length; ++i)
   {
-    auto rc = static_cast<unsigned char>(dis(gen));
-    std::stringstream hexstream;
-    hexstream << std::hex << static_cast<int>(rc);
-    auto hex = hexstream.str();
-    ss << (hex.length() < 2 ? '0' + hex : hex);
+    result += hex_chars[buf[i] >> 4];
+    result += hex_chars[buf[i] & 0x0f];
   }
-  return ss.str();
+  return result;
 }
 
 std::string beekeeper::create_session(const std::string& salt)

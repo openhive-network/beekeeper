@@ -7,6 +7,7 @@
 #include <fc/crypto/ripemd160.hpp>
 #include <fc/crypto/hex.hpp>
 #include <fc/crypto/base58.hpp>
+#include <fc/crypto/rand.hpp>
 
 #include <cstring>
 #include <stdexcept>
@@ -169,6 +170,13 @@ std::vector<uint8_t> fc_crypto_primitives::base58_decode(const std::string& str)
 {
   auto decoded = fc::from_base58(str);
   return std::vector<uint8_t>(decoded.begin(), decoded.end());
+}
+
+// ── Random ──────────────────────────────────────────────────
+
+void fc_crypto_primitives::get_random_bytes(uint8_t* buf, size_t len)
+{
+  fc::rand_bytes(reinterpret_cast<char*>(buf), static_cast<int>(len));
 }
 
 } // namespace beekeeper_minimal

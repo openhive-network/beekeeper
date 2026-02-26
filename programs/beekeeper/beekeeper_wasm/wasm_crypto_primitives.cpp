@@ -107,15 +107,20 @@ std::vector<uint8_t> wasm_crypto_primitives::aes256_cbc_decrypt(
 
 // ── Native secp256k1 ──────────────────────────────────────────
 
+void wasm_crypto_primitives::get_random_bytes(uint8_t* buf, size_t len)
+{
+  // crypto.getRandomValues() is synchronous and available in all modern environments
+  auto js_arr = val::global("crypto").call<val>("getRandomValues",
+      val::global("Uint8Array").new_(static_cast<unsigned>(len)));
+  for (unsigned i = 0; i < len; ++i)
+    buf[i] = js_arr[i].as<uint8_t>();
+}
+
 beekeeper_minimal::private_key_type wasm_crypto_primitives::generate_private_key()
 {
   beekeeper_minimal::private_key_type key;
 
-  // Use crypto.getRandomValues() for CSPRNG (synchronous, available everywhere)
-  auto js_random = val::global("crypto").call<val>("getRandomValues",
-      val::global("Uint8Array").new_(32u));
-  for (unsigned i = 0; i < 32; ++i)
-    key.data[i] = js_random[i].as<uint8_t>();
+  get_random_bytes(key.data.data(), 32);
 
   // Verify it's a valid secp256k1 scalar (retry if not — astronomically unlikely)
   if (!secp256k1_ec_seckey_verify(secp_ctx_, key.data.data()))

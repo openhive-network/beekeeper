@@ -36,7 +36,7 @@ public:
   void        check_timeouts();
 
 private:
-  std::string generate_token(const std::string& salt) const;
+  std::string generate_token(const std::string& salt);
 
   crypto_provider&                         crypto_;
   wallet_storage&                          storage_;

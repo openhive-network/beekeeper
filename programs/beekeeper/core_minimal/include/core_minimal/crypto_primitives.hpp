@@ -65,6 +65,11 @@ struct crypto_primitives
 
   /// Decode a Base58 string back to raw bytes.
   virtual std::vector<uint8_t> base58_decode(const std::string& str) = 0;
+
+  // ── Random ─────────────────────────────────────────────────
+
+  /// Fill buffer with cryptographically secure random bytes.
+  virtual void get_random_bytes(uint8_t* buf, size_t len) = 0;
 };
 
 } // namespace beekeeper_minimal
