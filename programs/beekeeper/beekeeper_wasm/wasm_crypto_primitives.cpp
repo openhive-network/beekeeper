@@ -48,11 +48,8 @@ template<size_t N>
 beekeeper_minimal::byte_array<N> wasm_crypto_primitives::from_js_fixed(val js_arr) const
 {
   beekeeper_minimal::byte_array<N> result;
-  unsigned js_len = js_arr["length"].as<unsigned>();
-  if (js_len < N)
-    throw std::runtime_error("JS crypto returned too few bytes");
-  for (unsigned i = 0; i < N; ++i)
-    result.data[i] = js_arr[i].as<uint8_t>();
+  emscripten::val(emscripten::typed_memory_view(N, result.data.data()))
+    .call<void>("set", js_arr);
   return result;
 }
 
@@ -60,8 +57,8 @@ std::vector<uint8_t> wasm_crypto_primitives::from_js_vector(val js_arr) const
 {
   unsigned len = js_arr["length"].as<unsigned>();
   std::vector<uint8_t> result(len);
-  for (unsigned i = 0; i < len; ++i)
-    result[i] = js_arr[i].as<uint8_t>();
+  emscripten::val(emscripten::typed_memory_view(len, result.data()))
+    .call<void>("set", js_arr);
   return result;
 }
 
@@ -109,11 +106,9 @@ std::vector<uint8_t> wasm_crypto_primitives::aes256_cbc_decrypt(
 
 void wasm_crypto_primitives::get_random_bytes(uint8_t* buf, size_t len)
 {
-  // crypto.getRandomValues() is synchronous and available in all modern environments
-  auto js_arr = val::global("crypto").call<val>("getRandomValues",
-      val::global("Uint8Array").new_(static_cast<unsigned>(len)));
-  for (unsigned i = 0; i < len; ++i)
-    buf[i] = js_arr[i].as<uint8_t>();
+  // JS callback fills the WASM heap view in place — zero-copy
+  crypto_.call<void>("getRandomBytes",
+      emscripten::val(emscripten::typed_memory_view(len, buf)));
 }
 
 beekeeper_minimal::private_key_type wasm_crypto_primitives::generate_private_key()

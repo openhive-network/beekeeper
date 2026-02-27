@@ -15,11 +15,12 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
                         save_fn(name: string, data: Uint8Array) => void,
                         load_fn(name: string) => Uint8Array  (throws if not found),
                         list_dir_fn() => string[]  (returns all stored wallet names)
-      crypto          : JS object with async hash/AES methods:
+      crypto          : JS object with crypto methods:
                         sha256(Uint8Array) => Promise<Uint8Array>,
                         sha512(Uint8Array) => Promise<Uint8Array>,
                         aes256CbcEncrypt(key, iv, data) => Promise<Uint8Array>,
-                        aes256CbcDecrypt(key, iv, data) => Promise<Uint8Array>
+                        aes256CbcDecrypt(key, iv, data) => Promise<Uint8Array>,
+                        getRandomBytes(dest: Uint8Array) => void  (fills WASM view in place)
                         (secp256k1, ripemd160, base58 are native in WASM)
       unlock_timeout  : timeout for an unlocked wallet in seconds. Default: `900`
 

@@ -73,8 +73,8 @@ std::vector<char> js_callback_storage::load(const std::string& name)
   // Convert JS Uint8Array back to vector<char>
   unsigned len = result["length"].as<unsigned>();
   std::vector<char> buf(len);
-  for (unsigned i = 0; i < len; ++i)
-    buf[i] = static_cast<char>(result[i].as<uint8_t>());
+  emscripten::val(emscripten::typed_memory_view(len, reinterpret_cast<uint8_t*>(buf.data())))
+    .call<void>("set", result);
   return buf;
 }
 
