@@ -6,42 +6,6 @@
 
 namespace beekeeper_wasm {
 
-// ── helpers ────────────────────────────────────────────────
-
-namespace {
-
-/// Escape a string for safe embedding in JSON.
-std::string json_escape(const std::string& s)
-{
-  std::string out;
-  out.reserve(s.size() + 8);
-  for (char c : s)
-  {
-    switch (c)
-    {
-      case '"':  out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '\n': out += "\\n";  break;
-      case '\r': out += "\\r";  break;
-      case '\t': out += "\\t";  break;
-      default:   out += c;
-    }
-  }
-  return out;
-}
-
-std::string ok_json(const std::string& inner_json)
-{
-  return "{\"result\":\"" + json_escape(inner_json) + "\"}";
-}
-
-std::string ok_empty()
-{
-  return "{\"result\":\"{}\"}";
-}
-
-} // anon
-
 // ── js_callback_storage ───────────────────────────────────
 
 js_callback_storage::js_callback_storage(emscripten::val storage)
@@ -100,192 +64,128 @@ beekeeper_api::beekeeper_api(emscripten::val storage, emscripten::val crypto, ui
 {
 }
 
-std::string beekeeper_api::error_json(const std::string& msg)
-{
-  return "{\"error\":\"" + json_escape(msg) + "\"}";
-}
-
 // ── session ────────────────────────────────────────────────
 
 std::string beekeeper_api::create_session()
 {
-  return wrap([&]() {
-    auto token = bk_.create_session();
-    return ok_json("{\"token\":\"" + token + "\"}");
-  });
+  return bk_.create_session();
 }
 
 std::string beekeeper_api::create_session(const std::string& salt)
 {
-  return wrap([&]() {
-    auto token = bk_.create_session(salt);
-    return ok_json("{\"token\":\"" + token + "\"}");
-  });
+  return bk_.create_session(salt);
 }
 
-std::string beekeeper_api::close_session(const std::string& token)
+void beekeeper_api::close_session(const std::string& token)
 {
-  return wrap([&]() {
-    bk_.close_session(token);
-    return ok_empty();
-  });
+  bk_.close_session(token);
 }
 
 // ── wallet lifecycle ───────────────────────────────────────
 
 std::string beekeeper_api::create(const std::string& token, const std::string& wallet_name)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto pw = ses.create_wallet(wallet_name, "");
-    return ok_json("{\"password\":\"" + json_escape(pw) + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  return ses.create_wallet(wallet_name, "");
 }
 
 std::string beekeeper_api::create(const std::string& token, const std::string& wallet_name, const std::string& password)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto pw = ses.create_wallet(wallet_name, password);
-    return ok_json("{\"password\":\"" + json_escape(pw) + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  return ses.create_wallet(wallet_name, password);
 }
 
 std::string beekeeper_api::create(const std::string& token, const std::string& wallet_name, const std::string& password, bool is_temporary)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto pw = ses.create_wallet(wallet_name, password, is_temporary);
-    return ok_json("{\"password\":\"" + json_escape(pw) + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  return ses.create_wallet(wallet_name, password, is_temporary);
 }
 
-std::string beekeeper_api::open(const std::string& token, const std::string& wallet_name)
+void beekeeper_api::open(const std::string& token, const std::string& wallet_name)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    ses.open_wallet(wallet_name);
-    return ok_empty();
-  });
+  auto& ses = bk_.get_session(token);
+  ses.open_wallet(wallet_name);
 }
 
-std::string beekeeper_api::close(const std::string& token, const std::string& wallet_name)
+void beekeeper_api::close(const std::string& token, const std::string& wallet_name)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    ses.close_wallet(wallet_name);
-    return ok_empty();
-  });
+  auto& ses = bk_.get_session(token);
+  ses.close_wallet(wallet_name);
 }
 
-std::string beekeeper_api::lock(const std::string& token, const std::string& wallet_name)
+void beekeeper_api::lock(const std::string& token, const std::string& wallet_name)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    ses.lock(wallet_name);
-    return ok_empty();
-  });
+  auto& ses = bk_.get_session(token);
+  ses.lock(wallet_name);
 }
 
-std::string beekeeper_api::lock_all(const std::string& token)
+void beekeeper_api::lock_all(const std::string& token)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    ses.lock_all();
-    return ok_empty();
-  });
+  auto& ses = bk_.get_session(token);
+  ses.lock_all();
 }
 
-std::string beekeeper_api::unlock(const std::string& token, const std::string& wallet_name, const std::string& password)
+void beekeeper_api::unlock(const std::string& token, const std::string& wallet_name, const std::string& password)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    ses.unlock(wallet_name, password);
-    return ok_empty();
-  });
+  auto& ses = bk_.get_session(token);
+  ses.unlock(wallet_name, password);
 }
 
 // ── key management ─────────────────────────────────────────
 
 std::string beekeeper_api::import_key(const std::string& token, const std::string& wallet_name, const std::string& wif_key)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto pub = ses.import_key(wallet_name, wif_key, prefix_);
-    return ok_json("{\"public_key\":\"" + json_escape(pub) + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  return ses.import_key(wallet_name, wif_key, prefix_);
 }
 
-std::string beekeeper_api::remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key)
+void beekeeper_api::remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto pk = crypto_.public_key_from_string(public_key, prefix_);
-    ses.remove_key(wallet_name, pk);
-    return ok_empty();
-  });
+  auto& ses = bk_.get_session(token);
+  auto pk = crypto_.public_key_from_string(public_key, prefix_);
+  ses.remove_key(wallet_name, pk);
 }
 
-std::string beekeeper_api::get_public_keys(const std::string& token)
+emscripten::val beekeeper_api::get_public_keys(const std::string& token)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto keys = ses.get_public_keys("");  // empty name → merge all unlocked
-    std::string arr = "[";
-    bool first = true;
-    for (auto& kv : keys)
-    {
-      if (!first) arr += ",";
-      first = false;
-      arr += "{\"public_key\":\"" + crypto_.public_key_to_string(kv.first, kv.second.second) + "\"}";
-    }
-    arr += "]";
-    return ok_json("{\"keys\":" + arr + "}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto keys = ses.get_public_keys("");  // empty name → merge all unlocked
+  auto arr = emscripten::val::array();
+  unsigned i = 0;
+  for (auto& kv : keys)
+    arr.set(i++, crypto_.public_key_to_string(kv.first, kv.second.second));
+  return arr;
 }
 
-std::string beekeeper_api::get_public_keys(const std::string& token, const std::string& wallet_name)
+emscripten::val beekeeper_api::get_public_keys(const std::string& token, const std::string& wallet_name)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto keys = ses.get_public_keys(wallet_name);
-    std::string arr = "[";
-    bool first = true;
-    for (auto& kv : keys)
-    {
-      if (!first) arr += ",";
-      first = false;
-      arr += "{\"public_key\":\"" + crypto_.public_key_to_string(kv.first, kv.second.second) + "\"}";
-    }
-    arr += "]";
-    return ok_json("{\"keys\":" + arr + "}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto keys = ses.get_public_keys(wallet_name);
+  auto arr = emscripten::val::array();
+  unsigned i = 0;
+  for (auto& kv : keys)
+    arr.set(i++, crypto_.public_key_to_string(kv.first, kv.second.second));
+  return arr;
 }
 
 // ── signing ────────────────────────────────────────────────
 
 std::string beekeeper_api::sign_digest(const std::string& token, const std::string& sig_digest, const std::string& public_key)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto pk = crypto_.public_key_from_string(public_key, prefix_);
-    auto digest = crypto_.digest_from_hex(sig_digest);
-    auto sig = ses.sign_digest("", digest, pk, prefix_);  // empty wallet name → search all
-    auto sig_str = crypto_.signature_to_hex(sig);
-    return ok_json("{\"signature\":\"" + sig_str + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto pk = crypto_.public_key_from_string(public_key, prefix_);
+  auto digest = crypto_.digest_from_hex(sig_digest);
+  auto sig = ses.sign_digest("", digest, pk, prefix_);  // empty wallet name → search all
+  return crypto_.signature_to_hex(sig);
 }
 
 std::string beekeeper_api::sign_digest(const std::string& token, const std::string& sig_digest, const std::string& public_key, const std::string& wallet_name)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto pk = crypto_.public_key_from_string(public_key, prefix_);
-    auto digest = crypto_.digest_from_hex(sig_digest);
-    auto sig = ses.sign_digest(wallet_name, digest, pk, prefix_);
-    auto sig_str = crypto_.signature_to_hex(sig);
-    return ok_json("{\"signature\":\"" + sig_str + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto pk = crypto_.public_key_from_string(public_key, prefix_);
+  auto digest = crypto_.digest_from_hex(sig_digest);
+  auto sig = ses.sign_digest(wallet_name, digest, pk, prefix_);
+  return crypto_.signature_to_hex(sig);
 }
 
 // ── encrypt / decrypt ───────────────────────────────────────
@@ -294,95 +194,79 @@ std::string beekeeper_api::encrypt_data(const std::string& token, const std::str
                                         const std::string& from_key, const std::string& to_key,
                                         const std::string& content)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
-    auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
-    auto encrypted = ses.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_);
-    return ok_json("{\"encrypted_content\":\"" + json_escape(encrypted) + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
+  auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
+  return ses.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_);
 }
 
 std::string beekeeper_api::encrypt_data(const std::string& token, const std::string& wallet_name,
                                         const std::string& from_key, const std::string& to_key,
                                         const std::string& content, uint32_t nonce)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
-    auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
-    auto encrypted = ses.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
-    return ok_json("{\"encrypted_content\":\"" + json_escape(encrypted) + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
+  auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
+  return ses.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
 }
 
 std::string beekeeper_api::decrypt_data(const std::string& token, const std::string& wallet_name,
                                         const std::string& from_key, const std::string& to_key,
                                         const std::string& encrypted_content)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
-    auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
-    auto decrypted = ses.decrypt_data(wallet_name, from_pk, to_pk, encrypted_content, prefix_);
-    return ok_json("{\"decrypted_content\":\"" + json_escape(decrypted) + "\"}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
+  auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
+  return ses.decrypt_data(wallet_name, from_pk, to_pk, encrypted_content, prefix_);
 }
 
 // ── query ──────────────────────────────────────────────────
 
-std::string beekeeper_api::has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key)
+bool beekeeper_api::has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto keys = ses.get_public_keys(wallet_name);
-    auto pk = crypto_.public_key_from_string(public_key, prefix_);
-    bool found = keys.find(pk) != keys.end();
-    return ok_json(std::string("{\"exists\":") + (found ? "true" : "false") + "}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto keys = ses.get_public_keys(wallet_name);
+  auto pk = crypto_.public_key_from_string(public_key, prefix_);
+  return keys.find(pk) != keys.end();
 }
 
-std::string beekeeper_api::has_wallet(const std::string& token, const std::string& wallet_name)
+bool beekeeper_api::has_wallet(const std::string& token, const std::string& wallet_name)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    bool found = ses.has_wallet(wallet_name);
-    return ok_json(std::string("{\"exists\":") + (found ? "true" : "false") + "}");
-  });
+  auto& ses = bk_.get_session(token);
+  return ses.has_wallet(wallet_name);
 }
 
-std::string beekeeper_api::list_wallets(const std::string& token)
+emscripten::val beekeeper_api::list_wallets(const std::string& token)
 {
-  return wrap([&]() {
-    auto& ses = bk_.get_session(token);
-    auto wallets = ses.list_wallets();
-    std::string arr = "[";
-    bool first = true;
-    for (auto& wd : wallets)
-    {
-      if (!first) arr += ",";
-      first = false;
-      arr += "{\"name\":\"" + json_escape(wd.name) + "\",\"unlocked\":" + (wd.unlocked ? "true" : "false") + "}";
-    }
-    arr += "]";
-    return ok_json("{\"wallets\":" + arr + "}");
-  });
+  auto& ses = bk_.get_session(token);
+  auto wallets = ses.list_wallets();
+  auto arr = emscripten::val::array();
+  unsigned i = 0;
+  for (auto& wd : wallets)
+  {
+    auto obj = emscripten::val::object();
+    obj.set("name", wd.name);
+    obj.set("unlocked", wd.unlocked);
+    arr.set(i++, obj);
+  }
+  return arr;
 }
 
-std::string beekeeper_api::get_info(const std::string& token)
+emscripten::val beekeeper_api::get_info(const std::string& token)
 {
-  return wrap([&]() {
-    bk_.check_timeouts();
-    // Validate session exists
-    auto& ses = bk_.get_session(token);
-    (void)ses;
-    auto now = std::chrono::system_clock::now();
-    auto now_t = std::chrono::system_clock::to_time_t(now);
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&now_t));
-    std::string now_str(buf);
-    return ok_json("{\"now\":\"" + now_str + "\",\"timeout_time\":\"" + now_str + "\"}");
-  });
+  bk_.check_timeouts();
+  // Validate session exists
+  auto& ses = bk_.get_session(token);
+  (void)ses;
+  auto now = std::chrono::system_clock::now();
+  auto now_t = std::chrono::system_clock::to_time_t(now);
+  char buf[32];
+  std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&now_t));
+  std::string now_str(buf);
+  auto obj = emscripten::val::object();
+  obj.set("now", now_str);
+  obj.set("timeout_time", now_str);
+  return obj;
 }
 
 } // namespace beekeeper_wasm

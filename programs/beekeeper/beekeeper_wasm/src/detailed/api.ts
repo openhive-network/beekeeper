@@ -34,27 +34,8 @@ export class BeekeeperApi implements IBeekeeperInstance {
     return process.env.npm_package_version as string;
   }
 
-  public extract(json: string) {
-    try {
-      const parsed = JSON.parse(json);
-
-      if(parsed.hasOwnProperty('error'))
-        throw new BeekeeperError(`Beekeeper API error: "${String(parsed.error)}"`);
-
-      if( !parsed.hasOwnProperty('result') )
-        throw new BeekeeperError(`Beekeeper response does not have contain the result: "${json}"`);
-
-      return JSON.parse(parsed.result);
-    } catch(error) {
-      if(!(error instanceof BeekeeperError))
-        throw new BeekeeperError(`${error instanceof Error ? error.name : 'Unknown error'}: Could not extract the result from the beekeeper response: "${json}"`);
-
-      throw error;
-    }
-  }
-
   public createSession(salt: string): IBeekeeperSession {
-    const { token } = this.extract(safeWasmCall(() => this.api.create_session(salt) as string, "session creation")) as { token: string };
+    const token = safeWasmCall(() => this.api.create_session(salt), "session creation");
     const session = new BeekeeperSession(this, token);
 
     this.sessions.set(token, session);
@@ -66,7 +47,7 @@ export class BeekeeperApi implements IBeekeeperInstance {
     if(!this.sessions.delete(token))
       throw new BeekeeperError(`This Beekeeper API instance is not the owner of session identified by token: "${token}"`);
 
-    this.extract(safeWasmCall(() => this.api.close_session(token) as string, "session closing"));
+    safeWasmCall(() => this.api.close_session(token), "session closing");
   }
 
   public async delete(): Promise<void> {

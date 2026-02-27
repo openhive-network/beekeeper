@@ -26,14 +26,6 @@ test.describe('WASM Base tests', () => {
     expect(retVal).toBe('object');
   });
 
-  test('Should be able to create instance of ExtractError - import script', async ({ beekeeperWasmTest }) => {
-    const retVal = await beekeeperWasmTest(async ({ ExtractError }) => {
-      return new ExtractError({ a: 10 }).parsed;
-    });
-
-    expect(retVal).toStrictEqual({ a: 10 });
-  });
-
   test('Should be able to create instance of BeekeeperInstanceHelper', async ({ beekeeperWasmTest }) => {
     const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE) => {
       return new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);

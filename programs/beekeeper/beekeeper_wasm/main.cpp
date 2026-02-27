@@ -37,8 +37,7 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
                 - not given, chosen is a version (1)
                 -     given, chosen is a version (2)
       RESULT:
-        {"token":"440c44f01dde9ef65e7b88c6d44f3a929bbf0ff993c06efa6d942d40b08567f3"}
-        token: a token of a session created explicitly.
+        string: the session token (hex string)
     */
     .function("create_session()", select_overload<std::string()>(&beekeeper_api::create_session))                       //(1)
     .function("create_session(salt)", select_overload<std::string(const std::string&)>(&beekeeper_api::create_session)) //(2)
@@ -56,7 +55,7 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
         password:     a password used for creation of a wallet. Not required.
                       If the password is not given, chosen is a version (1), otherwise (2)
       RESULT:
-        {"password":"PW5KNCWdnMZFKzrvVyA2xwKLRxcAZWxPoyGVSN9r38te3p1ceEjo1"}
+        string: the wallet password (provided or auto-generated)
     */
     .function("create(token, wallet_name)", select_overload<std::string(const std::string&, const std::string&)>(&beekeeper_api::create))                                             //(1)
     .function("create(token, wallet_name, password)", select_overload<std::string(const std::string&, const std::string&, const std::string&)>(&beekeeper_api::create))               //(2)
@@ -90,7 +89,7 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     /*
       ****importing of a private key into a wallet****
       RESULT:
-        {"public_key":"STM6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa"}
+        string: the public key (e.g. "STM6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa")
     */
     .function("import_key(token, wallet_name, wif_key)", &beekeeper_api::import_key)
 
@@ -101,12 +100,16 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
 
     /*
       ****listing of all public keys****
+      RESULT:
+        string[] (flat array of public key strings)
     */
-    .function("get_public_keys(token)", select_overload<std::string(const std::string&)>(&beekeeper_api::get_public_keys))                                  //(1)
-    .function("get_public_keys(token, wallet_name)", select_overload<std::string(const std::string&, const std::string&)>(&beekeeper_api::get_public_keys)) //(2)
+    .function("get_public_keys(token)", select_overload<val(const std::string&)>(&beekeeper_api::get_public_keys))                                  //(1)
+    .function("get_public_keys(token, wallet_name)", select_overload<val(const std::string&, const std::string&)>(&beekeeper_api::get_public_keys)) //(2)
 
     /*
       ****signing a transaction by signing a digest of the transaction****
+      RESULT:
+        string: the signature (hex string)
     */
     .function("sign_digest(token, sig_digest, public_key)", select_overload<std::string(const std::string&, const std::string&, const std::string&)>(&beekeeper_api::sign_digest))              //(1)
     .function("sign_digest(token, sig_digest, public_key, wallet_name)", select_overload<std::string(const std::string&, const std::string&, const std::string&, const std::string&)>(&beekeeper_api::sign_digest)) //(2)
@@ -121,7 +124,7 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
         content:      data to encrypt
         nonce:        optional nonce for deterministic encryption
       RESULT:
-        {"encrypted_content":"<base58 encoded encrypted data>"}
+        string: base58 encoded encrypted data
     */
     .function("encrypt_data(token, wallet_name, from_key, to_key, content)", select_overload<std::string(const std::string&, const std::string&, const std::string&, const std::string&, const std::string&)>(&beekeeper_api::encrypt_data))
     .function("encrypt_data(token, wallet_name, from_key, to_key, content, nonce)", select_overload<std::string(const std::string&, const std::string&, const std::string&, const std::string&, const std::string&, uint32_t)>(&beekeeper_api::encrypt_data))
@@ -135,31 +138,35 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
         to_key:            public key of the receiver
         encrypted_content: base58 encoded encrypted data
       RESULT:
-        {"decrypted_content":"<decrypted string>"}
+        string: decrypted content
     */
     .function("decrypt_data(token, wallet_name, from_key, to_key, encrypted_content)", &beekeeper_api::decrypt_data)
 
     /*
       ****information about a session****
+      RESULT:
+        object: { now: string, timeout_time: string } (ISO8601 timestamps)
     */
     .function("get_info(token)", &beekeeper_api::get_info)
 
     /*
       ****testing if a private key corresponding to a public key exists in a wallet****
+      RESULT:
+        boolean
     */
     .function("has_matching_private_key(token, wallet_name, public_key)", &beekeeper_api::has_matching_private_key)
 
     /*
       ****testing if a wallet with given name exists (in-memory or in storage)****
       RESULT:
-        {"exists":true} or {"exists":false}
+        boolean
     */
     .function("has_wallet(token, wallet_name)", &beekeeper_api::has_wallet)
 
     /*
       ****listing all wallets (in-memory + storage)****
       RESULT:
-        {"wallets":[{"name":"w0","unlocked":true},{"name":"w1","unlocked":false}]}
+        Array<{name: string, unlocked: boolean}>
     */
     .function("list_wallets(token)", &beekeeper_api::list_wallets)
     ;

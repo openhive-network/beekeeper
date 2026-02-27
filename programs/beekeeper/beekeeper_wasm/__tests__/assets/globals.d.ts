@@ -2,7 +2,7 @@
 import type { MainModule } from '../../dist/build/beekeeper_wasm.common.js';
 import type { IBeekeeperInstance } from '../../src/index.js';
 import type * as BeekeeperModule from '../../src/index.js';
-import type { BeekeeperInstanceHelper, ExtractError } from './run_node_helper.js';
+import type { BeekeeperInstanceHelper } from './run_node_helper.js';
 import type { ICryptoCallbacks } from '../../src/detailed/crypto.js';
 
 export type TEnvType = 'web' | 'node';
@@ -17,7 +17,6 @@ export interface IBeekeeperWasmGlobals {
   env: TEnvType;
   provider: MainModule;
   cryptoCallbacks: ICryptoCallbacks;
-  ExtractError: typeof ExtractError;
   BeekeeperInstanceHelper: typeof BeekeeperInstanceHelper;
 }
 

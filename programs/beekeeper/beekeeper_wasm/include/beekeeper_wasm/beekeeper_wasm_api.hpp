@@ -31,9 +31,8 @@ private:
 };
 
 /// Thin embind-friendly API that wraps core_minimal::beekeeper.
-/// Every method returns a JSON string:
-///   success → {"result": "<json>"}
-///   failure → {"error": "<message>"}
+/// Methods return native types (string, bool, emscripten::val) or void.
+/// Errors propagate as C++ exceptions (embind converts to JS exceptions).
 class beekeeper_api final
 {
 public:
@@ -46,7 +45,7 @@ public:
 
   std::string create_session();
   std::string create_session(const std::string& salt);
-  std::string close_session(const std::string& token);
+  void close_session(const std::string& token);
 
   // ── wallet lifecycle ─────────────────────────────────────
 
@@ -54,20 +53,20 @@ public:
   std::string create(const std::string& token, const std::string& wallet_name, const std::string& password);
   std::string create(const std::string& token, const std::string& wallet_name, const std::string& password, bool is_temporary);
 
-  std::string open(const std::string& token, const std::string& wallet_name);
-  std::string close(const std::string& token, const std::string& wallet_name);
+  void open(const std::string& token, const std::string& wallet_name);
+  void close(const std::string& token, const std::string& wallet_name);
 
-  std::string lock(const std::string& token, const std::string& wallet_name);
-  std::string lock_all(const std::string& token);
-  std::string unlock(const std::string& token, const std::string& wallet_name, const std::string& password);
+  void lock(const std::string& token, const std::string& wallet_name);
+  void lock_all(const std::string& token);
+  void unlock(const std::string& token, const std::string& wallet_name, const std::string& password);
 
   // ── key management ───────────────────────────────────────
 
   std::string import_key(const std::string& token, const std::string& wallet_name, const std::string& wif_key);
-  std::string remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
+  void remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
 
-  std::string get_public_keys(const std::string& token);
-  std::string get_public_keys(const std::string& token, const std::string& wallet_name);
+  emscripten::val get_public_keys(const std::string& token);
+  emscripten::val get_public_keys(const std::string& token, const std::string& wallet_name);
 
   // ── signing ──────────────────────────────────────────────
 
@@ -88,10 +87,10 @@ public:
 
   // ── query ────────────────────────────────────────────────
 
-  std::string has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
-  std::string has_wallet(const std::string& token, const std::string& wallet_name);
-  std::string list_wallets(const std::string& token);
-  std::string get_info(const std::string& token);
+  bool has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
+  bool has_wallet(const std::string& token, const std::string& wallet_name);
+  emscripten::val list_wallets(const std::string& token);
+  emscripten::val get_info(const std::string& token);
 
 private:
   static constexpr const char* prefix_ = "STM";
@@ -99,17 +98,6 @@ private:
   wasm_crypto_provider                   crypto_;
   js_callback_storage                    storage_;
   beekeeper_minimal::beekeeper           bk_;
-
-  /// Runs fn() and wraps the result in {"result":...} / {"error":...}
-  template<typename F>
-  std::string wrap(F&& fn)
-  {
-    try { return fn(); }
-    catch (const std::exception& e) { return error_json(e.what()); }
-    catch (...) { return error_json("unknown exception"); }
-  }
-
-  static std::string error_json(const std::string& msg);
 };
 
 } // namespace beekeeper_wasm

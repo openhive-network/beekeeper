@@ -30,7 +30,10 @@ export default [
     },
     external: [
       './build/beekeeper_wasm.common.js',
-      './detailed/index.js'
+      './detailed/index.js',
+      'node:fs/promises',
+      'node:path',
+      'node:url'
     ],
     plugins: [
       replace({
@@ -54,7 +57,8 @@ export default [
       './detailed/index.js',
       'node:fs/promises',
       'node:fs',
-      'node:path'
+      'node:path',
+      'node:url'
     ],
     plugins: [
       copy({

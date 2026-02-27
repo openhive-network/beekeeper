@@ -1,4 +1,4 @@
-import { BeekeeperInstanceHelper, ExtractError } from './run_node_helper.js';
+import { BeekeeperInstanceHelper } from './run_node_helper.js';
 
 async function loadCryptoCallbacks() {
   const detailedModule = await import('../../dist/bundle/detailed/index.js');
@@ -32,7 +32,6 @@ globalThis.createBeekeeperWasmTestFor = async function createBeekeeperWasmTestFo
     env,
     provider,
     cryptoCallbacks,
-    ExtractError,
     BeekeeperInstanceHelper
   };
 };
