@@ -27,8 +27,7 @@ variables:
   PYTHON_DIR: ${CI_PROJECT_DIR}/python
   PACKAGES_TO_CHECK: "${PYTHON_DIR}/tests/ ${PYTHON_DIR}/beekeepy/"
 
-  # Once image is stable, we can update tag to smth like :pypa_2_28-1
-  CI_BASE_IMAGE_TAG: ":2fc9d83726a4fddc681c2b30fbd67701316ba85a"
+  CI_BASE_IMAGE_TAG: ":pypa_2_28-4"
   CI_BASE_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${CI_BASE_IMAGE_TAG}"
 
   # colors
@@ -44,7 +43,7 @@ variables:
 
 include:
   - project: 'hive/common-ci-configuration'
-    ref: 394fc42bc7bf7deefa89792959de34f16c9e681b
+    ref: 4c97da098a4ceb7b343a708bb3b7b4e6474f3e26
     file:
       - '/templates/python_projects.gitlab-ci.yml'
       - '/templates/npm_projects.gitlab-ci.yml'
