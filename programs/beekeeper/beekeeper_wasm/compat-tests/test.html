@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Beekeeper Compat Test</title>
+</head>
+<body>
+  <script type="importmap">
+    {
+      "imports": {
+        "beekeeper-new": "/new/web.js",
+        "beekeeper-old": "/old/web.js"
+      }
+    }
+  </script>
+  <script type="module">
+    // Expose factory functions for Playwright's page.evaluate()
+    window.createNewBeekeeper = async (options) => {
+      const mod = await import('beekeeper-new');
+      return mod.default(options);
+    };
+    window.createOldBeekeeper = async (options) => {
+      const mod = await import('beekeeper-old');
+      return mod.default(options);
+    };
+    window.__ready = true;
+  </script>
+</body>
+</html>

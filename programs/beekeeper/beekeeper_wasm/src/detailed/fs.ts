@@ -5,4 +5,7 @@ export interface IStorageCallbacks {
   close?: () => void;
 }
 
+export const LEGACY_WALLET_EXT = '.wallet' as const;
+export const LEGACY_WALLET_DIR = '.beekeeper' as const;
+
 export type TStorageCreator = (storageBase: string) => Promise<IStorageCallbacks>;

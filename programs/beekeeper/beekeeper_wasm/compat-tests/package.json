@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "bench": "vitest run bench.test.ts"
+  },
+  "dependencies": {
+    "@hiveio/beekeeper-old": "npm:@hiveio/beekeeper@1.28.7-rc0",
+    "@hiveio/beekeeper": "file:../"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50",
+    "http-server": "^14",
+    "vitest": "^3"
+  }
+}

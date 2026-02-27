@@ -428,6 +428,31 @@ run_examples_beekeeper_wasm:
   tags:
     - public-runner-docker
 
+run_compatibility_beekeeper_wasm:
+  extends: .npm_process_built_package_tarball
+  stage: test
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  before_script:
+    - !reference [.submodule_init, script]
+    - !reference [.npm_process_built_package_tarball, before_script]
+  script:
+    - echo -e "\e[0Ksection_start:$(date +%s):testing[collapsed=false]\r\e[0KAttempting to run compatibility tests..."
+    - cd "${SOURCE_DIR}"
+    # Install Playwright browsers for example tests
+    - pnpm exec playwright install chromium
+    - pnpm compat-tests
+    - echo -e "\e[0Ksection_end:$(date +%s):testing\r\e[0K"
+  needs:
+    - job: beekeeper_wasm_build
+      artifacts: true
+    - job: beekeeper_wasm_pack
+      artifacts: true
+  tags:
+    - public-runner-docker
+
 deploy_beekeeper_wasm_dev_package:
   extends: .npm_deploy_package_template
   stage: publish

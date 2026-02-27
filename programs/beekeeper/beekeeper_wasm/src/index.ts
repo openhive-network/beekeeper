@@ -17,6 +17,8 @@ export const DEFAULT_BEEKEEPER_OPTIONS: Omit<IBeekeeperOptions, 'wasmLocation' |
   inMemory: false
 } as const;
 
+export const DEFAULT_STORAGE_ROOT = process.env.DEFAULT_STORAGE_ROOT as string;
+
 const getModuleExt = async(fileLocation?: string) => {
   if ((import.meta as any).client || (!(import.meta as any).client && typeof (import.meta as any).env === "object" && !(import.meta as any).env?.SSR)) {
     // This is import style specific to Vite. Simple hack with concatination to avoid TypeScript & Rollup bundler related errors

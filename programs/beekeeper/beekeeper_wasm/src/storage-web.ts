@@ -1,120 +1,42 @@
-import type { IStorageCallbacks, TStorageCreator } from './detailed/fs.js';
+import { type IStorageCallbacks, type TStorageCreator, LEGACY_WALLET_DIR, LEGACY_WALLET_EXT } from './detailed/fs.js';
 
-const WALLET_EXT = '.wallet';
-const LEGACY_IDBFS_DB = '/storage_root_v3';
+const OBJECT_STORE_NAME = 'FILE_DATA' as const;
 
 const openDb = (dbName: string): Promise<IDBDatabase> => new Promise<IDBDatabase>((resolve, reject) => {
-  const req = indexedDB.open(dbName, 1);
-  req.onupgradeneeded = () => req.result.createObjectStore('wallets');
-  req.onsuccess = () => resolve(req.result);
+  const req = indexedDB.open(dbName);
+  req.onupgradeneeded = () => req.result.createObjectStore(OBJECT_STORE_NAME);
+  req.onsuccess = () => {
+    const db = req.result;
+    if (!db.objectStoreNames.contains(OBJECT_STORE_NAME)) {
+      db.close();
+      const upgradeReq = indexedDB.open(dbName, db.version + 1);
+      upgradeReq.onupgradeneeded = () => upgradeReq.result.createObjectStore(OBJECT_STORE_NAME);
+      upgradeReq.onsuccess = () => resolve(upgradeReq.result);
+      upgradeReq.onerror = () => reject(upgradeReq.error);
+    } else {
+      resolve(db);
+    }
+  };
   req.onerror = () => reject(req.error);
 });
-
-/**
- * One-time migration from the old Emscripten IDBFS format.
- *
- * IDBFS stored files in a `FILE_DATA` object store with full-path keys
- * (e.g. `/storage_root_v3/.beekeeper/name.wallet`) and values of
- * `{ timestamp, mode, contents: { 0: byte, 1: byte, ... } }`.
- *
- * Opens the known legacy DB directly (O(1) — no database enumeration),
- * extracts `.wallet` entries, copies them into the new clean `wallets` store,
- * and deletes the legacy DB.
- */
-const migrateFromIDBFS = async (targetDb: IDBDatabase): Promise<void> => {
-  const idbfsDb = await new Promise<IDBDatabase | null>(resolve => {
-    const req = indexedDB.open(LEGACY_IDBFS_DB);
-    req.onsuccess = () => {
-      const db = req.result;
-      if (db.objectStoreNames.contains('FILE_DATA'))
-        resolve(db);
-      else {
-        db.close();
-        // Clean up empty DB we just created by opening a non-existent name
-        indexedDB.deleteDatabase(LEGACY_IDBFS_DB);
-        resolve(null);
-      }
-    };
-    req.onerror = () => resolve(null);
-  });
-
-  if (!idbfsDb) return;
-
-  // Extract wallet entries from FILE_DATA
-  const tx = idbfsDb.transaction('FILE_DATA', 'readonly');
-  const store = tx.objectStore('FILE_DATA');
-
-  const allKeys = await new Promise<IDBValidKey[]>(r => {
-    const req = store.getAllKeys();
-    req.onsuccess = () => r(req.result);
-  });
-
-  const walletKeys = allKeys.filter(
-    k => typeof k === 'string' && k.endsWith(WALLET_EXT)
-  ) as string[];
-
-  const wallets: [string, Uint8Array][] = [];
-
-  for (const fullPath of walletKeys) {
-    const entry = await new Promise<any>(r => {
-      const req = store.get(fullPath);
-      req.onsuccess = () => r(req.result);
-    });
-
-    if (!entry?.contents) continue;
-
-    // IDBFS contents is an object with numeric keys, not a typed array
-    const contents = entry.contents;
-    const length = Object.keys(contents).length;
-    const bytes = new Uint8Array(length);
-    for (let i = 0; i < length; i++)
-      bytes[i] = contents[i];
-
-    // Extract just the filename (e.g. "name.wallet") from the full path
-    const fileName = fullPath.split('/').pop()!;
-    wallets.push([fileName, bytes]);
-  }
-
-  idbfsDb.close();
-
-  if (wallets.length === 0) {
-    indexedDB.deleteDatabase(LEGACY_IDBFS_DB);
-    return;
-  }
-
-  // Copy wallets into our clean DB
-  const writeTx = targetDb.transaction('wallets', 'readwrite');
-  const writeStore = writeTx.objectStore('wallets');
-  for (const [key, data] of wallets)
-    writeStore.put(data, key);
-  await new Promise<void>(r => { writeTx.oncomplete = () => r(); });
-
-  // Delete old IDBFS database after successful migration
-  await new Promise<void>((resolve, reject) => {
-    const req = indexedDB.deleteDatabase(LEGACY_IDBFS_DB);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-};
 
 const webStorageCreator: TStorageCreator = async (dbName: string): Promise<IStorageCallbacks> => {
   const db = await openDb(dbName);
 
-  // One-time migration from old Emscripten IDBFS format
-  await migrateFromIDBFS(db);
-
   return {
     save_fn: async (name: string, data: Uint8Array): Promise<void> => {
-      const tx = db.transaction('wallets', 'readwrite');
-      tx.objectStore('wallets').put(new Uint8Array(data), name + WALLET_EXT);
+      const tx = db.transaction(OBJECT_STORE_NAME, 'readwrite');
+      tx.objectStore(OBJECT_STORE_NAME).put({
+        contents: new Uint8Array(data)
+      }, `${dbName}/${LEGACY_WALLET_DIR}/${name}${LEGACY_WALLET_EXT}`);
       await new Promise<void>(r => { tx.oncomplete = () => r(); });
     },
 
     load_fn: async (name: string): Promise<Uint8Array> => {
-      const tx = db.transaction('wallets', 'readonly');
+      const tx = db.transaction(OBJECT_STORE_NAME, 'readonly');
       const result = await new Promise<Uint8Array | undefined>(r => {
-        const req = tx.objectStore('wallets').get(name + WALLET_EXT);
-        req.onsuccess = () => r(req.result ? new Uint8Array(req.result) : undefined);
+        const req = tx.objectStore(OBJECT_STORE_NAME).get(`${dbName}/${LEGACY_WALLET_DIR}/${name}${LEGACY_WALLET_EXT}`);
+        req.onsuccess = () => r(req.result ? new Uint8Array(req.result.contents) : undefined);
       });
 
       if (!result)
@@ -124,13 +46,15 @@ const webStorageCreator: TStorageCreator = async (dbName: string): Promise<IStor
     },
 
     list_dir_fn: async (): Promise<string[]> => {
-      const tx = db.transaction('wallets', 'readonly');
+      const tx = db.transaction(OBJECT_STORE_NAME, 'readonly');
       const keys = await new Promise<string[]>(r => {
-        const req = tx.objectStore('wallets').getAllKeys();
+        const req = tx.objectStore(OBJECT_STORE_NAME).getAllKeys();
         req.onsuccess = () => r(req.result as string[]);
       });
 
-      return keys.map(k => k.slice(0, -WALLET_EXT.length));
+      return keys
+        .filter(k => k.endsWith(LEGACY_WALLET_EXT))
+        .map(k => k.slice(`${dbName}/${LEGACY_WALLET_DIR}/`.length, -LEGACY_WALLET_EXT.length));
     },
 
     close: () => {
