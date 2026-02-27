@@ -66,20 +66,5 @@ option(BUILD_TESTS "Build unit tests" OFF)
 if(BUILD_TESTS)
   message(STATUS "Building tests enabled")
 
-  # Build native beekeeper_wasm library for testing
-  # (The actual beekeeper_wasm is WASM-only, but tests need a native version)
-  add_library(beekeeper_wasm_native STATIC
-    programs/beekeeper/beekeeper_wasm/beekeeper_wasm_api.cpp
-  )
-  target_include_directories(beekeeper_wasm_native PUBLIC
-    programs/beekeeper/beekeeper_wasm/include
-    programs/beekeeper/core_minimal/include
-    programs/beekeeper/fc_crypto_bridge/include
-  )
-  target_link_libraries(beekeeper_wasm_native PUBLIC
-    beekeeper_core
-    fc_crypto_bridge
-  )
-
   add_subdirectory(tests)
 endif()

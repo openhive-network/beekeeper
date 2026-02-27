@@ -84,6 +84,14 @@ struct memory_storage : beekeeper_minimal::wallet_storage
       throw std::runtime_error("Not found: " + path);
     return it->second;
   }
+
+  std::vector<std::string> list_dir() override
+  {
+    std::vector<std::string> names;
+    for (auto& [k, v] : blobs)
+      names.push_back(k);
+    return names;
+  }
 };
 
 /// Deterministic test keys (WIF format)
@@ -125,6 +133,11 @@ struct file_storage : beekeeper_minimal::wallet_storage
     std::vector<char> buf(sz);
     f.read(buf.data(), sz);
     return buf;
+  }
+
+  std::vector<std::string> list_dir() override
+  {
+    return {}; // Not needed for cross-load tests
   }
 };
 

@@ -25,8 +25,6 @@
 #include <core/beekeeper_wallet_manager.hpp>
 #include <core/utilities.hpp>
 
-#include <beekeeper_wasm/beekeeper_wasm_api.hpp>
-
 #include <beekeeper/beekeeper_instance.hpp>
 #include <beekeeper/extended_api.hpp>
 
@@ -34,7 +32,6 @@
 
 using public_key_type           = beekeeper::public_key_type;
 using private_key_type          = beekeeper::private_key_type;
-using beekeeper_api             = beekeeper::beekeeper_api;
 using wallet_data               = beekeeper::wallet_data;
 using wallet_details            = beekeeper::wallet_details;
 using keys_details              = beekeeper::keys_details;
@@ -747,272 +744,7 @@ BOOST_AUTO_TEST_CASE(wallet_manager_sign_transaction)
 }
 #endif // HIVE_PROTOCOL_AVAILABLE
 
-std::string extract_json( const std::string& str )
-{
-  BOOST_TEST_MESSAGE( "JSON: " + str );
-  if( str.empty() )
-    return str;
-  auto _v_init = fc::json::from_string( str, fc::json::format_validation_mode::full );
-  BOOST_REQUIRE( _v_init.is_object() && ( _v_init.get_object().contains("result") || _v_init.get_object().contains("error") ) );
 
-  std::string _result;
-  if( _v_init.get_object().contains("result") )
-    fc::from_variant( _v_init.get_object()["result"], _result );
-  else
-    fc::from_variant( _v_init.get_object()["error"], _result );
-
-  return _result;
-};
-
-std::string get_wasm_data( const std::string& json )
-{
-  std::vector< std::string > _elements;
-  boost::split( _elements, json, boost::is_any_of( "\"" ) );
-  BOOST_REQUIRE( _elements.size() >= 2 );
-  return _elements[ _elements.size() - 2 ];
-};
-
-BOOST_AUTO_TEST_CASE(wasm_beekeeper)
-{
-  try {
-    test_utils::beekeeper_mgr b_mgr;
-    b_mgr.remove_wallets();
-
-    beekeeper_api _obj( { "--wallet-dir", b_mgr.dir.string() } );
-
-    BOOST_REQUIRE( fc::json::from_string( extract_json( _obj.init() ), fc::json::format_validation_mode::full ).as<beekeeper::beekeeper_api::init_data>().status == 0 );
-
-    auto _token = extract_json( _obj.create_session( "banana" ) );
-    BOOST_TEST_MESSAGE( _token );
-    _token = get_wasm_data( _token );
-
-    auto _password_0 = extract_json( _obj.create( _token, "wallet_0", "pear" ) );
-    BOOST_TEST_MESSAGE( _password_0 );
-    _password_0 = get_wasm_data( _password_0 );
-
-    auto _password_1 = extract_json( _obj.create( _token, "wallet_1", "cherry" ) );
-    BOOST_TEST_MESSAGE( _password_1 );
-    BOOST_REQUIRE( _password_1.find( "cherry" ) != std::string::npos );
-    _password_1 = get_wasm_data( _password_1 );
-
-    auto _public_key_0 = extract_json( _obj.import_key( _token, "wallet_0", "5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n" ) );
-    BOOST_TEST_MESSAGE( _public_key_0 );
-    BOOST_REQUIRE( _public_key_0.find( "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4" ) != std::string::npos );
-
-    auto _public_key_1a = extract_json( _obj.import_key( _token, "wallet_1", "5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78" ) );
-    BOOST_TEST_MESSAGE( _public_key_1a );
-    BOOST_REQUIRE( _public_key_1a.find( "6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa" ) != std::string::npos );
-
-    auto _public_key_1b = extract_json( _obj.import_key( _token, "wallet_1", "5KNbAE7pLwsLbPUkz6kboVpTR24CycqSNHDG95Y8nbQqSqd6tgS" ) );
-    BOOST_TEST_MESSAGE( _public_key_1b );
-    BOOST_REQUIRE( _public_key_1b.find( "7j1orEPpWp4bU2SuH46eYXuXkFKEMeJkuXkZVJSaru2zFDGaEH" ) != std::string::npos );
-
-    auto _wallets = extract_json( _obj.list_wallets( _token ) );
-    BOOST_TEST_MESSAGE( _wallets );
-    {
-      beekeeper::list_wallets_return _result = fc::json::from_string( _wallets, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>();
-      BOOST_REQUIRE( _result.wallets.size() == 2 );
-      BOOST_REQUIRE( _result.wallets.begin()->unlocked );
-      BOOST_REQUIRE( _result.wallets.rbegin()->unlocked );
-    }
-
-    {
-      auto _keys_all = fc::json::from_string( extract_json( _obj.get_public_keys( _token ) ), fc::json::format_validation_mode::full ).as<beekeeper::get_public_keys_return>().keys;
-      auto _keys_wallet_0 = fc::json::from_string( extract_json( _obj.get_public_keys( _token, "wallet_0" ) ), fc::json::format_validation_mode::full ).as<beekeeper::get_public_keys_return>().keys;
-      auto _keys_wallet_1 = fc::json::from_string( extract_json( _obj.get_public_keys( _token, "wallet_1" ) ), fc::json::format_validation_mode::full ).as<beekeeper::get_public_keys_return>().keys;
-
-      BOOST_REQUIRE_EQUAL( _keys_all.size(), 3 );
-      BOOST_REQUIRE_EQUAL( _keys_wallet_0.size(), 1 );
-      BOOST_REQUIRE_EQUAL( _keys_wallet_1.size(), 2 );
-    }
-
-    _obj.remove_key( _token, "wallet_1", "6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa" );
-
-    auto _public_keys = extract_json( _obj.get_public_keys( _token ) );
-    BOOST_TEST_MESSAGE( _public_keys );
-
-    _obj.close_session( _token );
-
-    _token = extract_json( _obj.create_session( "banana" ) );
-    BOOST_TEST_MESSAGE( _token );
-    _token = get_wasm_data( _token );
-
-    _obj.open( _token, "wallet_1" );
-
-    BOOST_REQUIRE( extract_json( _obj.get_public_keys( _token ) ).find( "You don't have any unlocked wallet" ) != std::string::npos );
-
-    _obj.close( _token, "wallet_1" );
-
-    _obj.unlock( _token, "wallet_0", _password_0 );
-
-    _wallets = extract_json( _obj.list_wallets( _token ) );
-    BOOST_TEST_MESSAGE( _wallets );
-    {
-      beekeeper::list_wallets_return _result = fc::json::from_string( _wallets, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>();
-      BOOST_REQUIRE( _result.wallets.size() == 2 ); /// Both wallets should be returned
-      BOOST_REQUIRE( _result.wallets.begin()->name == "wallet_0" );
-      BOOST_REQUIRE( _result.wallets.begin()->unlocked );
-      BOOST_REQUIRE( _result.wallets.rbegin()->name == "wallet_1" );
-      BOOST_REQUIRE( _result.wallets.rbegin()->unlocked == false );
-
-    }
-
-    _obj.unlock( _token, "wallet_1", _password_1 );
-
-    _wallets = extract_json( _obj.list_wallets( _token ) );
-    BOOST_TEST_MESSAGE( _wallets );
-    {
-      beekeeper::list_wallets_return _result = fc::json::from_string( _wallets, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>();
-      BOOST_REQUIRE( _result.wallets.size() == 2 );
-      BOOST_REQUIRE( _result.wallets.begin()->unlocked );
-      BOOST_REQUIRE( _result.wallets.rbegin()->unlocked );
-    }
-
-    auto _info = _obj.get_info( _token );
-    BOOST_TEST_MESSAGE( _info );
-
-    _obj.set_timeout( _token, 1 );
-
-    std::this_thread::sleep_for( std::chrono::seconds(2) );
-
-    _wallets = extract_json( _obj.list_wallets( _token ) );
-    BOOST_TEST_MESSAGE( _wallets );
-    {
-      beekeeper::list_wallets_return _result = fc::json::from_string( _wallets, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>();
-      BOOST_REQUIRE( _result.wallets.size() == 2 );
-      //although WASM beekeeper automatic locking is disabled, calling API endpoint triggers locks for every wallet
-      BOOST_REQUIRE( !_result.wallets.begin()->unlocked );
-      BOOST_REQUIRE( !_result.wallets.rbegin()->unlocked );
-    }
-
-    _info = _obj.get_info( _token );
-    BOOST_TEST_MESSAGE( _info );
-
-    _obj.unlock( _token, "wallet_0", _password_0 );
-    _obj.unlock( _token, "wallet_1", _password_1 );
-
-    _wallets = extract_json( _obj.list_wallets( _token ) );
-    BOOST_TEST_MESSAGE( _wallets );
-    {
-      beekeeper::list_wallets_return _result = fc::json::from_string( _wallets, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>();
-      BOOST_REQUIRE( _result.wallets.size() == 2 );
-      BOOST_REQUIRE( _result.wallets.begin()->unlocked );
-      BOOST_REQUIRE( _result.wallets.rbegin()->unlocked );
-    }
-
-    _obj.lock( _token, "wallet_0" );
-
-    _wallets = extract_json( _obj.list_wallets( _token ) );
-    BOOST_TEST_MESSAGE( _wallets );
-    {
-      beekeeper::list_wallets_return _result = fc::json::from_string( _wallets, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>();
-      BOOST_REQUIRE( _result.wallets.size() == 2 );
-      BOOST_REQUIRE( !_result.wallets.begin()->unlocked );
-      BOOST_REQUIRE( _result.wallets.begin()->name == "wallet_0" );
-      BOOST_REQUIRE( _result.wallets.rbegin()->unlocked );
-    }
-
-    _obj.unlock( _token, "wallet_0", _password_0 );
-
-    _wallets = extract_json( _obj.list_wallets( _token ) );
-    BOOST_TEST_MESSAGE( _wallets );
-    {
-      beekeeper::list_wallets_return _result = fc::json::from_string( _wallets, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>();
-      BOOST_REQUIRE( _result.wallets.size() == 2 );
-      BOOST_REQUIRE( _result.wallets.begin()->unlocked );
-      BOOST_REQUIRE( _result.wallets.rbegin()->unlocked );
-    }
-
-    _obj.lock_all( _token );
-
-    _wallets = extract_json( _obj.list_wallets( _token ) );
-    BOOST_TEST_MESSAGE( _wallets );
-    {
-      beekeeper::list_wallets_return _result = fc::json::from_string( _wallets, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>();
-      BOOST_REQUIRE( _result.wallets.size() == 2 );
-      BOOST_REQUIRE( !_result.wallets.begin()->unlocked );
-      BOOST_REQUIRE( !_result.wallets.rbegin()->unlocked );
-    }
-
-#ifdef HIVE_PROTOCOL_AVAILABLE
-    {
-      _obj.unlock( _token, "wallet_0", _password_0 );
-
-      auto _private_key_str = "5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n";
-      auto _public_key_str  = "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4";
-
-      const auto _private_key = private_key_type::wif_to_key( _private_key_str ).value();
-
-      auto _calculate_signature = [&]( const std::string& json_trx, const std::string& signature_pattern )
-      {
-        hive::protocol::transaction _trx = fc::json::from_string( json_trx, fc::json::format_validation_mode::full ).as<hive::protocol::transaction>();
-        hive::protocol::digest_type _sig_digest = _trx.sig_digest( HIVE_CHAIN_ID, hive::protocol::pack_type::hf26 );
-
-        auto _signature_local = _private_key.sign_compact( _sig_digest );
-
-        auto _signature_beekeeper = fc::json::from_string( extract_json( _obj.sign_digest( _token, _sig_digest, std::string( HIVE_ADDRESS_PREFIX ) + _public_key_str ) ), fc::json::format_validation_mode::full ).as<beekeeper::signature_return>();
-
-        auto _error_message = _obj.sign_digest( _token, _sig_digest, _public_key_str, "avocado" );
-        BOOST_REQUIRE( _error_message.find( "public key requires STM prefix" ) != std::string::npos );
-
-        _error_message = _obj.sign_digest( _token, _sig_digest, std::string( HIVE_ADDRESS_PREFIX ) + _public_key_str, "avocado" );
-        BOOST_REQUIRE( _error_message.find( "not found in avocado wallet" ) != std::string::npos );
-
-        auto _signature_beekeeper_2 = fc::json::from_string( extract_json( _obj.sign_digest( _token, _sig_digest, std::string( HIVE_ADDRESS_PREFIX ) + _public_key_str, "wallet_0" ) ), fc::json::format_validation_mode::full ).as<beekeeper::signature_return>();
-
-        auto _local = fc::json::to_string( _signature_local );
-        auto _beekeeper = fc::json::to_string( _signature_beekeeper.signature );
-        auto _beekeeper_2 = fc::json::to_string( _signature_beekeeper_2.signature );
-        BOOST_TEST_MESSAGE( _local );
-        BOOST_TEST_MESSAGE( _beekeeper );
-        BOOST_REQUIRE( _beekeeper == _beekeeper_2 );
-        BOOST_REQUIRE( _local.substr( 1, _local.size() - 2 )              == signature_pattern );
-        BOOST_REQUIRE( _beekeeper.substr( 1, _beekeeper.size() - 2 )      == signature_pattern );
-      };
-
-      std::string _signature_00_result = "1f17cc07f7c769073d39fac3385220b549e261fb33c5f619c5dced7f5b0fe9c0954f2684e703710840b7ea01ad7238b8db1d8a9309d03e93de212f86de38d66f21";
-      _calculate_signature( "{}", _signature_00_result );
-
-      //trx: "{\"ref_block_num\":95,\"ref_block_prefix\":4189425605,\"expiration\":\"2023-07-18T08:38:29\",\"operations\":[{\"type\":\"transfer_operation\",\"value\":{\"from\":\"initminer\",\"to\":\"alice\",\"amount\":{\"amount\":\"666\",\"precision\":3,\"nai\":\"@@000000021\"},\"memo\":\"memmm\"}}],\"extensions\":[],\"signatures\":[],\"transaction_id\":\"cc9630cdbc39da1c9b6264df3588c7bedb5762fa\",\"block_num\":0,\"transaction_num\":0}"
-      std::string _signature_01_result = "1f69e091fc79b0e8d1812fc662f12076561f9e38ffc212b901ae90fe559f863ad266fe459a8e946cff9bbe7e56ce253bbfab0cccdde944edc1d05161c61ae86340";
-      _calculate_signature( "{\"ref_block_num\":95,\"ref_block_prefix\":4189425605,\"expiration\":\"2023-07-18T08:38:29\",\"operations\":[{\"type\":\"transfer_operation\",\"value\":{\"from\":\"initminer\",\"to\":\"alice\",\"amount\":{\"amount\":\"666\",\"precision\":3,\"nai\":\"@@000000021\"},\"memo\":\"memmm\"}}],\"extensions\":[],\"signatures\":[],\"transaction_id\":\"cc9630cdbc39da1c9b6264df3588c7bedb5762fa\",\"block_num\":0,\"transaction_num\":0}",
-                            _signature_01_result );
-
-      auto _error_message = _obj.sign_digest( _token, "", std::string( HIVE_ADDRESS_PREFIX ) + _public_key_str, "avocado" );
-      BOOST_REQUIRE( _error_message.find( "`sig_digest` can't be empty" ) != std::string::npos );
-    }
-#endif // HIVE_PROTOCOL_AVAILABLE
-
-  } FC_LOG_AND_RETHROW()
-}
-
-BOOST_AUTO_TEST_CASE(wasm_beekeeper_false)
-{
-  try {
-    test_utils::beekeeper_mgr b_mgr;
-    b_mgr.remove_wallets();
-
-    {
-      beekeeper_api _obj( { "--unknown-parameter", "value_without_sense" } );
-
-      auto _init_error_msg = extract_json( _obj.init() );
-      BOOST_REQUIRE( _init_error_msg.find( "unrecognised option" ) != std::string::npos );
-      BOOST_REQUIRE( _init_error_msg.find( "--unknown-parameter" ) != std::string::npos );
-      BOOST_REQUIRE( _init_error_msg.find( "value_without_sense" ) != std::string::npos );
-
-      auto _create_session_error_msg = extract_json( _obj.create_session( "banana" ) );
-      BOOST_REQUIRE( _create_session_error_msg.find( "Initialization failed. API call aborted." ) != std::string::npos );
-    }
-
-    {
-      beekeeper_api _obj( { "--export-keys-wallet", "[\"2\", \"PW5JViFn5gd4rt6ohk7DQMgHzQN6Z9FuMRfKoE5Ysk25mkjy5AY1b\"]" } );
-
-      auto _init_error_msg = extract_json( _obj.init() );
-      BOOST_REQUIRE( _init_error_msg.find( "unrecognised option" ) != std::string::npos );
-    }
-
-  } FC_LOG_AND_RETHROW()
-}
 
 BOOST_AUTO_TEST_CASE(wallet_manager_brute_force_protection_test)
 {
@@ -1226,21 +958,9 @@ class timeout_simulation
 };
 
 template<>
-std::string timeout_simulation<beekeeper_api>::create_session( beekeeper_api& beekeeper_obj )
-{
-  return get_wasm_data( extract_json( beekeeper_obj.create_session( "salt" ) ) );
-}
-
-template<>
 std::string timeout_simulation<beekeeper_wallet_manager>::create_session( beekeeper_wallet_manager& beekeeper_obj )
 {
   return beekeeper_obj.create_session( "this is salt" );
-}
-
-template<>
-std::string timeout_simulation<beekeeper_api>::create( beekeeper_api& beekeeper_obj, const std::string& token, const std::string& name )
-{
-  return get_wasm_data( extract_json( beekeeper_obj.create( token, name ) ) );
 }
 
 template<>
@@ -1250,23 +970,9 @@ std::string timeout_simulation<beekeeper_wallet_manager>::create( beekeeper_wall
 }
 
 template<>
-flat_set<wallet_details> timeout_simulation<beekeeper_api>::list_wallets( beekeeper_api& beekeeper_obj, const std::string& token )
-{
-  auto _result = extract_json( beekeeper_obj.list_wallets( token ) );
-  return fc::json::from_string( _result, fc::json::format_validation_mode::full ). template as<beekeeper::list_wallets_return>().wallets;
-}
-
-template<>
 flat_set<wallet_details> timeout_simulation<beekeeper_wallet_manager>::list_wallets( beekeeper_wallet_manager& beekeeper_obj, const std::string& token )
 {
   return beekeeper_obj.list_wallets( token );
-}
-
-template<>
-keys_details timeout_simulation<beekeeper_api>::get_public_keys( beekeeper_api& beekeeper_obj, const std::string& token, const std::optional<std::string>& wallet_name )
-{
-  auto _result = extract_json( wallet_name ? beekeeper_obj.get_public_keys( token, *wallet_name ) : beekeeper_obj.get_public_keys( token ) );
-  return fc::json::from_string( _result, fc::json::format_validation_mode::full ). template as<beekeeper::keys_details>();
 }
 
 template<>
@@ -1274,26 +980,6 @@ keys_details timeout_simulation<beekeeper_wallet_manager>::get_public_keys( beek
 {
   return beekeeper_obj.get_public_keys( token, wallet_name );
 }
-
-class wasm_simulation_executor
-{
-  test_utils::beekeeper_mgr b_mgr;
-  timeout_simulation<beekeeper_api> sim;
-
-  public:
-
-    void run( const std::string& simulation_name, const uint32_t nr_sessions, const uint32_t nr_wallets, const std::vector<size_t>& timeouts, const std::vector<size_t>& stage_timeouts )
-    {
-      for( auto& stage_timeout : stage_timeouts )
-      {
-        beekeeper_api _beekeeper( { "--wallet-dir", b_mgr.dir.string() } );
-        BOOST_REQUIRE( fc::json::from_string( extract_json( _beekeeper.init() ), fc::json::format_validation_mode::full ).as<beekeeper::beekeeper_api::init_data>().status == 0 );
-
-        auto _details = sim.create( _beekeeper, simulation_name, nr_sessions, nr_wallets, timeouts );
-        sim.test( _beekeeper, "Wait for: " + std::to_string( stage_timeout ) + "[s]", _details, stage_timeout );
-      }
-    }
-};
 
 class simulation_executor
 {
@@ -1318,47 +1004,6 @@ class simulation_executor
       }
     }
 };
-
-BOOST_AUTO_TEST_CASE(wasm_beekeeper_timeout)
-{
-  try {
-    {
-      wasm_simulation_executor _executer;
-      _executer.run( "a-sim", 2/*nr_sessions*/, 3/*nr_wallets*/, {1, 1}/*timeouts*/, {0}/*stage_timeouts*/ );
-    }
-
-    {
-      wasm_simulation_executor _executer;
-      _executer.run( "b-sim", 2/*nr_sessions*/, 2/*nr_wallets*/, {1, 3}/*timeouts*/, {1}/*stage_timeouts*/ );
-    }
-
-    {
-      wasm_simulation_executor _executer;
-      _executer.run( "c-sim", 3/*nr_sessions*/, 1/*nr_wallets*/, {3, 1, 2}/*timeouts*/, {0, 1, 3}/*stage_timeouts*/ );
-    }
-
-    {
-      wasm_simulation_executor _executer;
-      _executer.run( "d-sim", 5/*nr_sessions*/, 1/*nr_wallets*/, {4, 3, 2, 1, 0}/*timeouts*/, {1, 2, 1, 1, 1}/*stage_timeouts*/ );
-    }
-
-    {
-      wasm_simulation_executor _executer;
-      _executer.run( "e-sim", 4/*nr_sessions*/, 3/*nr_wallets*/, {3, 3, 3, 1}/*timeouts*/, {1, 1, 1}/*stage_timeouts*/ );
-    }
-
-    {
-      wasm_simulation_executor _executer;
-      _executer.run( "f-sim", 4/*nr_sessions*/, 2/*nr_wallets*/, {1, 1, 1, 1}/*timeouts*/, {2, 1}/*stage_timeouts*/ );
-    }
-
-    {
-      wasm_simulation_executor _executer;
-      _executer.run( "g-sim", 4/*nr_sessions*/, 1/*nr_wallets*/, {3, 1, 3, 1}/*timeouts*/, {2}/*stage_timeouts*/ );
-    }
-
-  } FC_LOG_AND_RETHROW()
-}
 
 BOOST_AUTO_TEST_CASE(beekeeper_timeout)
 {
@@ -1397,53 +1042,6 @@ BOOST_AUTO_TEST_CASE(beekeeper_timeout)
       simulation_executor _executer;
       _executer.run( "g-sim", 4/*nr_sessions*/, 1/*nr_wallets*/, {3, 1, 3, 1}/*timeouts*/, {2}/*stage_timeouts*/ );
     }
-
-  } FC_LOG_AND_RETHROW()
-}
-
-BOOST_AUTO_TEST_CASE(wasm_beekeeper_refresh_timeout)
-{
-  try {
-    auto _list_wallets_action = []( beekeeper_api& beekeeper, const std::string& token )
-    {
-      auto _result = extract_json( beekeeper.list_wallets( token ) );
-      auto _wallets = fc::json::from_string( _result, fc::json::format_validation_mode::full ).as<beekeeper::list_wallets_return>().wallets;
-      BOOST_REQUIRE_EQUAL( _wallets.size(), 1 );
-      BOOST_REQUIRE_EQUAL( _wallets.begin()->unlocked, true );
-    };
-
-    auto _set_timeout_action = []( beekeeper_api& beekeeper, const std::string& token )
-    {
-      beekeeper.set_timeout( token, 1 );
-    };
-
-    using action_type = std::function<void(beekeeper_api& beekeeper, const std::string& token)>;
-
-    auto _refresh_timeout_simulation = []( action_type&& action, action_type&& aux_action = action_type() )
-    {
-      test_utils::beekeeper_mgr b_mgr;
-      b_mgr.remove_wallets();
-
-      beekeeper_api _beekeeper( { "--wallet-dir", b_mgr.dir.string() } );
-      BOOST_REQUIRE( fc::json::from_string( extract_json( _beekeeper.init() ), fc::json::format_validation_mode::full ).as<beekeeper::beekeeper_api::init_data>().status == 0 );
-
-      auto _token = get_wasm_data( extract_json( _beekeeper.create_session( "salt" ) ) );
-      _beekeeper.create( _token, "w0" );
-
-      _beekeeper.set_timeout( _token, 1 );
-
-      for( uint32_t i = 0; i < 4; ++i )
-      {
-        std::this_thread::sleep_for( std::chrono::milliseconds(500) );
-        action( _beekeeper, _token );
-      }
-
-      if( aux_action )
-        aux_action( _beekeeper, _token );
-    };
-
-    _refresh_timeout_simulation( _list_wallets_action );
-    _refresh_timeout_simulation( _set_timeout_action ,_list_wallets_action );
 
   } FC_LOG_AND_RETHROW()
 }
@@ -2056,37 +1654,17 @@ BOOST_AUTO_TEST_CASE(get_version)
     test_utils::beekeeper_mgr b_mgr;
     b_mgr.remove_wallets();
 
-    std::string _version_a;
-    std::string _version_b;
-    {
-      BOOST_TEST_MESSAGE( "Network beekeeper" );
-      const uint64_t _timeout = 90;
-      const uint32_t _limit = 3;
+    const uint64_t _timeout = 90;
+    const uint32_t _limit = 3;
 
-      appbase::application app;
-      bool _checker = false;
+    appbase::application app;
+    bool _checker = false;
 
-      beekeeper_wallet_manager wm = b_mgr.create_wallet( app, _timeout, _limit, [&_checker](){ _checker = true; } );
-      BOOST_REQUIRE( wm.start() );
+    beekeeper_wallet_manager wm = b_mgr.create_wallet( app, _timeout, _limit, [&_checker](){ _checker = true; } );
+    BOOST_REQUIRE( wm.start() );
 
-      auto _version = wm.get_version();
-      _version_a = _version.version;
-      BOOST_REQUIRE( !_version_a.empty() );
-    }
-    {
-      BOOST_TEST_MESSAGE( "WASM beekeeper" );
-      beekeeper_api _obj( { "--wallet-dir", b_mgr.dir.string() } );
-
-      BOOST_REQUIRE( fc::json::from_string( extract_json( _obj.init() ), fc::json::format_validation_mode::full ).as<beekeeper::beekeeper_api::init_data>().status == 0 );
-
-      auto _version_str = extract_json( _obj.get_version() );
-      beekeeper::get_version_return _version = fc::json::from_string( _version_str, fc::json::format_validation_mode::full ).as<beekeeper::get_version_return>();
-      _version_b = _version.version;
-      BOOST_REQUIRE( !_version_b.empty() );
-    }
-    {
-      BOOST_REQUIRE_EQUAL( _version_a, _version_b );
-    }
+    auto _version = wm.get_version();
+    BOOST_REQUIRE( !_version.version.empty() );
 
   } FC_LOG_AND_RETHROW()
 }

@@ -23,13 +23,11 @@ target_include_directories(beekeeper_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/programs/beekeeper/core/include
     ${CMAKE_SOURCE_DIR}/programs/beekeeper/beekeeper/include
-    ${CMAKE_SOURCE_DIR}/programs/beekeeper/beekeeper_wasm/include
 )
 
 target_link_libraries(beekeeper_test PRIVATE
     beekeeper_core
     beekeeper_lib
-    beekeeper_wasm_native
     fc
     appbase
     Boost::unit_test_framework
