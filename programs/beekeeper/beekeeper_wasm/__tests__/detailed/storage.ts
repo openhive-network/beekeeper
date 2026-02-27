@@ -16,7 +16,7 @@ const DB_NAME = 'beekeeper_wallets';
 
 const saveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeeperWasmTestWebOnlyWithPage'], page: Page, options: { dbName: string, close: boolean }) =>
   await beekeeperWasmTestWebOnlyWithPage(page, async({ provider, BeekeeperInstanceHelper }, { dbName, close }) => {
-    const storage = createIdbStorage(dbName);
+    const storage = await createIdbStorage(dbName);
 
     await storage.syncFromIdb();
 
@@ -40,7 +40,7 @@ const saveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeep
 
 const retrieveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeeperWasmTestWebOnlyWithPage'], page: Page, options: { dbName: string, close: boolean }) =>
   await beekeeperWasmTestWebOnlyWithPage(page, async({ provider, BeekeeperInstanceHelper }, { dbName, close }) => {
-    const storage = createIdbStorage(dbName);
+    const storage = await createIdbStorage(dbName);
 
     await storage.syncFromIdb();
 
@@ -76,7 +76,7 @@ test.describe('WASM storage tests', () => {
 
   test('Should be able to persist data to IndexedDB and read it back', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
     const result = await beekeeperWasmTestWebOnlyWithPage(page1, async ({ provider, BeekeeperInstanceHelper }, dbName) => {
-      const storage = createIdbStorage(dbName);
+      const storage = await createIdbStorage(dbName);
 
       const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn, list_dir_fn: storage.list_dir_fn });
 
@@ -92,7 +92,7 @@ test.describe('WASM storage tests', () => {
 
   test('Should not contain any data from the previous test in a new context', async ({ beekeeperWasmTestWebOnly }) => {
     const keys = await beekeeperWasmTestWebOnly(async ({ provider }, dbName) => {
-      const storage = createIdbStorage(dbName);
+      const storage = await createIdbStorage(dbName);
       await storage.syncFromIdb();
 
       return await storage.listKeys();
@@ -104,7 +104,7 @@ test.describe('WASM storage tests', () => {
 
   test('Should contain data from the previous test in the same context', async ({ beekeeperWasmTestWebOnlyWithPage }) => {
     const keys = await beekeeperWasmTestWebOnlyWithPage(page2, async ({ provider }, dbName) => {
-      const storage = createIdbStorage(dbName);
+      const storage = await createIdbStorage(dbName);
       await storage.syncFromIdb();
 
       return await storage.listKeys();
@@ -128,7 +128,7 @@ test.describe('WASM storage tests', () => {
 
   test('Should not be able to access previously created wallet from other context', async ({ beekeeperWasmTestWebOnly }) => {
     const hasNoWallets = await beekeeperWasmTestWebOnly(async ({ provider, BeekeeperInstanceHelper }, dbName) => {
-      const storage = createIdbStorage(dbName);
+      const storage = await createIdbStorage(dbName);
       await storage.syncFromIdb();
 
       const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn, list_dir_fn: storage.list_dir_fn });

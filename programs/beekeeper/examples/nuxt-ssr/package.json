@@ -14,7 +14,8 @@
     "build": "nuxt build",
     "dev": "nuxt dev --port 5173",
     "start": "node .output/server/index.mjs",
-    "test": "rm -rf ./.nuxt ./.output ./node_modules/.cache && unset CI && DEBUG=pw:webserver playwright test --workers 1 --max-failures 1 --project=beekeeper_nuxt_vite_testsuite"
+    "test": "rm -rf ./.nuxt ./.output ./node_modules/.cache && unset CI && DEBUG=pw:webserver playwright test --workers 1 --max-failures 1 --project=beekeeper_nuxt_vite_testsuite",
+    "pretest": "pnpm exec playwright install"
   },
   "type": "module"
 }

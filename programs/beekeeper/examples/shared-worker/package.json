@@ -19,7 +19,8 @@
     "build": "tsc",
     "postbuild": "rollup -c",
     "start": "http-server -a 0.0.0.0 --port 5173 .",
-    "test": "unset CI && DEBUG=pw:webserver playwright test --workers 1 --max-failures 1 --project=beekeeper_shared_worker_testsuite"
+    "test": "unset CI && DEBUG=pw:webserver playwright test --workers 1 --max-failures 1 --project=beekeeper_shared_worker_testsuite",
+    "pretest": "pnpm exec playwright install"
   },
   "type": "module"
 }
