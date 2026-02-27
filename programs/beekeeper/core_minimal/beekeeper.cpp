@@ -1,5 +1,7 @@
 #include <core_minimal/beekeeper.hpp>
 
+#include <stdexcept>
+
 namespace beekeeper_minimal {
 
 beekeeper::beekeeper(crypto_provider& crypto, wallet_storage& storage,

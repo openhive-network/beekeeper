@@ -70,7 +70,6 @@ if(BUILD_TESTS)
   # (The actual beekeeper_wasm is WASM-only, but tests need a native version)
   add_library(beekeeper_wasm_native STATIC
     programs/beekeeper/beekeeper_wasm/beekeeper_wasm_api.cpp
-    programs/beekeeper/beekeeper_wasm/beekeeper_wasm_app.cpp
   )
   target_include_directories(beekeeper_wasm_native PUBLIC
     programs/beekeeper/beekeeper_wasm/include
