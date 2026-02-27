@@ -31,6 +31,18 @@ void session::check_timeout()
     lock_all();
 }
 
+std::chrono::seconds session::get_remaining_seconds() const
+{
+  if (timeout_.count() == 0)
+    return std::chrono::seconds::max();
+
+  auto remaining = timeout_time_ - clock::now();
+  if (remaining.count() <= 0)
+    return std::chrono::seconds(0);
+
+  return std::chrono::duration_cast<std::chrono::seconds>(remaining);
+}
+
 std::string session::gen_password() const
 {
   auto key = crypto_.generate_private_key();

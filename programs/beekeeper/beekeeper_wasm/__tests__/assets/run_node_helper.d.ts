@@ -2,9 +2,9 @@ import { beekeeper_api, MainModule } from "../../dist/build/beekeeper_wasm.commo
 import type { ICryptoCallbacks } from "../../src/detailed/crypto.js";
 
 export interface IStorageFns {
-  save_fn: (name: string, data: Uint8Array) => void;
-  load_fn: (name: string) => Uint8Array;
-  list_dir_fn: () => string[];
+  save_fn: (name: string, data: Uint8Array) => (Promise<void> | void);
+  load_fn: (name: string) => (Promise<Uint8Array> | Uint8Array);
+  list_dir_fn: () => (Promise<string[]> | string);
 }
 
 export interface IBeekeeperInstanceHelperConstructorSimplified {

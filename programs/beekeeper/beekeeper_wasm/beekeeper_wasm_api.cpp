@@ -255,17 +255,33 @@ emscripten::val beekeeper_api::list_wallets(const std::string& token)
 emscripten::val beekeeper_api::get_info(const std::string& token)
 {
   bk_.check_timeouts();
-  // Validate session exists
   auto& ses = bk_.get_session(token);
-  (void)ses;
+
   auto now = std::chrono::system_clock::now();
   auto now_t = std::chrono::system_clock::to_time_t(now);
   char buf[32];
   std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&now_t));
   std::string now_str(buf);
+
+  // Convert steady_clock remaining duration to a wall-clock timestamp
+  auto remaining = ses.get_remaining_seconds();
+  std::string timeout_str;
+  if (remaining == std::chrono::seconds::max())
+  {
+    timeout_str = "9999-12-31T23:59:59";
+  }
+  else
+  {
+    auto timeout_tp = now + remaining;
+    auto timeout_t = std::chrono::system_clock::to_time_t(timeout_tp);
+    char tbuf[32];
+    std::strftime(tbuf, sizeof(tbuf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&timeout_t));
+    timeout_str = std::string(tbuf);
+  }
+
   auto obj = emscripten::val::object();
   obj.set("now", now_str);
-  obj.set("timeout_time", now_str);
+  obj.set("timeout_time", timeout_str);
   return obj;
 }
 

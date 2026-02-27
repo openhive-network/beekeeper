@@ -303,6 +303,84 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     });
   });
 
+  test('Should return timeout_time in the future', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const info = await session.getInfo();
+
+      return {
+        nowMs: info.now.getTime(),
+        timeoutMs: info.timeoutTime.getTime()
+      };
+    });
+
+    expect(retVal.timeoutMs).toBeGreaterThan(retVal.nowMs);
+  });
+
+  test('Should return timeout_time reflecting custom unlockTimeout', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const bk = await provider.default({ unlockTimeout: 10 });
+      const session = bk.createSession("my.salt");
+      const info = await session.getInfo();
+
+      const diffSeconds = (info.timeoutTime.getTime() - info.now.getTime()) / 1000;
+
+      await bk.delete();
+
+      return diffSeconds;
+    });
+
+    // Should be roughly 10 seconds (allow ±2s tolerance for execution time)
+    expect(retVal).toBeGreaterThanOrEqual(8);
+    expect(retVal).toBeLessThanOrEqual(12);
+  });
+
+  test('Should auto-lock wallets after timeout expires', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const bk = await provider.default({ unlockTimeout: 2 });
+      const session = bk.createSession("my.salt");
+      const { wallet } = await session.createWallet('w0', 'mypassword');
+
+      await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      const keysBefore = await wallet.getPublicKeys();
+
+      // Wait for timeout to expire
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // getInfo triggers check_timeouts which auto-locks all wallets
+      await session.getInfo();
+
+      // After auto-lock, the wallet is locked — getPublicKeys throws
+      let locked = false;
+      try {
+        await wallet.getPublicKeys();
+      } catch {
+        locked = true;
+      }
+
+      await bk.delete();
+
+      return {
+        keysBefore: keysBefore.length,
+        locked
+      };
+    });
+
+    expect(retVal.keysBefore).toBe(1);
+    expect(retVal.locked).toBe(true);
+  });
+
+  test('Should throw when using a closed session', async ({ beekeeperTest }) => {
+    await expect(beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      await session.close();
+
+      // Operations on a closed session should throw
+      await session.createWallet('w0', 'mypassword');
+    })).rejects.toThrow();
+  });
+
   test.afterAll(async () => {
     await browser.close();
   });

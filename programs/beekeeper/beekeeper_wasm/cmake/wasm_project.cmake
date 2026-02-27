@@ -49,14 +49,13 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*crypto_provider_impl::ecdh_decrypt*"
     "*crypto_provider_impl::wif_to_key*"
     "*crypto_provider_impl::key_to_wif*"
-    # wallet — calls crypto_provider_impl and storage (most inlined by -Oz)
+    # wallet — calls crypto_provider_impl and storage
     "*wallet::lock*"
     "*wallet::encrypt_and_save*"
-    # session — calls wallet and storage (most inlined by -Oz)
+    # session — calls wallet and storage
     "*session::create_wallet*"
     "*session::open_wallet*"
     "*session::encrypt_data*"
-    "*session::decrypt_data*"
     # beekeeper — create_session survives, rest inlined
     "*beekeeper::create_session*"
     # beekeeper_api — embind entry points (wrap() is inlined into each)
@@ -65,7 +64,6 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*beekeeper_api::close*"
     "*beekeeper_api::unlock*"
     "*beekeeper_api::lock*"
-    "*beekeeper_api::lock_all*"
     "*beekeeper_api::import_key*"
     "*beekeeper_api::remove_key*"
     "*beekeeper_api::sign_digest*"
@@ -76,19 +74,15 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*beekeeper_api::has_wallet*"
     "*beekeeper_api::list_wallets*"
     "*beekeeper_api::get_public_keys*"
-    "*beekeeper_api::create_session*"
-    "*beekeeper_api::close_session*"
     # JS callback storage — called during wallet save/load/list_dir in async context
     "*js_callback_storage::save*"
     "*js_callback_storage::load*"
     "*js_callback_storage::list_dir*"
-    # Embind dispatch layer (MethodInvoker/Invoker call beekeeper_api methods)
-    "*MethodInvoker*"
+    # Embind dispatch layer (Invoker call beekeeper_api methods)
     "*Invoker*"
     # emscripten::val — await, call, and internalCall are in the async path
     "*emscripten::val*"
     # wasm_crypto_primitives helpers called around val::await
-    "*wasm_crypto_primitives::from_js*"
     "*wasm_crypto_primitives::to_js*"
     # std::function wrappers for key_finder lambdas in decrypt_data
     "*__func*session::decrypt_data*"

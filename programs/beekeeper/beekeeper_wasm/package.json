@@ -68,7 +68,7 @@
   "scripts": {
     "build": "tsc",
     "examples": "cd ../examples/nuxt-ssr && pnpm install && pnpm test && cd ../shared-worker && pnpm install && pnpm build && pnpm test",
-    "compat-tests": "cd ./compat-tests && pnpm install && pnpm test",
+    "compat-tests": "cd ./compat-tests && pnpm install --ignore-workspace && pnpm test",
     "postbuild": "rollup -c &&  tsx ./npm-common-config/ts-common/terser.ts && size-limit",
     "prebuild": "cd ../../.. && husky install programs/beekeeper/beekeeper_wasm/.husky && ./scripts/build_wasm_beekeeper.sh",
     "prepack": "cp ../../../LICENSE.md ./LICENSE.md",

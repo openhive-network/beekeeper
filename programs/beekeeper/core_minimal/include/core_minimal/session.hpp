@@ -35,6 +35,9 @@ public:
   /// Call periodically (or before each operation) to enforce auto-lock.
   void check_timeout();
 
+  /// Returns seconds until auto-lock, or seconds::max() if timeout is disabled.
+  std::chrono::seconds get_remaining_seconds() const;
+
   // ── wallet queries ────────────────────────────────────────
 
   /// Check if a wallet exists (in-memory or in storage).

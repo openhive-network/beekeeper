@@ -1036,6 +1036,82 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     })).resolves.toBeUndefined();
   });
 
+  test('Should return timeout_time different from now', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+
+      const session = api.createSession('pear');
+      const info = await api.getInfo(session);
+
+      const now = new Date(info.now);
+      const timeoutTime = new Date(info.timeout_time);
+      const diffSeconds = (timeoutTime.getTime() - now.getTime()) / 1000;
+
+      return diffSeconds;
+    }, WALLET_OPTIONS_NODE);
+
+    // Default timeout is 900 seconds; allow ±5s tolerance
+    expect(retVal).toBeGreaterThanOrEqual(895);
+    expect(retVal).toBeLessThanOrEqual(905);
+  });
+
+  test('Should auto-lock wallets after timeout expires', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }) => {
+      const api = new BeekeeperInstanceHelper(provider, ['--wallet-dir', '.beekeeper', '--unlock-timeout', '2']);
+
+      const session = api.createSession('pear');
+      await api.create_with_password(session, 'w0', 'pass');
+      await api.importKey(session, 'w0', '5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      // Keys visible before timeout
+      const keysBefore = await api.getPublicKeys(session);
+
+      // Wait for timeout to expire
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // get_info triggers check_timeouts which auto-locks all wallets
+      await api.getInfo(session);
+
+      const keysAfter = await api.getPublicKeys(session);
+
+      return {
+        keysBefore: keysBefore.keys.length,
+        keysAfter: keysAfter.keys.length
+      };
+    });
+
+    expect(retVal.keysBefore).toBe(1);
+    expect(retVal.keysAfter).toBe(0);
+  });
+
+  test('Should refresh timeout on wallet operations', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }) => {
+      const api = new BeekeeperInstanceHelper(provider, ['--wallet-dir', '.beekeeper', '--unlock-timeout', '5']);
+
+      const session = api.createSession('pear');
+      await api.create_with_password(session, 'w0', 'pass');
+      await api.importKey(session, 'w0', '5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      // Wait 3 seconds (within 5s timeout)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Perform an operation to refresh timeout (import another key)
+      await api.importKey(session, 'w0', '5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
+
+      // Wait another 3 seconds (6s total, but only 3s since last operation)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Trigger timeout check
+      await api.getInfo(session);
+
+      // Should still have keys since timeout was refreshed at 3s mark
+      const keys = await api.getPublicKeys(session);
+      return keys.keys.length;
+    });
+
+    expect(retVal).toBe(2);
+  });
+
   test.afterAll(async () => {
     await browser.close();
   });

@@ -127,23 +127,15 @@ test.describe('WASM storage tests', () => {
   });
 
   test('Should not be able to access previously created wallet from other context', async ({ beekeeperWasmTestWebOnly }) => {
-    const hasNoWallets = await beekeeperWasmTestWebOnly(async ({ provider, BeekeeperInstanceHelper }, dbName) => {
+    const keys = await beekeeperWasmTestWebOnly(async (_globals, dbName) => {
       const storage = await createIdbStorage(dbName);
       await storage.syncFromIdb();
 
-      const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn, list_dir_fn: storage.list_dir_fn });
-
-      // In a fresh context there should be no wallets — opening "w0" should fail
-      try {
-        await api.open(api.implicitSessionToken, "w0");
-        await api.unlock(api.implicitSessionToken, "w0", "badf00d");
-        return false; // Wallet found — not expected in a fresh context
-      } catch {
-        return true; // Expected — no wallet file exists
-      }
+      // A fresh browser context has its own IndexedDB — should have no wallet files
+      return await storage.listKeys();
     }, DB_NAME);
 
-    expect(hasNoWallets).toBeTruthy();
+    expect(keys).toStrictEqual([]);
   });
 
   test('Should be able to list the previously imported key from another page with the same browser context with explicitly closing the instance of beekeeper', async ({ beekeeperWasmTestWebOnlyWithPage }) => {

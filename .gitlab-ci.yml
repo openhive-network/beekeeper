@@ -467,6 +467,7 @@ deploy_beekeeper_wasm_dev_package:
   needs:
     - job: beekeeper_wasm_test
     - job: run_examples_beekeeper_wasm
+    - job: run_compatibility_beekeeper_wasm
     - job: beekeeper_wasm_pack
       artifacts: true
     - job: push_to_wiki
@@ -489,6 +490,7 @@ deploy_beekeeper_wasm_production_public_npm:
   needs:
     - job: beekeeper_wasm_test
     - job: run_examples_beekeeper_wasm
+    - job: run_compatibility_beekeeper_wasm
     - job: beekeeper_wasm_pack
       artifacts: true
     - job: push_to_wiki
