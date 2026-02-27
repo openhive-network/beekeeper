@@ -126,7 +126,7 @@ testpaths = ["tests/beekeepy_test"]
 [tool.poetry-dynamic-versioning]
 enable = true
 pattern = '''beekeeper-v(?P<base>\d+\.\d+\.\d+)(-?(?P<stage>[a-zA-Z]+)\.?(?P<revision>\d+)?)?$'''
-# PEP 440 compliant versioning with .post{timestamp}
+# PEP 440 compliant versioning
 # https://peps.python.org/pep-0440/
 #
 # Pattern matches only `beekeeper-v` prefixed tags (e.g. beekeeper-v1.0.0),
@@ -137,21 +137,21 @@ pattern = '''beekeeper-v(?P<base>\d+\.\d+\.\d+)(-?(?P<stage>[a-zA-Z]+)\.?(?P<rev
 #   Tag (distance=0, dirty):       1.28.5+dirty
 #   master (distance>0):           1.28.5.post20260130132734
 #   master (dirty):                1.28.5.post20260130132734+dirty
-#   feature branch (distance>0):   1.28.5.post20260130132734.dev0+unstable
-#   feature branch (dirty):        1.28.5.post20260130132734.dev0+unstable.dirty
+#   feature branch (distance>0):   1.28.5.dev20260130132734+unstable
+#   feature branch (dirty):        1.28.5.dev20260130132734+unstable.dirty
 #   feature branch (distance=0):   1.28.5  (same as tag)
 #
 # Pre-release tag (e.g. beekeeper-v1.28.5rc1):
 #   Tag (distance=0):              1.28.5rc1
 #   master (distance>0):           1.28.5rc1.post20260130132734
-#   feature branch (distance>0):   1.28.5rc1.post20260130132734.dev0+unstable
+#   feature branch (distance>0):   1.28.5rc1.dev20260130132734+unstable
 #
 # Logic:
-#   - distance=0         -> exact tag version
-#   - distance>0, stable -> tag + .post{timestamp}
-#   - distance>0, unstable -> tag + .post{timestamp}.dev0+unstable (pre-release, ignored by default)
-#   - dirty              -> + 'dirty' marker
-#   - unstable           -> + 'unstable' marker
+#   - distance=0           -> exact tag version
+#   - distance>0, stable   -> tag + .post{timestamp} (post-release, after tag)
+#   - distance>0, unstable -> tag + .dev{timestamp}+unstable (pre-release, before tag)
+#   - dirty                -> + 'dirty' marker
+#   - unstable             -> + 'unstable' marker
 #
 # Stability detection:
 #   - stable: develop/master/main branches OR tag checkout (detached HEAD with distance=0)
@@ -160,12 +160,14 @@ pattern = '''beekeeper-v(?P<base>\d+\.\d+\.\d+)(-?(?P<stage>[a-zA-Z]+)\.?(?P<rev
 #     use CI_COMMIT_REF_NAME env var as fallback for branch detection
 #
 # Version ordering (newest last):
-#   1.28.5 < 1.28.5.post20260130132734 < 1.28.5.post20260130133000.dev0+unstable < 1.28.5.post20260130133000
-#   (tag)    (master)                    (feature, newer timestamp)                (master, same timestamp)
+#   1.28.5.dev20260130132734+unstable < 1.28.5 < 1.28.5.post20260130132734
+#   (feature branch, before tag)        (tag)    (master, after tag)
 #
 # pip/poetry behavior:
-#   - `poetry update` / `pip install pkg>=1.0` -> selects stable only (ignores .dev0)
+#   - `poetry update` / `pip install pkg>=1.0` -> selects stable only (ignores .dev pre-releases)
 #   - `pip install --pre` / `allow-prereleases = true` -> includes feature branches
+#   - Feature branch versions are ALWAYS lower than the tag, providing double protection:
+#     1. pre-release filtering (default) 2. numerically lower version
 format-jinja = """
     {%- set STABLE_BRANCHES = ['develop', 'master', 'main'] -%}
 
@@ -176,8 +178,8 @@ format-jinja = """
     {%- set is_stable = effective_branch in STABLE_BRANCHES or is_tag_checkout -%}
     {%- set is_feature_branch = is_after_tag and not is_stable -%}
 
-    {%- set post = timestamp|int if is_after_tag else none -%}
-    {%- set dev = 0 if is_feature_branch else none -%}
+    {%- set post = timestamp|int if is_after_tag and not is_feature_branch else none -%}
+    {%- set dev = timestamp|int if is_feature_branch else none -%}
     {%- set local_parts = ['unstable'] if is_feature_branch else [] -%}
     {%- set local_parts = local_parts + ['dirty'] if dirty else local_parts -%}
 
