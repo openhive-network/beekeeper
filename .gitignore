@@ -29,4 +29,5 @@ node_modules/
 results.json
 results.xml
 .beekeeper
+storage_root-node
 .last-run.json

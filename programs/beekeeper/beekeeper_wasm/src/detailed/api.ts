@@ -15,6 +15,8 @@ export class BeekeeperApi implements IBeekeeperInstance {
 
   public readonly isInMemory: boolean;
 
+  readonly #storage: IStorageCallbacks;
+
   public constructor(
     private readonly provider: MainModule,
     private readonly options: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'>,
@@ -22,6 +24,7 @@ export class BeekeeperApi implements IBeekeeperInstance {
     crypto: ICryptoCallbacks
   ) {
     this.isInMemory = Boolean(options.inMemory);
+    this.#storage = storage;
 
     this.api = new this.provider.beekeeper_api(
       storage,
@@ -55,5 +58,7 @@ export class BeekeeperApi implements IBeekeeperInstance {
       await session.close();
 
     safeWasmCall(() => this.api.delete(), "WASM api deletion");
+
+    this.#storage.close?.();
   }
 }
