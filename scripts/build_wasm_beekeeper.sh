@@ -37,16 +37,22 @@ build() {
   cmake --install "${BUILD_DIR}" --component wasm_runtime_components --prefix "${BUILD_DIR}/"
 
   # Emscripten still uses redundant createRequire for legacy CJS support - remove it so we have proper bundlers support
+  # Emscripten 5.x uses "node:module" prefix, 4.x used "module"
   sed -i "s#var require = createRequire(import.meta.url);##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
   sed -i "s#const {createRequire} = await import(\"module\");##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
+  sed -i "s#const {createRequire} = await import(\"node:module\");##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
 
-  # Replace requires with our await import-s
+  # Replace requires with our await import-s (Emscripten 5.x uses node: prefix)
   sed -i "s#require(\"fs\");#(await import(\"fs\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
+  sed -i "s#require(\"node:fs\");#(await import(\"node:fs\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
   sed -i "s#require(\"path\")#(await import(\"path\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
+  sed -i "s#require(\"node:path\")#(await import(\"node:path\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
   sed -i "s#require(\"url\")#(await import(\"url\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
+  sed -i "s#require(\"node:url\")#(await import(\"node:url\"))#g" "${BUILD_DIR}/beekeeper_wasm.node.js"
 
   # Remove Node.js "crypto" module import, as we already have crypto API support in Node.js 19+
   sed -i "s#var nodeCrypto = require(\"crypto\");##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
+  sed -i "s#var nodeCrypto = require(\"node:crypto\");##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
   sed -i "s#return view => nodeCrypto.randomFillSync(view);##g" "${BUILD_DIR}/beekeeper_wasm.node.js"
 }
 
@@ -56,7 +62,7 @@ if [ "${DIRECT_EXECUTION}" -eq 0 ]; then
     -it --rm \
     -v "${PROJECT_DIR}/":"${EXECUTION_PATH}" \
     -u "$(id -u):$(id -g)" \
-  registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.22-6 \
+  registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-1 \
   /bin/bash /src/scripts/build_wasm_beekeeper.sh 1 "${EXECUTION_PATH}"
 else
   echo "Performing a build..."
