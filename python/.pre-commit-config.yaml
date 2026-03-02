@@ -29,23 +29,24 @@ repos:
         name: checking if tests/local-tools/poetry.lock is consistent with pyproject.toml
         args: [ "-C", "./python/tests/local-tools" ]
         language_version: python3.14
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: 'v0.6.5'
+  - repo: local
     hooks:
       - id: ruff
         name: linting code with Ruff
-        args: [ "--fix", "--config", "./python/pyproject.toml" ]
+        entry: ruff check --fix --config ./python/pyproject.toml
+        language: system
+        types: [python]
       - id: ruff-format
         name: format code using Ruff formatter
-        args: [ "--config", "./python/pyproject.toml" ]
-  - repo: local
-    hooks:
-    - id: mypy
-      name: type check with mypy
-      entry: mypy
-      args: ["--config-file", "./python/pyproject.toml"]
-      language: system
-      types: [ python ]
+        entry: ruff format --config ./python/pyproject.toml
+        language: system
+        types: [python]
+      - id: mypy
+        name: type check with mypy
+        entry: mypy
+        args: ["--config-file", "./python/pyproject.toml"]
+        language: system
+        types: [python]
   - repo: https://github.com/codespell-project/codespell
     rev: v2.2.4
     hooks:
