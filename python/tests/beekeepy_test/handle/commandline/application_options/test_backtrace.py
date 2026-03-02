@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize("backtrace", ["yes", "no"])
 def test_backtrace(backtrace: Literal["yes", "no"], beekeeper_exe: BeekeeperExecutable) -> None:
     """Test will check command line flag --backtrace."""
-    # ARRAGNE & ACT
+    # ARRANGE & ACT
 
     with beekeeper_exe.restore_arguments(
         BeekeeperArguments(data_dir=beekeeper_exe.working_directory, backtrace=backtrace)
