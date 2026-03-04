@@ -479,7 +479,7 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     expect(retVal.timeoutTimeCheck).toBeFalsy();
   });
 
-  test('Create 3 wallets and add to every wallet 3 the same keys. Every key should be displayed only once', async ({ beekeeperWasmTest }) => {
+  test('Create 3 wallets and add to every wallet 3 the same keys. Each wallet has all 3 keys', async ({ beekeeperWasmTest }) => {
     const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, walletNames, keys) => {
       const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
 
@@ -492,14 +492,21 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
         for(let keyNo = 7; keyNo <= 9; ++keyNo)
           await api.importKey(api.implicitSessionToken, walletNames[walletNo], keys[keyNo][0]);
 
-      return (await api.getPublicKeys(api.implicitSessionToken)).keys;
+      // Each wallet has the same 3 keys
+      const results: { public_key: string }[][] = [];
+      for(let walletNo = 4; walletNo <= 6; ++walletNo)
+        results.push((await api.getPublicKeys(api.implicitSessionToken, walletNames[walletNo])).keys);
+
+      return results;
     }, WALLET_OPTIONS_NODE, walletNames, keys);
 
-    expect(retVal).toStrictEqual([
+    const expectedKeys = [
       { public_key: 'STM6a34GANY5LD8deYvvfySSWGd7sPahgVNYoFPapngMUD27pWb45' },
       { public_key: 'STM8FDsHdPkHbY8fuUkVLyAmrnKMvj6DddLopi3YJ51dVqsG9vZa4' },
       { public_key: 'STM8mmxXz5BfQc2NJfqhiPkbgcyJm4EvWEr2UAUdr56gEWSN9ZnA5' }
-    ]);
+    ];
+    for (const keys of retVal)
+      expect(keys).toStrictEqual(expectedKeys);
   });
 
   test('Remove all keys from 3 wallets. As a result all keys are removed in mentioned wallets', async ({ beekeeperWasmTest }) => {
@@ -515,15 +522,21 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
         for(let keyNo = 7; keyNo <= 9; ++keyNo)
           await api.importKey(api.implicitSessionToken, walletNames[walletNo], keys[keyNo][0]);
 
-      // Remove keys 7-9 to wallets 4-6
+      // Remove keys 7-9 from wallets 4-6
       for(let walletNo = 4; walletNo <= 6; ++walletNo)
         for(let keyNo = 7; keyNo <= 9; ++keyNo)
           await api.removeKey(api.implicitSessionToken!, walletNames[walletNo], keys[keyNo][1]);
 
-      return (await api.getPublicKeys(api.implicitSessionToken)).keys;
+      // Each wallet should be empty
+      const results: { public_key: string }[][] = [];
+      for(let walletNo = 4; walletNo <= 6; ++walletNo)
+        results.push((await api.getPublicKeys(api.implicitSessionToken, walletNames[walletNo])).keys);
+
+      return results;
     }, WALLET_OPTIONS_NODE, walletNames, keys);
 
-    expect(retVal).toStrictEqual([]);
+    for (const keys of retVal)
+      expect(keys).toStrictEqual([]);
   });
 
   test('Close implicitly created session. Create 3 new sessions. Every session has a 1 wallet. Every wallet has unique 1 key. As a result there are 3 keys', async ({ beekeeperWasmTest }) => {
@@ -537,20 +550,18 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
       await api.closeSession(api.implicitSessionToken);
 
       const sessions = [
-        { keyNo: 4, session: api.createSession('avocado') },
-        { keyNo: 5, session: api.createSession('avocado') },
-        { keyNo: 6, session: api.createSession('avocado') }
+        { keyNo: 4, walletNo: 7, session: api.createSession('avocado') },
+        { keyNo: 5, walletNo: 8, session: api.createSession('avocado') },
+        { keyNo: 6, walletNo: 9, session: api.createSession('avocado') }
       ];
 
-      let walletNo = 7;
-      for(const { session, keyNo } of sessions) {
+      for(const { session, keyNo, walletNo } of sessions) {
         await api.create(session, walletNames[walletNo]);
         await api.importKey(session, walletNames[walletNo], keys[keyNo][0]);
-        ++walletNo;
       }
 
-      for(const { session } of sessions)
-        publicKeys.push((await api.getPublicKeys(session)).keys);
+      for(const { session, walletNo } of sessions)
+        publicKeys.push((await api.getPublicKeys(session, walletNames[walletNo])).keys);
 
       return publicKeys;
     }, WALLET_OPTIONS_NODE, walletNames, keys);
@@ -769,14 +780,12 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     }, WALLET_OPTIONS_NODE));
   });
 
-  test('Should return empty keys when no wallets are open', async ({ beekeeperWasmTest }) => {
-    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE) => {
+  test('Should throw when querying keys without a wallet', async ({ beekeeperWasmTest }) => {
+    await expect(beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE) => {
       const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
 
-      return (await api.getPublicKeys(api.implicitSessionToken)).keys;
-    }, WALLET_OPTIONS_NODE);
-
-    expect(retVal).toStrictEqual([]);
+      await api.getPublicKeys(api.implicitSessionToken, 'nonexistent');
+    }, WALLET_OPTIONS_NODE)).rejects.toThrowError('Wallet not found: nonexistent');
   });
 
   test('Should throw when opening a wallet that does not exist on disk', async ({ beekeeperWasmTest }) => {
@@ -971,7 +980,7 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     }, WALLET_OPTIONS_NODE, keys)).rejects.toThrow();
   });
 
-  test('Should get all keys from multiple wallets (merged)', async ({ beekeeperWasmTest }) => {
+  test('Should get keys per wallet (not merged across wallets)', async ({ beekeeperWasmTest }) => {
     const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, walletNames, keys) => {
       const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
 
@@ -982,13 +991,17 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
       await api.importKey(api.implicitSessionToken, walletNames[0], keys[1][0]);
       await api.importKey(api.implicitSessionToken, walletNames[1], keys[2][0]);
 
-      // get_public_keys(token) returns all keys from all wallets (deduplicated)
-      return (await api.getPublicKeys(api.implicitSessionToken)).keys;
+      return {
+        w0: (await api.getPublicKeys(api.implicitSessionToken, walletNames[0])).keys,
+        w1: (await api.getPublicKeys(api.implicitSessionToken, walletNames[1])).keys
+      };
     }, WALLET_OPTIONS_NODE, walletNames, keys);
 
-    expect(retVal).toStrictEqual([
+    expect(retVal.w0).toStrictEqual([
       { public_key: 'STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh' },
-      { public_key: 'STM6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa' },
+      { public_key: 'STM6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa' }
+    ]);
+    expect(retVal.w1).toStrictEqual([
       { public_key: 'STM7j1orEPpWp4bU2SuH46eYXuXkFKEMeJkuXkZVJSaru2zFDGaEH' }
     ]);
   });
@@ -1072,16 +1085,22 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
       // get_info triggers check_timeouts which auto-locks all wallets
       await api.getInfo(session);
 
-      const keysAfter = await api.getPublicKeys(session);
+      // After auto-lock, getPublicKeys throws because wallet is locked
+      let locked = false;
+      try {
+        await api.getPublicKeys(session);
+      } catch {
+        locked = true;
+      }
 
       return {
         keysBefore: keysBefore.keys.length,
-        keysAfter: keysAfter.keys.length
+        locked
       };
     });
 
     expect(retVal.keysBefore).toBe(1);
-    expect(retVal.keysAfter).toBe(0);
+    expect(retVal.locked).toBe(true);
   });
 
   test('Should refresh timeout on wallet operations', async ({ beekeeperWasmTest }) => {

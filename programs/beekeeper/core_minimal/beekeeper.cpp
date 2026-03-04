@@ -142,20 +142,6 @@ const wallet& beekeeper::get_wallet(const std::string& wallet_name) const
   return it->second;
 }
 
-template<typename Fn>
-void beekeeper::for_each_session_wallet(const std::string& token, Fn&& fn) const
-{
-  auto it = token_wallets_.find(token);
-  if (it == token_wallets_.end())
-    return;
-  for (auto& name : it->second)
-  {
-    auto wit = wallets_.find(name);
-    if (wit != wallets_.end())
-      fn(wit->second);
-  }
-}
-
 // ── wallet queries ──────────────────────────────────────────
 
 bool beekeeper::has_wallet(const std::string& wallet_name) const
@@ -297,21 +283,9 @@ void beekeeper::remove_key(const std::string& wallet_name,
   get_wallet(wallet_name).remove_key(public_key);
 }
 
-keys_map beekeeper::get_public_keys(const std::string& token,
-                                    const std::string& wallet_name) const
+keys_map beekeeper::get_public_keys(const std::string& wallet_name) const
 {
-  if (!wallet_name.empty())
-    return get_wallet(wallet_name).get_keys();
-
-  keys_map result;
-  for_each_session_wallet(token, [&](const wallet& w) {
-    if (!w.is_locked())
-    {
-      auto& k = w.get_keys();
-      result.insert(k.begin(), k.end());
-    }
-  });
-  return result;
+  return get_wallet(wallet_name).get_keys();
 }
 
 bool beekeeper::has_private_key(const std::string& wallet_name,
@@ -322,44 +296,23 @@ bool beekeeper::has_private_key(const std::string& wallet_name,
 
 // ── signing ─────────────────────────────────────────────────
 
-signature_type beekeeper::sign_digest(const std::string& token,
-                                      const std::string& wallet_name,
+signature_type beekeeper::sign_digest(const std::string& wallet_name,
                                       const digest_type& digest,
                                       const public_key_type& public_key,
                                       const std::string& prefix)
 {
   refresh_timeout();
 
-  if (!wallet_name.empty())
-  {
-    auto sig = get_wallet(wallet_name).try_sign_digest(digest, public_key);
-    if (sig)
-      return *sig;
-    throw std::runtime_error("Public key " + crypto_.public_key_to_string(public_key, prefix) +
-                             " not found in wallet " + wallet_name);
-  }
-
-  std::optional<signature_type> found;
-  for_each_session_wallet(token, [&](const wallet& w) {
-    if (!found)
-    {
-      auto sig = w.try_sign_digest(digest, public_key);
-      if (sig)
-        found = *sig;
-    }
-  });
-
-  if (found)
-    return *found;
-
+  auto sig = get_wallet(wallet_name).try_sign_digest(digest, public_key);
+  if (sig)
+    return *sig;
   throw std::runtime_error("Public key " + crypto_.public_key_to_string(public_key, prefix) +
-                           " not found in any unlocked wallet");
+                           " not found in wallet " + wallet_name);
 }
 
 // ── encrypt / decrypt ───────────────────────────────────────
 
-std::string beekeeper::encrypt_data(const std::string& token,
-                                    const std::string& wallet_name,
+std::string beekeeper::encrypt_data(const std::string& wallet_name,
                                     const public_key_type& from_key,
                                     const public_key_type& to_key,
                                     const std::string& content,
@@ -368,22 +321,10 @@ std::string beekeeper::encrypt_data(const std::string& token,
 {
   refresh_timeout();
 
-  std::optional<private_key_type> priv;
-  if (!wallet_name.empty())
-  {
-    priv = get_wallet(wallet_name).find_private_key(from_key);
-  }
-  else
-  {
-    for_each_session_wallet(token, [&](const wallet& w) {
-      if (!priv)
-        priv = w.find_private_key(from_key);
-    });
-  }
-
+  auto priv = get_wallet(wallet_name).find_private_key(from_key);
   if (!priv)
     throw std::runtime_error("Public key " + crypto_.public_key_to_string(from_key, prefix) +
-                             " not found in " + (wallet_name.empty() ? "any unlocked wallet" : ("wallet " + wallet_name)));
+                             " not found in wallet " + wallet_name);
 
   std::optional<uint64_t> nonce_opt;
   if (nonce != 0)
@@ -392,50 +333,7 @@ std::string beekeeper::encrypt_data(const std::string& token,
   return crypto_.ecdh_encrypt(*priv, to_key, content, nonce_opt);
 }
 
-std::pair<private_key_type, public_key_type>
-beekeeper::find_decrypt_keys(const std::string& token,
-                             const std::string& wallet_name,
-                             const public_key_type& from_key,
-                             const public_key_type& to_key) const
-{
-  // Try to_key first (receiver), then from_key (sender)
-  if (!wallet_name.empty())
-  {
-    auto& w = get_wallet(wallet_name);
-    auto priv = w.find_private_key(to_key);
-    if (priv)
-      return { *priv, from_key };
-    priv = w.find_private_key(from_key);
-    if (priv)
-      return { *priv, to_key };
-  }
-  else
-  {
-    std::optional<std::pair<private_key_type, public_key_type>> found;
-
-    for_each_session_wallet(token, [&](const wallet& w) {
-      if (!found)
-      {
-        auto priv = w.find_private_key(to_key);
-        if (priv)
-          found = std::make_pair(*priv, from_key);
-        else
-        {
-          priv = w.find_private_key(from_key);
-          if (priv)
-            found = std::make_pair(*priv, to_key);
-        }
-      }
-    });
-    if (found)
-      return *found;
-  }
-
-  throw std::runtime_error("No matching private key found for ECDH decryption");
-}
-
-std::string beekeeper::decrypt_data(const std::string& token,
-                                    const std::string& wallet_name,
+std::string beekeeper::decrypt_data(const std::string& wallet_name,
                                     const public_key_type& from_key,
                                     const public_key_type& to_key,
                                     const std::string& encrypted_content,
@@ -443,8 +341,16 @@ std::string beekeeper::decrypt_data(const std::string& token,
 {
   refresh_timeout();
 
-  auto [priv, other_pub] = find_decrypt_keys(token, wallet_name, from_key, to_key);
-  return crypto_.ecdh_decrypt(priv, other_pub, encrypted_content);
+  // Try to_key first (receiver), then from_key (sender)
+  auto& w = get_wallet(wallet_name);
+  auto priv = w.find_private_key(to_key);
+  if (priv)
+    return crypto_.ecdh_decrypt(*priv, from_key, encrypted_content);
+  priv = w.find_private_key(from_key);
+  if (priv)
+    return crypto_.ecdh_decrypt(*priv, to_key, encrypted_content);
+
+  throw std::runtime_error("No matching private key found for ECDH decryption");
 }
 
 } // namespace beekeeper_minimal

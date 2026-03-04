@@ -125,7 +125,7 @@ void beekeeper_api::remove_key(const std::string& token, const std::string& wall
 std::vector<std::string> beekeeper_api::get_public_keys(const std::string& token, const std::string& wallet_name)
 {
   bk_.validate_token(token);
-  auto keys = bk_.get_public_keys(token, wallet_name);
+  auto keys = bk_.get_public_keys(wallet_name);
   std::vector<std::string> result;
   result.reserve(keys.size());
   for (auto& kv : keys)
@@ -140,7 +140,7 @@ std::string beekeeper_api::sign_digest(const std::string& token, const std::stri
   bk_.validate_token(token);
   auto pk = crypto_.public_key_from_string(public_key, prefix_);
   auto digest = crypto_.digest_from_hex(sig_digest);
-  auto sig = bk_.sign_digest(token, wallet_name, digest, pk, prefix_);
+  auto sig = bk_.sign_digest(wallet_name, digest, pk, prefix_);
   return crypto_.signature_to_hex(sig);
 }
 
@@ -153,7 +153,7 @@ std::string beekeeper_api::encrypt_data(const std::string& token, const std::str
   bk_.validate_token(token);
   auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
   auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
-  return bk_.encrypt_data(token, wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
+  return bk_.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
 }
 
 std::string beekeeper_api::decrypt_data(const std::string& token, const std::string& wallet_name,
@@ -163,7 +163,7 @@ std::string beekeeper_api::decrypt_data(const std::string& token, const std::str
   bk_.validate_token(token);
   auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
   auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
-  return bk_.decrypt_data(token, wallet_name, from_pk, to_pk, encrypted_content, prefix_);
+  return bk_.decrypt_data(wallet_name, from_pk, to_pk, encrypted_content, prefix_);
 }
 
 // ── query ──────────────────────────────────────────────────

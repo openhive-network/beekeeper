@@ -460,13 +460,11 @@ BOOST_AUTO_TEST_CASE(has_matching_private_key_agrees)
   BOOST_REQUIRE(!w_min.has_private_key(min_pub3));
 }
 
-/// 10. Session-level: sign_digest across multiple wallets gives same result
-BOOST_AUTO_TEST_CASE(session_sign_across_wallets)
+/// 10. Session-level: sign_digest with explicit wallet name gives same result
+BOOST_AUTO_TEST_CASE(session_sign_named_wallet)
 {
   memory_storage ms;
 
-  auto priv1 = fc::ecc::private_key::wif_to_key(wif_key1).value();
-  auto pub1  = priv1.get_public_key();
   auto priv3 = fc::ecc::private_key::wif_to_key(wif_key3).value();
   auto pub3  = priv3.get_public_key();
   auto digest = fc::sha256::hash("session sign test data");
@@ -483,8 +481,8 @@ BOOST_AUTO_TEST_CASE(session_sign_across_wallets)
   bk.create_wallet(token, "w2", "password2");
   bk.import_key("w2", wif_key3, prefix);
 
-  // Sign without specifying wallet (searches all in session)
-  auto sig_min = bk.sign_digest(token, "", min_digest, min_pub3, prefix);
+  // Sign specifying the wallet that contains key3
+  auto sig_min = bk.sign_digest("w2", min_digest, min_pub3, prefix);
 
   // ── original (direct wallet) ──
   beekeeper::wallet_content_handler original(true);

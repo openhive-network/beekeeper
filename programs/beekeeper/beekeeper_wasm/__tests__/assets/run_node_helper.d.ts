@@ -48,9 +48,9 @@ export declare class BeekeeperInstanceHelper {
 
   public decryptData(sessionToken: string, walletName: string, fromPublicKey: string, toPublicKey: string, encryptedContent: string): Promise<string>;
 
-  public signDigest(sessionToken: string, sigDigest: string, publicKey: string): Promise<string>;
+  public signDigest(sessionToken: string, sigDigest: string, publicKey: string, walletName?: string): Promise<string>;
 
-  public getPublicKeys(sessionToken: string): Promise<{ keys: Array<{ public_key: string }> }>;
+  public getPublicKeys(sessionToken: string, walletName?: string): Promise<{ keys: Array<{ public_key: string }> }>;
 
   public getInfo(sessionToken: string): Promise<{ now: string, timeout_time: string }>;
 

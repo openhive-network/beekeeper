@@ -3,6 +3,7 @@ export class BeekeeperInstanceHelper {
 
   #instance = undefined;
   #implicitSessionToken = undefined;
+  #lastWalletName = undefined;
 
   static #passwords = new Map();
 
@@ -118,6 +119,7 @@ export class BeekeeperInstanceHelper {
   async create(sessionToken, walletName) {
     const password = await this.instance.create(sessionToken, walletName, "", false);
     BeekeeperInstanceHelper.#setPassword(walletName, password);
+    this.#lastWalletName = walletName;
 
     return password;
   }
@@ -125,6 +127,7 @@ export class BeekeeperInstanceHelper {
   async create_with_password(sessionToken, walletName, explicitPassword) {
     const password = await this.instance.create(sessionToken, walletName, explicitPassword, false);
     BeekeeperInstanceHelper.#setPassword(walletName, password);
+    this.#lastWalletName = walletName;
 
     return password;
   }
@@ -150,12 +153,12 @@ export class BeekeeperInstanceHelper {
     return await this.instance.decrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, encryptedContent);
   }
 
-  async signDigest(sessionToken, sigDigest, publicKey) {
-    return await this.instance.sign_digest(sessionToken, sigDigest, publicKey, "");
+  async signDigest(sessionToken, sigDigest, publicKey, walletName = this.#lastWalletName ?? "") {
+    return await this.instance.sign_digest(sessionToken, sigDigest, publicKey, walletName);
   }
 
-  async getPublicKeys(sessionToken) {
-    const keys = Array.from(await this.instance.get_public_keys(sessionToken, ""));
+  async getPublicKeys(sessionToken, walletName = this.#lastWalletName ?? "") {
+    const keys = Array.from(await this.instance.get_public_keys(sessionToken, walletName));
     // Wrap flat string[] into {keys: [{public_key: ...}]} for test compatibility
     return { keys: keys.map(k => ({ public_key: k })) };
   }
@@ -166,6 +169,7 @@ export class BeekeeperInstanceHelper {
 
   async open(sessionToken, walletName) {
     await this.instance.open(sessionToken, walletName);
+    this.#lastWalletName = walletName;
   }
 
   async close(sessionToken, walletName) {

@@ -30,8 +30,8 @@ struct session_info
 /// All crypto is delegated through crypto_provider hooks.
 ///
 /// Wallets are scoped to sessions: each session tracks which wallets it
-/// created/opened.  Operations that search "all wallets" (empty wallet_name)
-/// only consider wallets belonging to the calling session, matching core/.
+/// created/opened.  All key/sign/encrypt/decrypt operations require an
+/// explicit wallet name.
 class beekeeper
 {
 public:
@@ -102,9 +102,8 @@ public:
   void remove_key(const std::string& wallet_name,
                   const public_key_type& public_key);
 
-  /// Get keys from named wallet, or merge unlocked wallets belonging to token.
-  keys_map get_public_keys(const std::string& token,
-                           const std::string& wallet_name) const;
+  /// Get all public keys from the named wallet.
+  keys_map get_public_keys(const std::string& wallet_name) const;
 
   /// Check if a specific private key exists in the named wallet.
   bool has_private_key(const std::string& wallet_name,
@@ -112,9 +111,8 @@ public:
 
   // ── signing ────────────────────────────────────────────────
 
-  /// Sign a digest.  Searches the named wallet, or wallets belonging to token.
-  signature_type sign_digest(const std::string& token,
-                             const std::string& wallet_name,
+  /// Sign a digest using a key from the named wallet.
+  signature_type sign_digest(const std::string& wallet_name,
                              const digest_type& digest,
                              const public_key_type& public_key,
                              const std::string& prefix);
@@ -122,8 +120,7 @@ public:
   // ── encrypt / decrypt ──────────────────────────────────────
 
   /// Encrypt data using ECDH. nonce=0 means auto-generate from current time.
-  std::string encrypt_data(const std::string& token,
-                           const std::string& wallet_name,
+  std::string encrypt_data(const std::string& wallet_name,
                            const public_key_type& from_key,
                            const public_key_type& to_key,
                            const std::string& content,
@@ -131,8 +128,7 @@ public:
                            uint64_t nonce = 0);
 
   /// Decrypt data using ECDH.
-  std::string decrypt_data(const std::string& token,
-                           const std::string& wallet_name,
+  std::string decrypt_data(const std::string& wallet_name,
                            const public_key_type& from_key,
                            const public_key_type& to_key,
                            const std::string& encrypted_content,
@@ -148,19 +144,8 @@ private:
   wallet& get_wallet(const std::string& wallet_name);
   const wallet& get_wallet(const std::string& wallet_name) const;
 
-  /// Iterate wallets belonging to a session token.
-  template<typename Fn>
-  void for_each_session_wallet(const std::string& token, Fn&& fn) const;
-
   std::string generate_token(const std::string& salt);
   std::string gen_password() const;
-
-  /// Find the private key for ECDH decryption, trying both to_key and from_key.
-  std::pair<private_key_type, public_key_type>
-  find_decrypt_keys(const std::string& token,
-                    const std::string& wallet_name,
-                    const public_key_type& from_key,
-                    const public_key_type& to_key) const;
 
   crypto_provider&                         crypto_;
   wallet_storage&                          storage_;
