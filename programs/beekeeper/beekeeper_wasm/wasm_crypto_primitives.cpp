@@ -16,8 +16,8 @@ namespace beekeeper_wasm {
 // ── wasm_crypto_provider (wires primitives → impl) ────────────
 
 wasm_crypto_provider::wasm_crypto_provider(val crypto_obj)
-  : crypto_provider_impl(prims_)
-  , prims_(std::move(crypto_obj))
+  : wasm_crypto_provider_prims_holder(std::move(crypto_obj))
+  , crypto_provider_impl(wasm_crypto_provider_prims_holder::prims_)
 {
 }
 

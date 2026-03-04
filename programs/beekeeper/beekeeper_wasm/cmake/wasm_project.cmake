@@ -42,6 +42,7 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*wasm_crypto_primitives::aes256_cbc_decrypt*"
     "*wasm_crypto_primitives::ecdh_shared_secret*"
     # crypto_provider_impl — calls async primitives (some inlined by -Oz)
+    "*crypto_provider_impl::encrypt_wallet_keys*"
     "*crypto_provider_impl::encrypt_wallet_data*"
     "*crypto_provider_impl::decrypt_wallet_data*"
     "*crypto_provider_impl::validate_password*"
@@ -51,12 +52,6 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*crypto_provider_impl::key_to_wif*"
     # wallet — encrypt_and_save calls async crypto, but lock() is now sync (no longer saves)
     "*wallet::encrypt_and_save*"
-    # beekeeper — owns wallets directly, calls wallet and storage
-    "*beekeeper::create_session*"
-    "*beekeeper::create_wallet*"
-    "*beekeeper::encrypt_data*"
-    "*beekeeper::decrypt_data*"
-    "*beekeeper::find_decrypt_keys*"
     # beekeeper_api — embind entry points (only those that transitively call async crypto)
     "*beekeeper_api::create*"
     "*beekeeper_api::unlock*"

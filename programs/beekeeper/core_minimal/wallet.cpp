@@ -1,4 +1,5 @@
 #include <core_minimal/wallet.hpp>
+#include <core_minimal/binary_serializer.hpp>
 
 #include <stdexcept>
 
@@ -15,12 +16,19 @@ const std::string& wallet::get_name() const { return name_; }
 
 void wallet::encrypt_and_save()
 {
-  auto wallet_file_content = crypto_.encrypt_wallet_data(password_, keys_);
-
-  wallet_data_.cipher_keys = crypto_.parse_wallet_file(wallet_file_content);
+  wallet_data_.cipher_keys = crypto_.encrypt_wallet_keys(password_, keys_);
 
   if (storage_)
-    storage_->save(name_, wallet_file_content);
+  {
+    // Serialize cipher_keys as the wallet file format: JSON hex string "abcd..."
+    auto hex = hex_encode(wallet_data_.cipher_keys);
+    std::vector<char> buf;
+    buf.reserve(hex.size() + 2);
+    buf.push_back('"');
+    buf.insert(buf.end(), hex.begin(), hex.end());
+    buf.push_back('"');
+    storage_->save(name_, buf);
+  }
 }
 
 // ── lifecycle ────────────────────────────────────────────────

@@ -26,17 +26,18 @@ struct crypto_primitives
   /// RIPEMD-160 hash (20 bytes). Used for public key checksums.
   virtual std::array<uint8_t, 20> ripemd160(const uint8_t* data, size_t len) = 0;
 
-  // ── AES-256-CBC (no padding) ─────────────────────────────────
+  // ── AES-256-CBC (PKCS#7 padding) ────────────────────────────
 
-  /// Encrypt data with AES-256-CBC, no PKCS7 padding.
+  /// Encrypt data with AES-256-CBC + PKCS#7 padding.
+  /// Matches FC's standalone aes_encrypt() which uses OpenSSL defaults.
   /// @param key  32-byte encryption key
   /// @param iv   16-byte initialization vector
-  /// @param data plaintext (must be multiple of 16 bytes)
+  /// @param data plaintext (any length; PKCS#7 padding is applied)
   virtual std::vector<uint8_t> aes256_cbc_encrypt(
       const uint8_t* key, const uint8_t* iv,
       const uint8_t* data, size_t len) = 0;
 
-  /// Decrypt data with AES-256-CBC, no PKCS7 padding.
+  /// Decrypt data with AES-256-CBC, removing PKCS#7 padding.
   virtual std::vector<uint8_t> aes256_cbc_decrypt(
       const uint8_t* key, const uint8_t* iv,
       const uint8_t* data, size_t len) = 0;

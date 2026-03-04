@@ -46,7 +46,7 @@ public:
   // ── session management ─────────────────────────────────────
 
   /// Create a new session.  Returns its unique token.
-  std::string create_session(const std::string& salt = "");
+  std::string create_session();
 
   /// Destroy a session and disassociate its wallets.
   void        close_session(const std::string& token);
@@ -144,7 +144,7 @@ private:
   wallet& get_wallet(const std::string& wallet_name);
   const wallet& get_wallet(const std::string& wallet_name) const;
 
-  std::string generate_token(const std::string& salt);
+  std::string generate_token();
   std::string gen_password() const;
 
   crypto_provider&                         crypto_;

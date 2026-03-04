@@ -54,8 +54,13 @@ struct crypto_provider
 
   // ── Wallet encryption (high-level) ─────────────────────────
 
+  /// Encrypt wallet keys: password + key pairs -> raw AES ciphertext.
+  virtual std::vector<char> encrypt_wallet_keys(
+      const std::string& password,
+      const keys_map& keys) = 0;
+
   /// Encrypt wallet data: password + key pairs -> wallet file content (JSON bytes).
-  /// Internally handles password hashing, serialization, and AES encryption.
+  /// Convenience wrapper: calls encrypt_wallet_keys() then wraps as JSON hex string.
   virtual std::vector<char> encrypt_wallet_data(
       const std::string& password,
       const keys_map& keys) = 0;

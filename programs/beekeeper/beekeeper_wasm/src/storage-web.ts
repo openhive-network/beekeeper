@@ -51,7 +51,7 @@ const webStorageCreator: TStorageCreator = async (dbName: string): Promise<IStor
 
   const toKey = (name: string) => `${keyPrefix}${name}${LEGACY_WALLET_EXT}`;
 
-  const pendingWrites: Promise<void>[] = [];
+  let pendingWrites: Promise<void>[] = [];
 
   return {
     save_fn: (name: string, data: Uint8Array): void => {
@@ -66,10 +66,6 @@ const webStorageCreator: TStorageCreator = async (dbName: string): Promise<IStor
         tx.onerror = () => reject(tx.error);
       });
       pendingWrites.push(p);
-      p.then(
-        () => { pendingWrites.splice(pendingWrites.indexOf(p), 1); },
-        () => { pendingWrites.splice(pendingWrites.indexOf(p), 1); }
-      );
     },
 
     load_fn: (name: string): Uint8Array => {
@@ -87,7 +83,10 @@ const webStorageCreator: TStorageCreator = async (dbName: string): Promise<IStor
     },
 
     sync: async (): Promise<void> => {
-      await Promise.all(pendingWrites);
+      // Atomic switch arrays
+      const writes = pendingWrites;
+      pendingWrites = [];
+      await Promise.all(writes);
     },
 
     close: () => {

@@ -77,14 +77,23 @@ private:
   secp256k1_context_struct* secp_ctx_;
 };
 
+/// Private base that ensures prims_ is fully constructed before
+/// crypto_provider_impl binds a reference to it (base-from-member idiom).
+struct wasm_crypto_provider_prims_holder
+{
+  explicit wasm_crypto_provider_prims_holder(emscripten::val crypto_obj)
+    : prims_(std::move(crypto_obj)) {}
+protected:
+  wasm_crypto_primitives prims_;
+};
+
 /// Full crypto_provider for WASM: primitives → crypto_provider_impl.
-class wasm_crypto_provider final : public beekeeper_minimal::crypto_provider_impl
+class wasm_crypto_provider final
+  : private wasm_crypto_provider_prims_holder
+  , public  beekeeper_minimal::crypto_provider_impl
 {
 public:
   explicit wasm_crypto_provider(emscripten::val crypto_obj);
-
-private:
-  wasm_crypto_primitives prims_;
 };
 
 } // namespace beekeeper_wasm

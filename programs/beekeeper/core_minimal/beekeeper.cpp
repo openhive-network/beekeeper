@@ -19,7 +19,7 @@ beekeeper::beekeeper(crypto_provider& crypto, wallet_storage& storage,
 
 // ── session management ──────────────────────────────────────
 
-std::string beekeeper::generate_token(const std::string& salt)
+std::string beekeeper::generate_token()
 {
   static constexpr char hex_chars[] = "0123456789abcdef";
   constexpr unsigned int token_length = 32;
@@ -37,12 +37,12 @@ std::string beekeeper::generate_token(const std::string& salt)
   return result;
 }
 
-std::string beekeeper::create_session(const std::string& salt)
+std::string beekeeper::create_session()
 {
-  std::string token = generate_token(salt);
+  std::string token = generate_token();
 
   while (tokens_.count(token))
-    token = generate_token(salt);
+    token = generate_token();
 
   tokens_.insert(token);
   token_wallets_[token];  // create empty set

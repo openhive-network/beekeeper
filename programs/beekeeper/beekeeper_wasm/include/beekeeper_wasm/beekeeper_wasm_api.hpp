@@ -72,7 +72,7 @@ public:
 
   std::string encrypt_data(const std::string& token, const std::string& wallet_name,
                            const std::string& from_key, const std::string& to_key,
-                           const std::string& content, uint32_t nonce);
+                           const std::string& content, double nonce);
   std::string decrypt_data(const std::string& token, const std::string& wallet_name,
                            const std::string& from_key, const std::string& to_key,
                            const std::string& encrypted_content);

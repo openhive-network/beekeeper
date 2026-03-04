@@ -176,21 +176,22 @@ std::string crypto_provider_impl::signature_to_hex(const signature_type& sig)
 
 // ── Wallet encryption ──────────────────────────────────────────
 
-std::vector<char> crypto_provider_impl::encrypt_wallet_data(
+std::vector<char> crypto_provider_impl::encrypt_wallet_keys(
     const std::string& password, const keys_map& keys)
 {
-  // 1. Hash password → sha512
   auto pw = prims_.sha512(
     reinterpret_cast<const uint8_t*>(password.data()),
     password.size());
 
-  // 2. Pack plain_keys = { checksum=pw, keys=keys }
   auto plain_txt = pack_plain_keys(pw, keys);
+  return aes_encrypt(pw, plain_txt);
+}
 
-  // 3. AES-encrypt with pw as key+IV
-  auto cipher_keys = aes_encrypt(pw, plain_txt);
+std::vector<char> crypto_provider_impl::encrypt_wallet_data(
+    const std::string& password, const keys_map& keys)
+{
+  auto cipher_keys = encrypt_wallet_keys(password, keys);
 
-  // 4. Serialize as wallet file JSON
   // FC's wallet_data serializes as just the cipher_keys vector (hex-encoded string in JSON)
   auto hex = hex_encode(cipher_keys);
   std::string json = "\"" + hex + "\"";

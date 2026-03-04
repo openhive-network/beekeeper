@@ -59,9 +59,11 @@ beekeeper_api::beekeeper_api(emscripten::val storage, emscripten::val crypto, ui
 
 // ── session ────────────────────────────────────────────────
 
-std::string beekeeper_api::create_session(const std::string& salt)
+std::string beekeeper_api::create_session(const std::string& /*salt*/)
 {
-  return bk_.create_session(salt);
+  // salt is accepted for API compatibility but not used — tokens are
+  // generated from cryptographically secure random bytes.
+  return bk_.create_session();
 }
 
 void beekeeper_api::close_session(const std::string& token)
@@ -148,11 +150,13 @@ std::string beekeeper_api::sign_digest(const std::string& token, const std::stri
 
 std::string beekeeper_api::encrypt_data(const std::string& token, const std::string& wallet_name,
                                         const std::string& from_key, const std::string& to_key,
-                                        const std::string& content, uint32_t nonce)
+                                        const std::string& content, double nonce)
 {
   bk_.validate_token(token);
   auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
   auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
+  // JS number (double) preserves integers exactly up to 2^53, sufficient for
+  // microsecond timestamps.  Previous uint32_t silently truncated 64-bit nonces.
   return bk_.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
 }
 

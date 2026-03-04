@@ -30,6 +30,8 @@ public:
   digest_type digest_from_hex(const std::string& hex) override;
   std::string signature_to_hex(const signature_type& sig) override;
 
+  std::vector<char> encrypt_wallet_keys(
+      const std::string& password, const keys_map& keys) override;
   std::vector<char> encrypt_wallet_data(
       const std::string& password, const keys_map& keys) override;
   keys_map decrypt_wallet_data(
