@@ -1,7 +1,6 @@
 /**
  * Compatibility tests between old (1.28.7-rc0) and new beekeeper.
  * Each test runs in both Node.js and Chromium via the compatTest fixture.
- * Using `await` on all API calls works uniformly — old sync methods just resolve immediately.
  */
 import { existsSync, rmSync } from 'fs';
 import { test, expect } from './compat-fixture.js';
@@ -97,8 +96,8 @@ test.describe('Key import compatibility', () => {
         await newW.importKey(wif);
       }
 
-      const oldPubKeys = (await oldW.getPublicKeys()).sort();
-      const newPubKeys = (await newW.getPublicKeys()).sort();
+      const oldPubKeys = oldW.getPublicKeys().sort();
+      const newPubKeys = newW.getPublicKeys().sort();
 
       await oldBk.delete();
       await newBk.delete();
@@ -300,7 +299,7 @@ test.describe('Wallet compatibility (cross-version)', () => {
       const newBk = await createNew();
       const newSession = newBk.createSession('compat-new');
       // Re-open the same wallet and unlock it
-      const newW = await (await newSession.openWallet('w0')).unlock('password');
+      const newW = await newSession.openWallet('w0').unlock('password');
       const newCipher = await newW.encryptData(message, fromPub, toPub, 54321);
 
       await newBk.delete();

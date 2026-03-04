@@ -12,7 +12,7 @@ export interface IWallet {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  close(): Promise<IBeekeeperSession>;
+  close(): IBeekeeperSession;
 
   /**
    * Name of this wallet
@@ -101,7 +101,7 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  lock(): Promise<IBeekeeperWallet>;
+  lock(): IBeekeeperWallet;
 
   /**
    * Imports given private key to this wallet and returns the associated public key for further use
@@ -128,11 +128,11 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
    *
    * @param {TPublicKey} publicKey public key in WIF format to match the private key in the wallet
    *
-   * @returns {Promise<boolean>} `true` if a matching private key is found otherwise `false`
+   * @returns {boolean} `true` if a matching private key is found otherwise `false`
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  hasMatchingPrivateKey(publicKey: TPublicKey): Promise<boolean>;
+  hasMatchingPrivateKey(publicKey: TPublicKey): boolean;
 
   /**
    * Signs a transaction by signing a digest of the transaction
@@ -149,11 +149,11 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
   /**
    * Lists all of the public keys inside this wallet
    *
-   * @returns {Promise<TPublicKey[]>} a set of all keys for this wallet
+   * @returns {TPublicKey[]} a set of all keys for this wallet
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  getPublicKeys(): Promise<TPublicKey[]>;
+  getPublicKeys(): TPublicKey[];
 
   /**
    * Encrypts given data for a specific entity and returns the encrypted message
@@ -223,22 +223,22 @@ export interface IBeekeeperSession {
   /**
    * Retrieves the current session info
    *
-   * @returns {Promise<IBeekeeperInfo>} Current session information
+   * @returns {IBeekeeperInfo} Current session information
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  getInfo(): Promise<IBeekeeperInfo>;
+  getInfo(): IBeekeeperInfo;
 
   /**
    * Checks if wallet with given name exists
    *
    * @param {string} name name of the wallet
    *
-   * @returns {Promise<boolean>} `true` if a wallet exists otherwise `false`
+   * @returns {boolean} `true` if a wallet exists otherwise `false`
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  hasWallet(name: string): Promise<boolean>;
+  hasWallet(name: string): boolean;
 
   /**
    * Lists all of the opened wallets
@@ -282,11 +282,11 @@ export interface IBeekeeperSession {
    *
    * @param {string} name name of wallet
    *
-   * @returns {Promise<IBeekeeperWallet>} the opened Beekeeper wallet object (may be unlocked if it has been previously unlocked)
+   * @returns {IBeekeeperWallet} the opened Beekeeper wallet object (may be unlocked if it has been previously unlocked)
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  openWallet(name: string): Promise<IBeekeeperWallet>;
+  openWallet(name: string): IBeekeeperWallet;
 
   /**
    * Locks all of the unlocked wallets owned by this session
@@ -295,7 +295,7 @@ export interface IBeekeeperSession {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  lockAll(): Promise<Array<IBeekeeperWallet>>;
+  lockAll(): Array<IBeekeeperWallet>;
 
   /**
    * Locks all of the unlocked wallets, closes them, closes this session and makes it unusable
@@ -304,7 +304,7 @@ export interface IBeekeeperSession {
    *
    * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
    */
-  close(): Promise<IBeekeeperInstance>;
+  close(): IBeekeeperInstance;
 }
 
 export interface IBeekeeperInstance {

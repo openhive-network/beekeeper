@@ -1,7 +1,7 @@
 import { BeekeeperApi } from "./api.js";
 import { BeekeeperSession } from "./session.js";
 import { IBeekeeperUnlockedWallet, IBeekeeperSession, TPublicKey, IBeekeeperWallet, TSignature } from "./interfaces.js";
-import { safeAsyncWasmCall } from './util/wasm_error.js';
+import { safeAsyncWasmCall, safeWasmCall } from './util/wasm_error.js';
 
 export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   public constructor(
@@ -18,8 +18,8 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return this.locked.isTemporary;
   }
 
-  public async lock(): Promise<BeekeeperLockedWallet> {
-    await safeAsyncWasmCall(
+  public lock(): BeekeeperLockedWallet {
+    safeWasmCall(
       () => this.api.api.lock(this.session.token, this.locked.name),
       `wallet '${this.locked.name}' locking`
     );
@@ -35,8 +35,8 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     );
   }
 
-  public async hasMatchingPrivateKey(publicKey: TPublicKey): Promise<boolean> {
-    return await safeAsyncWasmCall(
+  public hasMatchingPrivateKey(publicKey: TPublicKey): boolean {
+    return safeWasmCall(
       () => this.api.api.has_matching_private_key(this.session.token, this.locked.name, publicKey),
       `checking for matching key '${publicKey}' in wallet '${this.locked.name}'`
     );
@@ -61,8 +61,8 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     );
   }
 
-  public async getPublicKeys(): Promise<TPublicKey[]> {
-    const vec = await safeAsyncWasmCall(
+  public getPublicKeys(): TPublicKey[] {
+    const vec = safeWasmCall(
       () => this.api.api.get_public_keys(this.session.token, this.locked.name),
       `public keys retrieval from wallet '${this.locked.name}'`
     );
@@ -85,8 +85,8 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     );
   }
 
-  public async close(): Promise<IBeekeeperSession> {
-    return await this.locked.close();
+  public close(): IBeekeeperSession {
+    return this.locked.close();
   }
 }
 
@@ -110,11 +110,11 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
     return this.unlocked;
   }
 
-  public async close(): Promise<IBeekeeperSession> {
+  public close(): IBeekeeperSession {
     if(typeof this.unlocked !== 'undefined')
-      await this.unlocked.lock();
+      this.unlocked.lock();
 
-    await this.session.closeWallet(this.name);
+    this.session.closeWallet(this.name);
 
     return this.session;
   }

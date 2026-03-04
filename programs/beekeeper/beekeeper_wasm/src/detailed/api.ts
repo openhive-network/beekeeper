@@ -55,10 +55,11 @@ export class BeekeeperApi implements IBeekeeperInstance {
 
   public async delete(): Promise<void> {
     for(const session of this.sessions.values())
-      await session.close();
+      session.close();
 
     safeWasmCall(() => this.api.delete(), "WASM api deletion");
 
+    await this.#storage.sync?.();
     this.#storage.close?.();
   }
 }

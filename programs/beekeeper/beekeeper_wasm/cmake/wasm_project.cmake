@@ -49,36 +49,22 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*crypto_provider_impl::ecdh_decrypt*"
     "*crypto_provider_impl::wif_to_key*"
     "*crypto_provider_impl::key_to_wif*"
-    # wallet — calls crypto_provider_impl and storage
-    "*wallet::lock*"
+    # wallet — encrypt_and_save calls async crypto, but lock() is now sync (no longer saves)
     "*wallet::encrypt_and_save*"
     # beekeeper — owns wallets directly, calls wallet and storage
     "*beekeeper::create_session*"
     "*beekeeper::create_wallet*"
-    "*beekeeper::open_wallet*"
     "*beekeeper::encrypt_data*"
     "*beekeeper::decrypt_data*"
     "*beekeeper::find_decrypt_keys*"
-    # beekeeper_api — embind entry points
+    # beekeeper_api — embind entry points (only those that transitively call async crypto)
     "*beekeeper_api::create*"
-    "*beekeeper_api::open*"
-    "*beekeeper_api::close*"
     "*beekeeper_api::unlock*"
-    "*beekeeper_api::lock*"
     "*beekeeper_api::import_key*"
     "*beekeeper_api::remove_key*"
     "*beekeeper_api::sign_digest*"
     "*beekeeper_api::encrypt_data*"
     "*beekeeper_api::decrypt_data*"
-    "*beekeeper_api::get_info*"
-    "*beekeeper_api::has_matching_private_key*"
-    "*beekeeper_api::has_wallet*"
-    "*beekeeper_api::list_wallets*"
-    "*beekeeper_api::get_public_keys*"
-    # JS callback storage — called during wallet save/load/list_dir in async context
-    "*js_callback_storage::save*"
-    "*js_callback_storage::load*"
-    "*js_callback_storage::list_dir*"
     # Embind dispatch layer (Invoker call beekeeper_api methods)
     "*Invoker*"
     # emscripten::val — await, call, and internalCall are in the async path

@@ -1,7 +1,9 @@
 export interface IStorageCallbacks {
-  save_fn: (name: string, data: Uint8Array) => (Promise<void> | void);
-  load_fn: (name: string) => (Promise<Uint8Array> | Uint8Array);
-  list_dir_fn: () => (Promise<string[]> | string[]);
+  save_fn: (name: string, data: Uint8Array) => void;
+  load_fn: (name: string) => Uint8Array;
+  list_dir_fn: () => string[];
+  /** Flush pending writes to persistent storage (e.g. IndexedDB). No-op for synchronous backends. */
+  sync?: () => Promise<void>;
   close?: () => void;
 }
 

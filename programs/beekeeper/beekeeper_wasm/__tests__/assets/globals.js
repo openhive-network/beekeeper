@@ -52,9 +52,9 @@ globalThis.createIdbStorage = async function createIdbStorage(dbName) {
     save_fn: storage.save_fn,
     load_fn: storage.load_fn,
     list_dir_fn: storage.list_dir_fn,
-    syncToIdb: async () => {},
-    syncFromIdb: async () => {},
-    listKeys: async () => storage.list_dir_fn(),
+    syncToIdb: () => storage.sync ? storage.sync() : Promise.resolve(),
+    syncFromIdb: () => Promise.resolve(),
+    listKeys: () => Promise.resolve(storage.list_dir_fn()),
     close: () => { storage.close?.(); }
   };
 };

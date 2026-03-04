@@ -28,8 +28,8 @@ const saveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['beekeep
     await storage.syncToIdb();
 
     if(close) {
-      await api.close(api.implicitSessionToken, "w0");
-      await api.closeSession(api.implicitSessionToken);
+      api.close(api.implicitSessionToken, "w0");
+      api.closeSession(api.implicitSessionToken);
       api.deleteInstance();
     }
 
@@ -46,14 +46,14 @@ const retrieveKeys = async(beekeeperWasmTestWebOnlyWithPage: IBeekeeperTest['bee
 
     const api = new BeekeeperInstanceHelper(provider, [], { save_fn: storage.save_fn, load_fn: storage.load_fn, list_dir_fn: storage.list_dir_fn });
 
-    await api.open(api.implicitSessionToken, "w0");
+    api.open(api.implicitSessionToken, "w0");
     await api.unlock(api.implicitSessionToken, "w0", "badf00d");
 
-    const keys = await api.getPublicKeys(api.implicitSessionToken);
+    const keys = api.getPublicKeys(api.implicitSessionToken);
 
     if(close) {
-      await api.close(api.implicitSessionToken, "w0");
-      await api.closeSession(api.implicitSessionToken);
+      api.close(api.implicitSessionToken, "w0");
+      api.closeSession(api.implicitSessionToken);
       api.deleteInstance();
     }
 

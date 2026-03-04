@@ -27,10 +27,10 @@ test.describe('Beekeeper factory tests for Node.js', () => {
   });
 
   test('Should be able to get_info based on the created session', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ beekeeper }) => {
+    const retVal = await beekeeperTest.dynamic(({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");
 
-      return await session.getInfo();
+      return session.getInfo();
     });
 
     expect(retVal).toHaveProperty('now');
@@ -63,7 +63,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
       await unlocked.removeKey('STM6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa');
 
-      return await unlocked.getPublicKeys();
+      return unlocked.getPublicKeys();
     });
 
     expect(retVal).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
@@ -79,7 +79,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       await unlocked1.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
       await unlocked2.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
 
-      return await unlocked1.getPublicKeys();
+      return unlocked1.getPublicKeys();
     });
 
     expect(retVal).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
@@ -93,7 +93,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
       await unlocked.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
 
-      return await unlocked.hasMatchingPrivateKey('STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh');
+      return unlocked.hasMatchingPrivateKey('STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh');
     });
 
     expect(retVal).toBeTruthy();
@@ -105,7 +105,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
       const { wallet: unlocked } = await session.createWallet('w0', 'mypassword');
 
-      await unlocked.close();
+      unlocked.close();
 
       await unlocked.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT'); // This should fail
     })).rejects.toThrow(/Wallet not found: w0/);
@@ -261,7 +261,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       const bk = await provider.default({ unlockTimeout: 5 });
 
       const session = bk.createSession("my.salt");
-      const info = await session.getInfo();
+      const info = session.getInfo();
 
       await bk.delete();
 
@@ -304,9 +304,9 @@ test.describe('Beekeeper factory tests for Node.js', () => {
   });
 
   test('Should return timeout_time in the future', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ beekeeper }) => {
+    const retVal = await beekeeperTest.dynamic(({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");
-      const info = await session.getInfo();
+      const info = session.getInfo();
 
       return {
         nowMs: info.now.getTime(),
@@ -321,7 +321,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
       const bk = await provider.default({ unlockTimeout: 10 });
       const session = bk.createSession("my.salt");
-      const info = await session.getInfo();
+      const info = session.getInfo();
 
       const diffSeconds = (info.timeoutTime.getTime() - info.now.getTime()) / 1000;
 
@@ -343,18 +343,18 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
       await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
 
-      const keysBefore = await wallet.getPublicKeys();
+      const keysBefore = wallet.getPublicKeys();
 
       // Wait for timeout to expire
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       // getInfo triggers check_timeouts which auto-locks all wallets
-      await session.getInfo();
+      session.getInfo();
 
       // After auto-lock, the wallet is locked — getPublicKeys throws
       let locked = false;
       try {
-        await wallet.getPublicKeys();
+        wallet.getPublicKeys();
       } catch {
         locked = true;
       }
@@ -374,7 +374,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
   test('Should throw when using a closed session', async ({ beekeeperTest }) => {
     await expect(beekeeperTest(async ({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");
-      await session.close();
+      session.close();
 
       // Operations on a closed session should throw
       await session.createWallet('w0', 'mypassword');

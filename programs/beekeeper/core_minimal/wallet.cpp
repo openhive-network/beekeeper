@@ -63,8 +63,6 @@ void wallet::lock()
   if (is_locked())
     return;
 
-  encrypt_and_save();
-
   for (auto& kv : keys_)
     kv.second = key_data(private_key_type(), "");
 

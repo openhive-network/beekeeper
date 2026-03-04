@@ -22,12 +22,12 @@ void js_callback_storage::save(const std::string& name, const std::vector<char>&
                     reinterpret_cast<const uint8_t*>(buffer.data())));
   js_uint8.call<void>("set", mem_view);
 
-  save_fn_(std::string(name), js_uint8).await();
+  save_fn_(std::string(name), js_uint8);
 }
 
 std::vector<char> js_callback_storage::load(const std::string& name)
 {
-  emscripten::val result = load_fn_(std::string(name)).await();
+  emscripten::val result = load_fn_(std::string(name));
 
   unsigned len = result["length"].as<unsigned>();
   std::vector<char> buf(len);
@@ -38,7 +38,7 @@ std::vector<char> js_callback_storage::load(const std::string& name)
 
 std::vector<std::string> js_callback_storage::list_dir()
 {
-  emscripten::val result = list_dir_fn_().await();
+  emscripten::val result = list_dir_fn_();
 
   unsigned len = result["length"].as<unsigned>();
   std::vector<std::string> names;

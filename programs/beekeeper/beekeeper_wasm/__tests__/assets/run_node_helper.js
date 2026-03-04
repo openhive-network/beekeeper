@@ -99,20 +99,20 @@ export class BeekeeperInstanceHelper {
     return this.instance.create_session("");
   }
 
-  async closeSession(token) {
-    await this.instance.close_session(token);
+  closeSession(token) {
+    this.instance.close_session(token);
   }
 
-  async hasMatchingPrivateKey(token, walletName, publicKey) {
-    return await this.instance.has_matching_private_key(token, walletName, publicKey);
+  hasMatchingPrivateKey(token, walletName, publicKey) {
+    return this.instance.has_matching_private_key(token, walletName, publicKey);
   }
 
-  async hasWallet(token, walletName) {
-    return await this.instance.has_wallet(token, walletName);
+  hasWallet(token, walletName) {
+    return this.instance.has_wallet(token, walletName);
   }
 
-  async listWallets(token) {
-    const wallets = Array.from(await this.instance.list_wallets(token));
+  listWallets(token) {
+    const wallets = Array.from(this.instance.list_wallets(token));
     return { wallets };
   }
 
@@ -157,23 +157,23 @@ export class BeekeeperInstanceHelper {
     return await this.instance.sign_digest(sessionToken, sigDigest, publicKey, walletName);
   }
 
-  async getPublicKeys(sessionToken, walletName = this.#lastWalletName ?? "") {
-    const keys = Array.from(await this.instance.get_public_keys(sessionToken, walletName));
+  getPublicKeys(sessionToken, walletName = this.#lastWalletName ?? "") {
+    const keys = Array.from(this.instance.get_public_keys(sessionToken, walletName));
     // Wrap flat string[] into {keys: [{public_key: ...}]} for test compatibility
     return { keys: keys.map(k => ({ public_key: k })) };
   }
 
-  async getInfo(sessionToken) {
-    return await this.instance.get_info(sessionToken);
+  getInfo(sessionToken) {
+    return this.instance.get_info(sessionToken);
   }
 
-  async open(sessionToken, walletName) {
-    await this.instance.open(sessionToken, walletName);
+  open(sessionToken, walletName) {
+    this.instance.open(sessionToken, walletName);
     this.#lastWalletName = walletName;
   }
 
-  async close(sessionToken, walletName) {
-    await this.instance.close(sessionToken, walletName);
+  close(sessionToken, walletName) {
+    this.instance.close(sessionToken, walletName);
   }
 
   /**
@@ -186,12 +186,12 @@ export class BeekeeperInstanceHelper {
     await this.instance.unlock(sessionToken, walletName, pass);
   }
 
-  async lock(sessionToken, walletName) {
-    await this.instance.lock(sessionToken, walletName);
+  lock(sessionToken, walletName) {
+    this.instance.lock(sessionToken, walletName);
   }
 
-  async lockAll(sessionToken) {
-    await this.instance.lock_all(sessionToken);
+  lockAll(sessionToken) {
+    this.instance.lock_all(sessionToken);
   }
 
   deleteInstance() {
