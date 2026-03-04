@@ -17,6 +17,12 @@ struct wallet_details
   bool unlocked = false;
 };
 
+struct session_info
+{
+  std::string now;
+  std::string timeout_time;
+};
+
 /// A session owns a set of wallets and auto-locks them on timeout.
 class session
 {
@@ -35,8 +41,17 @@ public:
   /// Call periodically (or before each operation) to enforce auto-lock.
   void check_timeout();
 
+  /// Change the inactivity timeout (0 = disable).
+  void set_timeout(uint32_t seconds);
+
+  /// Refresh the timeout timer (resets the deadline to now + timeout).
+  void refresh_timeout();
+
   /// Returns seconds until auto-lock, or seconds::max() if timeout is disabled.
   std::chrono::seconds get_remaining_seconds() const;
+
+  /// Returns current time and timeout deadline as ISO8601 strings.
+  session_info get_info() const;
 
   // ── wallet queries ────────────────────────────────────────
 
@@ -72,6 +87,11 @@ public:
                          const std::string& wif_key,
                          const std::string& prefix);
 
+  /// Import multiple keys at once. Returns the corresponding public keys.
+  std::vector<std::string> import_keys(const std::string& wallet_name,
+                                       const std::vector<std::string>& wif_keys,
+                                       const std::string& prefix);
+
   void remove_key(const std::string& wallet_name,
                   const public_key_type& public_key);
 
@@ -105,7 +125,6 @@ public:
                            const std::string& prefix);
 
 private:
-  void refresh_timeout();
   wallet& get_wallet(const std::string& wallet_name);
   const wallet& get_wallet(const std::string& wallet_name) const;
   std::string gen_password() const;

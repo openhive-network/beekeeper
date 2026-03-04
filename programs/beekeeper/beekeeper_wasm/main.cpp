@@ -6,6 +6,24 @@ using namespace beekeeper_wasm;
 using namespace emscripten;
 
 EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
+
+  // ── value types ─────────────────────────────────────────
+  // Embind auto-serializes these as plain JS objects (no wrapper class overhead).
+  // register_vector types are JS-iterable via for...of / Array.from() / spread (Emscripten 5.0+).
+
+  value_object<beekeeper_minimal::wallet_details>("WalletDetails")
+    .field("name", &beekeeper_minimal::wallet_details::name)
+    .field("unlocked", &beekeeper_minimal::wallet_details::unlocked);
+
+  value_object<beekeeper_minimal::session_info>("SessionInfo")
+    .field("now", &beekeeper_minimal::session_info::now)
+    .field("timeout_time", &beekeeper_minimal::session_info::timeout_time);
+
+  register_vector<std::string>("StringVector");
+  register_vector<beekeeper_minimal::wallet_details>("WalletDetailsVector");
+
+  // ── main API class ──────────────────────────────────────
+
   class_<beekeeper_api>("beekeeper_api")
 
     /*
@@ -101,10 +119,10 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     /*
       ****listing of all public keys****
       RESULT:
-        string[] (flat array of public key strings)
+        StringVector (iterable: supports for...of / Array.from() / spread)
     */
-    .function("get_public_keys(token)", select_overload<val(const std::string&)>(&beekeeper_api::get_public_keys))                                  //(1)
-    .function("get_public_keys(token, wallet_name)", select_overload<val(const std::string&, const std::string&)>(&beekeeper_api::get_public_keys)) //(2)
+    .function("get_public_keys(token)", select_overload<std::vector<std::string>(const std::string&)>(&beekeeper_api::get_public_keys))                                  //(1)
+    .function("get_public_keys(token, wallet_name)", select_overload<std::vector<std::string>(const std::string&, const std::string&)>(&beekeeper_api::get_public_keys)) //(2)
 
     /*
       ****signing a transaction by signing a digest of the transaction****
@@ -145,7 +163,7 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     /*
       ****information about a session****
       RESULT:
-        object: { now: string, timeout_time: string } (ISO8601 timestamps)
+        SessionInfo: { now: string, timeout_time: string } (ISO8601 timestamps)
     */
     .function("get_info(token)", &beekeeper_api::get_info)
 
@@ -166,7 +184,7 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     /*
       ****listing all wallets (in-memory + storage)****
       RESULT:
-        Array<{name: string, unlocked: boolean}>
+        WalletDetailsVector (iterable: supports for...of / Array.from() / spread)
     */
     .function("list_wallets(token)", &beekeeper_api::list_wallets)
     ;

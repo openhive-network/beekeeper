@@ -111,7 +111,7 @@ export class BeekeeperInstanceHelper {
   }
 
   async listWallets(token) {
-    const wallets = await this.instance.list_wallets(token);
+    const wallets = Array.from(await this.instance.list_wallets(token));
     return { wallets };
   }
 
@@ -158,7 +158,7 @@ export class BeekeeperInstanceHelper {
   }
 
   async getPublicKeys(sessionToken) {
-    const keys = await this.instance.get_public_keys(sessionToken);
+    const keys = Array.from(await this.instance.get_public_keys(sessionToken));
     // Wrap flat string[] into {keys: [{public_key: ...}]} for test compatibility
     return { keys: keys.map(k => ({ public_key: k })) };
   }

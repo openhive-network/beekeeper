@@ -1,5 +1,7 @@
 #pragma once
 
+#include <core_minimal/session.hpp>
+
 #include <fc/reflect/reflect.hpp>
 #include <fc/container/flat.hpp>
 #include <fc/container/flat_fwd.hpp>
@@ -50,11 +52,7 @@ struct public_key_details
   bool operator<( const public_key_details& obj ) const;
 };
 
-struct info
-{
-  std::string now;
-  std::string timeout_time;
-};
+using info = beekeeper_minimal::session_info;
 
 struct version
 {

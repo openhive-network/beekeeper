@@ -1,6 +1,7 @@
 #include <core_minimal/session.hpp>
 
 #include <algorithm>
+#include <ctime>
 #include <stdexcept>
 
 namespace beekeeper_minimal {
@@ -18,6 +19,12 @@ session::session(std::string token, uint32_t unlock_timeout_seconds,
 }
 
 const std::string& session::get_token() const { return token_; }
+
+void session::set_timeout(uint32_t seconds)
+{
+  timeout_ = std::chrono::seconds(seconds);
+  refresh_timeout();
+}
 
 void session::refresh_timeout()
 {
@@ -41,6 +48,31 @@ std::chrono::seconds session::get_remaining_seconds() const
     return std::chrono::seconds(0);
 
   return std::chrono::duration_cast<std::chrono::seconds>(remaining);
+}
+
+session_info session::get_info() const
+{
+  auto now = std::chrono::system_clock::now();
+  auto now_t = std::chrono::system_clock::to_time_t(now);
+  char buf[32];
+  std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&now_t));
+
+  auto remaining = get_remaining_seconds();
+  std::string timeout_str;
+  if (remaining == std::chrono::seconds::max())
+  {
+    timeout_str = "9999-12-31T23:59:59";
+  }
+  else
+  {
+    auto timeout_tp = now + remaining;
+    auto timeout_t = std::chrono::system_clock::to_time_t(timeout_tp);
+    char tbuf[32];
+    std::strftime(tbuf, sizeof(tbuf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&timeout_t));
+    timeout_str = std::string(tbuf);
+  }
+
+  return session_info{ std::string(buf), std::move(timeout_str) };
 }
 
 std::string session::gen_password() const
@@ -174,6 +206,19 @@ std::string session::import_key(const std::string& wallet_name,
 {
   refresh_timeout();
   return get_wallet(wallet_name).import_key(wif_key, prefix);
+}
+
+std::vector<std::string> session::import_keys(const std::string& wallet_name,
+                                              const std::vector<std::string>& wif_keys,
+                                              const std::string& prefix)
+{
+  refresh_timeout();
+  auto& w = get_wallet(wallet_name);
+  std::vector<std::string> result;
+  result.reserve(wif_keys.size());
+  for (auto& wif : wif_keys)
+    result.push_back(w.import_key(wif, prefix));
+  return result;
 }
 
 void session::remove_key(const std::string& wallet_name,

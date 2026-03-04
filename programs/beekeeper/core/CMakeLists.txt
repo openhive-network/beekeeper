@@ -14,7 +14,7 @@ add_library( beekeeper_core
              ${HEADERS}
            )
 
-target_link_libraries( beekeeper_core fc )
+target_link_libraries( beekeeper_core fc beekeeper_core_minimal )
 target_include_directories( beekeeper_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 target_compile_options( beekeeper_core PUBLIC -fexceptions )
 target_link_options( beekeeper_core PUBLIC -fexceptions )

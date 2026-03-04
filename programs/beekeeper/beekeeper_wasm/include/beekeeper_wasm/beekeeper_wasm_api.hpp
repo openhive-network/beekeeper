@@ -31,7 +31,7 @@ private:
 };
 
 /// Thin embind-friendly API that wraps core_minimal::beekeeper.
-/// Methods return native types (string, bool, emscripten::val) or void.
+/// Methods return native types (string, bool, structs) or void.
 /// Errors propagate as C++ exceptions (embind converts to JS exceptions).
 class beekeeper_api final
 {
@@ -65,8 +65,8 @@ public:
   std::string import_key(const std::string& token, const std::string& wallet_name, const std::string& wif_key);
   void remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
 
-  emscripten::val get_public_keys(const std::string& token);
-  emscripten::val get_public_keys(const std::string& token, const std::string& wallet_name);
+  std::vector<std::string> get_public_keys(const std::string& token);
+  std::vector<std::string> get_public_keys(const std::string& token, const std::string& wallet_name);
 
   // ── signing ──────────────────────────────────────────────
 
@@ -89,8 +89,8 @@ public:
 
   bool has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
   bool has_wallet(const std::string& token, const std::string& wallet_name);
-  emscripten::val list_wallets(const std::string& token);
-  emscripten::val get_info(const std::string& token);
+  std::vector<beekeeper_minimal::wallet_details> list_wallets(const std::string& token);
+  beekeeper_minimal::session_info get_info(const std::string& token);
 
 private:
   static constexpr const char* prefix_ = "STM";

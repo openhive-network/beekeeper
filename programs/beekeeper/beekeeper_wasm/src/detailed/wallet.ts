@@ -62,10 +62,11 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   }
 
   public async getPublicKeys(): Promise<TPublicKey[]> {
-    return await safeAsyncWasmCall(
+    const vec = await safeAsyncWasmCall(
       () => this.api.api.get_public_keys(this.session.token, this.locked.name),
       `public keys retrieval from wallet '${this.locked.name}'`
     );
+    return Array.from(vec);
   }
 
   public async encryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): Promise<string> {

@@ -146,26 +146,26 @@ void beekeeper_api::remove_key(const std::string& token, const std::string& wall
   ses.remove_key(wallet_name, pk);
 }
 
-emscripten::val beekeeper_api::get_public_keys(const std::string& token)
+std::vector<std::string> beekeeper_api::get_public_keys(const std::string& token)
 {
   auto& ses = bk_.get_session(token);
   auto keys = ses.get_public_keys("");  // empty name → merge all unlocked
-  auto arr = emscripten::val::array();
-  unsigned i = 0;
+  std::vector<std::string> result;
+  result.reserve(keys.size());
   for (auto& kv : keys)
-    arr.set(i++, crypto_.public_key_to_string(kv.first, kv.second.second));
-  return arr;
+    result.push_back(crypto_.public_key_to_string(kv.first, kv.second.second));
+  return result;
 }
 
-emscripten::val beekeeper_api::get_public_keys(const std::string& token, const std::string& wallet_name)
+std::vector<std::string> beekeeper_api::get_public_keys(const std::string& token, const std::string& wallet_name)
 {
   auto& ses = bk_.get_session(token);
   auto keys = ses.get_public_keys(wallet_name);
-  auto arr = emscripten::val::array();
-  unsigned i = 0;
+  std::vector<std::string> result;
+  result.reserve(keys.size());
   for (auto& kv : keys)
-    arr.set(i++, crypto_.public_key_to_string(kv.first, kv.second.second));
-  return arr;
+    result.push_back(crypto_.public_key_to_string(kv.first, kv.second.second));
+  return result;
 }
 
 // ── signing ────────────────────────────────────────────────
@@ -236,53 +236,17 @@ bool beekeeper_api::has_wallet(const std::string& token, const std::string& wall
   return ses.has_wallet(wallet_name);
 }
 
-emscripten::val beekeeper_api::list_wallets(const std::string& token)
+std::vector<beekeeper_minimal::wallet_details> beekeeper_api::list_wallets(const std::string& token)
 {
   auto& ses = bk_.get_session(token);
-  auto wallets = ses.list_wallets();
-  auto arr = emscripten::val::array();
-  unsigned i = 0;
-  for (auto& wd : wallets)
-  {
-    auto obj = emscripten::val::object();
-    obj.set("name", wd.name);
-    obj.set("unlocked", wd.unlocked);
-    arr.set(i++, obj);
-  }
-  return arr;
+  return ses.list_wallets();
 }
 
-emscripten::val beekeeper_api::get_info(const std::string& token)
+beekeeper_minimal::session_info beekeeper_api::get_info(const std::string& token)
 {
   bk_.check_timeouts();
   auto& ses = bk_.get_session(token);
-
-  auto now = std::chrono::system_clock::now();
-  auto now_t = std::chrono::system_clock::to_time_t(now);
-  char buf[32];
-  std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&now_t));
-  std::string now_str(buf);
-
-  // Convert steady_clock remaining duration to a wall-clock timestamp
-  auto remaining = ses.get_remaining_seconds();
-  std::string timeout_str;
-  if (remaining == std::chrono::seconds::max())
-  {
-    timeout_str = "9999-12-31T23:59:59";
-  }
-  else
-  {
-    auto timeout_tp = now + remaining;
-    auto timeout_t = std::chrono::system_clock::to_time_t(timeout_tp);
-    char tbuf[32];
-    std::strftime(tbuf, sizeof(tbuf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&timeout_t));
-    timeout_str = std::string(tbuf);
-  }
-
-  auto obj = emscripten::val::object();
-  obj.set("now", now_str);
-  obj.set("timeout_time", timeout_str);
-  return obj;
+  return ses.get_info();
 }
 
 } // namespace beekeeper_wasm
