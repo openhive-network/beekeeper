@@ -1,7 +1,7 @@
 import { describe, test, beforeAll, afterAll } from 'vitest';
 import { createOldBeekeeper, createNewBeekeeper, type ITestBeekeeper } from './helpers.js';
 import { keys, signData } from './data.js';
-import { existsSync, rmdirSync } from 'fs';
+import { existsSync, rmSync } from 'fs';
 import { DEFAULT_STORAGE_ROOT as newRoot } from '@hiveio/beekeeper';
 import { DEFAULT_STORAGE_ROOT as oldRoot } from '@hiveio/beekeeper-old';
 
@@ -39,9 +39,9 @@ describe('Benchmarks', () => {
 
   beforeAll(async () => {
     if (existsSync(oldRoot))
-      rmdirSync(oldRoot, { recursive: true });
+      rmSync(oldRoot, { recursive: true });
     if (newRoot !== oldRoot && existsSync(newRoot))
-      rmdirSync(newRoot, { recursive: true });
+      rmSync(newRoot, { recursive: true });
 
     oldBkSign = await createOldBeekeeper([keys[3][0]]);
     newBkSign = await createNewBeekeeper([keys[3][0]]);

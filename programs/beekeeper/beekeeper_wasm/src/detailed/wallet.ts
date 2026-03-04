@@ -56,7 +56,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     }
 
     return await safeAsyncWasmCall(
-      () => this.api.api.sign_digest(this.session.token, sigDigest, publicKey),
+      () => this.api.api.sign_digest(this.session.token, sigDigest, publicKey, this.locked.name),
       `signing digest with key '${publicKey}' using wallet '${this.locked.name}'`
     );
   }
@@ -71,11 +71,10 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
 
   public async encryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): Promise<string> {
     const toKey = anotherKey ?? key;
-    return await safeAsyncWasmCall(() => {
-      if (nonce !== undefined)
-        return this.api.api.encrypt_data(this.session.token, this.locked.name, key, toKey, content, nonce);
-      return this.api.api.encrypt_data(this.session.token, this.locked.name, key, toKey, content);
-    }, `encrypting data in wallet '${this.locked.name}'`);
+    return await safeAsyncWasmCall(
+      () => this.api.api.encrypt_data(this.session.token, this.locked.name, key, toKey, content, nonce ?? 0),
+      `encrypting data in wallet '${this.locked.name}'`
+    );
   }
 
   public async decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): Promise<string> {

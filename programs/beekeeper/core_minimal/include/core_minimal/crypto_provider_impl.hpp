@@ -43,8 +43,8 @@ public:
       const private_key_type& from_key, const public_key_type& to_key,
       const std::string& content, std::optional<uint64_t> nonce = {}) override;
   std::string ecdh_decrypt(
-      key_finder_type key_finder, const public_key_type& from_key,
-      const public_key_type& to_key, const std::string& encrypted_content) override;
+      const private_key_type& priv_key, const public_key_type& other_pub,
+      const std::string& encrypted_content) override;
 
   void get_random_bytes(uint8_t* buf, size_t len) override;
 

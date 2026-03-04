@@ -37,20 +37,17 @@ class beekeeper_api final
 {
 public:
   /// @param storage         JS object: { save_fn, load_fn, list_dir_fn }
-  /// @param crypto          JS object with async hash/AES methods (sha256, sha512, aes256CbcEncrypt/Decrypt)
+  /// @param crypto          JS object with async hash/AES methods
   /// @param unlock_timeout  Inactivity timeout in seconds (default 900)
   beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout);
 
   // ── session ──────────────────────────────────────────────
 
-  std::string create_session();
   std::string create_session(const std::string& salt);
   void close_session(const std::string& token);
 
   // ── wallet lifecycle ─────────────────────────────────────
 
-  std::string create(const std::string& token, const std::string& wallet_name);
-  std::string create(const std::string& token, const std::string& wallet_name, const std::string& password);
   std::string create(const std::string& token, const std::string& wallet_name, const std::string& password, bool is_temporary);
 
   void open(const std::string& token, const std::string& wallet_name);
@@ -65,19 +62,14 @@ public:
   std::string import_key(const std::string& token, const std::string& wallet_name, const std::string& wif_key);
   void remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
 
-  std::vector<std::string> get_public_keys(const std::string& token);
   std::vector<std::string> get_public_keys(const std::string& token, const std::string& wallet_name);
 
   // ── signing ──────────────────────────────────────────────
 
-  std::string sign_digest(const std::string& token, const std::string& sig_digest, const std::string& public_key);
   std::string sign_digest(const std::string& token, const std::string& sig_digest, const std::string& public_key, const std::string& wallet_name);
 
   // ── encrypt / decrypt ────────────────────────────────────
 
-  std::string encrypt_data(const std::string& token, const std::string& wallet_name,
-                           const std::string& from_key, const std::string& to_key,
-                           const std::string& content);
   std::string encrypt_data(const std::string& token, const std::string& wallet_name,
                            const std::string& from_key, const std::string& to_key,
                            const std::string& content, uint32_t nonce);

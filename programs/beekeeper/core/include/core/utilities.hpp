@@ -1,6 +1,6 @@
 #pragma once
 
-#include <core_minimal/session.hpp>
+#include <core_minimal/beekeeper.hpp>
 
 #include <fc/reflect/reflect.hpp>
 #include <fc/container/flat.hpp>

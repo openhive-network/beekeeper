@@ -3,7 +3,7 @@
  * Each test runs in both Node.js and Chromium via the compatTest fixture.
  * Using `await` on all API calls works uniformly — old sync methods just resolve immediately.
  */
-import { existsSync, rmdirSync } from 'fs';
+import { existsSync, rmSync } from 'fs';
 import { test, expect } from './compat-fixture.js';
 import { DEFAULT_STORAGE_ROOT as newRoot } from '@hiveio/beekeeper';
 import { DEFAULT_STORAGE_ROOT as oldRoot } from '@hiveio/beekeeper-old';
@@ -40,9 +40,9 @@ const signData = [
 test.describe('Signature compatibility', () => {
   test.beforeAll(() => {
     if (existsSync(oldRoot))
-      rmdirSync(oldRoot, { recursive: true });
+      rmSync(oldRoot, { recursive: true });
     if (newRoot !== oldRoot && existsSync(newRoot))
-      rmdirSync(newRoot, { recursive: true });
+      rmSync(newRoot, { recursive: true });
   });
 
   test('old and new produce identical signatures', async ({ compatTest }) => {

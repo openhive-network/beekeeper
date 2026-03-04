@@ -474,18 +474,17 @@ BOOST_AUTO_TEST_CASE(session_sign_across_wallets)
   auto min_pub3 = to_min_pubkey(pub3);
   auto min_digest = to_min_digest(digest);
 
-  // ── minimal session ──
+  // ── minimal beekeeper ──
   beekeeper_minimal::beekeeper bk(crypto, ms, 900);
   auto token = bk.create_session("test-salt");
-  auto& sess = bk.get_session(token);
 
-  sess.create_wallet("w1", password);
-  sess.import_key("w1", wif_key1, prefix);
-  sess.create_wallet("w2", "password2");
-  sess.import_key("w2", wif_key3, prefix);
+  bk.create_wallet(token, "w1", password);
+  bk.import_key("w1", wif_key1, prefix);
+  bk.create_wallet(token, "w2", "password2");
+  bk.import_key("w2", wif_key3, prefix);
 
-  // Sign without specifying wallet (searches all)
-  auto sig_min = sess.sign_digest("", min_digest, min_pub3, prefix);
+  // Sign without specifying wallet (searches all in session)
+  auto sig_min = bk.sign_digest(token, "", min_digest, min_pub3, prefix);
 
   // ── original (direct wallet) ──
   beekeeper::wallet_content_handler original(true);

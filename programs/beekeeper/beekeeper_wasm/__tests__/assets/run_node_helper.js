@@ -95,7 +95,7 @@ export class BeekeeperInstanceHelper {
   }
 
   createSessionWithoutSalt() {
-    return this.instance.create_session();
+    return this.instance.create_session("");
   }
 
   async closeSession(token) {
@@ -116,14 +116,14 @@ export class BeekeeperInstanceHelper {
   }
 
   async create(sessionToken, walletName) {
-    const password = await this.instance.create(sessionToken, walletName);
+    const password = await this.instance.create(sessionToken, walletName, "", false);
     BeekeeperInstanceHelper.#setPassword(walletName, password);
 
     return password;
   }
 
   async create_with_password(sessionToken, walletName, explicitPassword) {
-    const password = await this.instance.create(sessionToken, walletName, explicitPassword);
+    const password = await this.instance.create(sessionToken, walletName, explicitPassword, false);
     BeekeeperInstanceHelper.#setPassword(walletName, password);
 
     return password;
@@ -143,10 +143,7 @@ export class BeekeeperInstanceHelper {
   }
 
   async encryptData(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce) {
-    if (nonce !== undefined)
-      return await this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce);
-    else
-      return await this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content);
+    return await this.instance.encrypt_data(sessionToken, walletName, fromPublicKey, toPublicKey, content, nonce ?? 0);
   }
 
   async decryptData(sessionToken, walletName, fromPublicKey, toPublicKey, encryptedContent) {
@@ -154,11 +151,11 @@ export class BeekeeperInstanceHelper {
   }
 
   async signDigest(sessionToken, sigDigest, publicKey) {
-    return await this.instance.sign_digest(sessionToken, sigDigest, publicKey);
+    return await this.instance.sign_digest(sessionToken, sigDigest, publicKey, "");
   }
 
   async getPublicKeys(sessionToken) {
-    const keys = Array.from(await this.instance.get_public_keys(sessionToken));
+    const keys = Array.from(await this.instance.get_public_keys(sessionToken, ""));
     // Wrap flat string[] into {keys: [{public_key: ...}]} for test compatibility
     return { keys: keys.map(k => ({ public_key: k })) };
   }

@@ -2,7 +2,6 @@
 
 #include <core_minimal/crypto_types.hpp>
 
-#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -91,14 +90,11 @@ struct crypto_provider
   /// Fill buffer with cryptographically secure random bytes.
   virtual void get_random_bytes(uint8_t* buf, size_t len) = 0;
 
-  /// Callback type: given a public key, return the corresponding private key (or nullopt).
-  using key_finder_type = std::function<std::optional<private_key_type>(const public_key_type&)>;
-
   /// Decrypt a message using ECDH shared secret.
+  /// The caller resolves the private key beforehand (no callback needed).
   virtual std::string ecdh_decrypt(
-      key_finder_type key_finder,
-      const public_key_type& from_key,
-      const public_key_type& to_key,
+      const private_key_type& priv_key,
+      const public_key_type& other_pub,
       const std::string& encrypted_content) = 0;
 };
 

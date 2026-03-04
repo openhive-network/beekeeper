@@ -282,8 +282,8 @@ std::string crypto_provider_impl::ecdh_encrypt(
 }
 
 std::string crypto_provider_impl::ecdh_decrypt(
-    key_finder_type key_finder, const public_key_type& from_key,
-    const public_key_type& to_key, const std::string& encrypted_content)
+    const private_key_type& priv_key, const public_key_type& other_pub,
+    const std::string& encrypted_content)
 {
   // 1. Base58-decode and unpack content
   auto decoded = prims_.base58_decode(encrypted_content);
@@ -292,31 +292,20 @@ std::string crypto_provider_impl::ecdh_decrypt(
     reinterpret_cast<const char*>(decoded.data()) + decoded.size());
   auto content = unpack_crypto_content(packed);
 
-  // 2. Find private key — try both from_key and to_key
-  auto priv = key_finder(to_key);
-  const public_key_type* other_pub = &from_key;
-  if (!priv)
-  {
-    priv = key_finder(from_key);
-    other_pub = &to_key;
-  }
-  if (!priv)
-    throw std::runtime_error("No matching private key found for ECDH decryption");
+  // 2. Compute shared secret
+  auto shared = prims_.ecdh_shared_secret(priv_key, other_pub);
 
-  // 3. Compute shared secret
-  auto shared = prims_.ecdh_shared_secret(*priv, *other_pub);
-
-  // 4. Regenerate encryption key
+  // 3. Regenerate encryption key
   auto enc_key = generate_encrypted_key(content.nonce, shared);
 
-  // 5. Verify check
+  // 4. Verify check
   auto check_hash = prims_.sha256(enc_key.data.data(), 64);
   uint32_t expected_check;
   std::memcpy(&expected_check, check_hash.data.data(), 4);
   if (expected_check != content.check)
     throw std::runtime_error("ECDH decryption check mismatch");
 
-  // 6. AES-decrypt and unpack string
+  // 5. AES-decrypt and unpack string
   auto decrypted = aes_decrypt(enc_key, content.encrypted);
   return unpack_string(decrypted);
 }

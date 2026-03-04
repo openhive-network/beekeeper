@@ -758,7 +758,7 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
       await api.create(api.implicitSessionToken, walletNames[9]);
 
       await api.create(api.implicitSessionToken, walletNames[9]);
-    }, WALLET_OPTIONS_NODE, walletNames)).rejects.toThrowError('Wallet already exists in session: w9');
+    }, WALLET_OPTIONS_NODE, walletNames)).rejects.toThrowError('Wallet already exists: w9');
   });
 
   test('Should not throw when the wallet does not exist', async ({ beekeeperWasmTest }) => {

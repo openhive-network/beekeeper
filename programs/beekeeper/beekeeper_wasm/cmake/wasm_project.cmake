@@ -52,13 +52,14 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     # wallet — calls crypto_provider_impl and storage
     "*wallet::lock*"
     "*wallet::encrypt_and_save*"
-    # session — calls wallet and storage
-    "*session::create_wallet*"
-    "*session::open_wallet*"
-    "*session::encrypt_data*"
-    # beekeeper — create_session survives, rest inlined
+    # beekeeper — owns wallets directly, calls wallet and storage
     "*beekeeper::create_session*"
-    # beekeeper_api — embind entry points (wrap() is inlined into each)
+    "*beekeeper::create_wallet*"
+    "*beekeeper::open_wallet*"
+    "*beekeeper::encrypt_data*"
+    "*beekeeper::decrypt_data*"
+    "*beekeeper::find_decrypt_keys*"
+    # beekeeper_api — embind entry points
     "*beekeeper_api::create*"
     "*beekeeper_api::open*"
     "*beekeeper_api::close*"
@@ -84,8 +85,6 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*emscripten::val*"
     # wasm_crypto_primitives helpers called around val::await
     "*wasm_crypto_primitives::to_js*"
-    # std::function wrappers for key_finder lambdas in decrypt_data
-    "*__func*session::decrypt_data*"
     # Emscripten dynCall trampolines (exception-safe indirect calls)
     "*dynCall*"
   )
