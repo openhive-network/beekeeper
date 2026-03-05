@@ -1,9 +1,8 @@
 #include <beekeeper/beekeeper_app.hpp>
-#include <beekeeper/session_manager.hpp>
-
-#include <core/beekeeper_wallet_manager.hpp>
 
 #include <fc/value_set.hpp>
+#include <fc/io/json.hpp>
+#include <fc/stacktrace.hpp>
 
 #include <hive/plugins/webserver/webserver_plugin.hpp>
 #include <hive/plugins/app_status_api/app_status_api_plugin.hpp>
@@ -19,6 +18,8 @@ beekeeper_app::beekeeper_app()
 
 beekeeper_app::~beekeeper_app()
 {
+  timer_.reset(); // Stop timeout thread before destroying beekeeper
+
   if( start_loop )
   {
     ilog("beekeeper is exiting");
@@ -39,9 +40,14 @@ void beekeeper_app::set_program_options()
 
   options_cfg.add_options()
     ("unlock-interval", boost::program_options::value<uint64_t>()->default_value( 500 ), "Protection against unlocking by bots. Every wrong `unlock` enables a delay. By default 500[ms]." )
+    ("wallet-dir", bpo::value<std::string>()->default_value("."),
+      "The path of the wallet files (absolute path or relative to application data dir)")
+    ("unlock-timeout", bpo::value<uint64_t>()->default_value(900),
+      "Timeout for unlocked wallet in seconds (default 900 (15 minutes))."
+      "Wallets will be automatically locked after specified number of seconds of inactivity."
+      "Activity is defined as any wallet command e.g. list-wallets.")
+    ("backtrace", bpo::value<std::string>()->default_value( "yes" ), "Whether to print backtrace on SIGSEGV" )
     ;
-
-  beekeeper_app_base::set_program_options();
 }
 
 std::string beekeeper_app::check_version()
@@ -71,21 +77,27 @@ uint32_t beekeeper_app::save_keys( const std::string& wallet_name, const std::st
   ilog( "*****Saving keys into `${_filename}` file*****", (_filename) );
 
   ilog( "Create a session" );
-  std::string _token = wallet_manager_ptr->create_session( "salt" );
+  std::string _token = bk_->create_session();
 
   auto _save_keys = [&]()
   {
+    ilog( "Open the wallet" );
+    bk_->open_wallet( _token, wallet_name );
+
     ilog( "Unlock the wallet" );
-    wallet_manager_ptr->unlock( _token, wallet_name, wallet_password );
+    bk_->unlock( wallet_name, wallet_password );
 
     ilog( "Get keys" );
-    auto _keys = wallet_manager_ptr->list_keys( _token, wallet_name, wallet_password );
+    auto _keys = bk_->get_public_keys( wallet_name );
 
     std::vector<keys_container> _v;
     std::transform( _keys.begin(), _keys.end(), std::back_inserter( _v ),
-    []( const beekeeper::key_detail_pair& item )
+    [this]( const beekeeper_minimal::keys_map::value_type& item )
     {
-      return keys_container{ beekeeper::utility::public_key::to_string( item ), item.second.first.key_to_wif() };
+      return keys_container{
+        crypto_->public_key_to_string( item.first, item.second.second ),
+        crypto_->key_to_wif( item.second.first )
+      };
     } );
 
     ilog( "Save keys into `${_filename}` file", (_filename) );
@@ -96,10 +108,10 @@ uint32_t beekeeper_app::save_keys( const std::string& wallet_name, const std::st
   auto _finish = [this, &_token, &wallet_name]()
   {
     ilog( "Lock the wallet" );
-    wallet_manager_ptr->lock( _token, wallet_name );
+    bk_->lock( wallet_name );
 
     ilog( "Close a session" );
-    wallet_manager_ptr->close_session( _token, false/*allow_close_all_sessions_action*/ );
+    bk_->close_session( _token );
   };
 
   auto _exec_action = [&_result]( std::function<void()>&& call )
@@ -127,7 +139,7 @@ uint32_t beekeeper_app::save_keys( const std::string& wallet_name, const std::st
     }
   };
 
-  BOOST_SCOPE_EXIT(&wallet_manager_ptr, &_exec_action, &_finish, &_result)
+  BOOST_SCOPE_EXIT(&bk_, &_exec_action, &_finish, &_result)
   {
     _exec_action( _finish );
 
@@ -141,6 +153,52 @@ uint32_t beekeeper_app::save_keys( const std::string& wallet_name, const std::st
   _exec_action( _save_keys );
 
   return _result;
+}
+
+uint32_t beekeeper_app::initialize_program_options()
+{
+  try {
+      const auto& _args = app.get_args();
+
+      FC_ASSERT( _args.count("unlock-interval") );
+      unlock_interval = _args.at("unlock-interval").as<uint64_t>();
+      ilog("Options are set.");
+
+      FC_ASSERT( _args.count("wallet-dir") );
+      boost::filesystem::path _dir( _args.at("wallet-dir").as<std::string>() );
+      if(_dir.is_relative() )
+          _dir = app.data_dir() / _dir;
+      if( !bfs::exists( _dir ) )
+          bfs::create_directories( _dir );
+
+      FC_ASSERT( _args.count("unlock-timeout") );
+      auto _timeout = _args.at("unlock-timeout").as<uint64_t>();
+
+      // Create core_minimal objects
+      instance = std::make_shared<beekeeper_instance>( app, _dir );
+      mtx_handler = std::make_shared<mutex_handler>();
+
+      crypto_ = std::make_unique<beekeeper_minimal::fc_crypto_provider>();
+      storage_ = std::make_unique<beekeeper::file_storage>( _dir );
+      bk_ = std::make_unique<beekeeper_minimal::beekeeper>( *crypto_, *storage_, static_cast<uint32_t>(_timeout) );
+
+      // Start timeout thread
+      timer_ = std::make_unique<beekeeper::time_manager>( [this]()
+      {
+        std::shared_lock guard( mtx_handler->get_mutex() );
+        bk_->check_timeout();
+      });
+
+      FC_ASSERT( _args.count("backtrace") );
+      if( _args.at( "backtrace" ).as<std::string>() == "yes" )
+      {
+        fc::print_stacktrace_on_segfault();
+        ilog( "Backtrace on segfault is enabled." );
+      }
+
+      return save_keys( _args );
+
+  } FC_LOG_AND_RETHROW()
 }
 
 uint32_t beekeeper_app::initialize( int argc, char** argv )
@@ -171,7 +229,7 @@ uint32_t beekeeper_app::initialize( int argc, char** argv )
 
     if( instance->is_instance_started() )
     {
-      api_ptr = std::make_unique<beekeeper::beekeeper_wallet_api>( wallet_manager_ptr, mtx_handler, app, unlock_interval );
+      api_ptr = std::make_unique<beekeeper::beekeeper_wallet_api>( *bk_, *crypto_, *storage_, mtx_handler, app, unlock_interval );
       instance->get_app().status.save_status( "beekeeper is starting" );
     }
     else
@@ -201,20 +259,16 @@ void beekeeper_app::start()
   ilog("waiting is finished");
 }
 
-const boost::program_options::variables_map& beekeeper_app::get_args() const
+uint32_t beekeeper_app::run( int argc, char** argv )
 {
-  return app.get_args();
-}
+  set_program_options();
 
-bfs::path beekeeper_app::get_data_dir() const
-{
-  return app.data_dir();
-}
+  auto _result = initialize( argc, argv );
 
-void beekeeper_app::setup( const boost::program_options::variables_map& args )
-{
-  FC_ASSERT( args.count("unlock-interval") );
-  unlock_interval = args.at("unlock-interval").as<uint64_t>();
+  if( start_loop )
+    start();
+
+  return _result;
 }
 
 uint32_t beekeeper_app::save_keys( const boost::program_options::variables_map& args )
@@ -237,20 +291,6 @@ uint32_t beekeeper_app::save_keys( const boost::program_options::variables_map& 
 
   return _result;
 }
-
-std::shared_ptr<beekeeper::beekeeper_wallet_manager> beekeeper_app::create_wallet( const boost::filesystem::path& cmd_wallet_dir, uint64_t cmd_unlock_timeout, uint32_t cmd_session_limit )
-{
-  instance = std::make_shared<beekeeper_instance>( app, cmd_wallet_dir );
-  mtx_handler = std::make_shared<mutex_handler>();
-  return std::make_shared<beekeeper::beekeeper_wallet_manager>( std::make_shared<session_manager>( mtx_handler ), instance,
-                                                                       cmd_wallet_dir, cmd_unlock_timeout, cmd_session_limit,
-                                                                       [this]() { app.kill(); } );
-}
-
-bool beekeeper_app::should_start_loop() const
-{
-  return start_loop;
-};
 
 uint32_t beekeeper_app::init( int argc, char** argv )
 {

@@ -1,9 +1,10 @@
 #pragma once
 
-#include <core/beekeeper_wallet_manager.hpp>
-#include <core/utilities.hpp>
-
+#include <beekeeper/api_types.hpp>
 #include <beekeeper/mutex_handler.hpp>
+
+#include <core_minimal/beekeeper.hpp>
+#include <core_minimal/crypto_provider.hpp>
 
 #include <hive/plugins/json_rpc/utility.hpp>
 
@@ -26,7 +27,9 @@ namespace detail
 class beekeeper_wallet_api
 {
   public:
-    beekeeper_wallet_api( std::shared_ptr<beekeeper::beekeeper_wallet_manager> wallet_mgr, std::shared_ptr<mutex_handler> mtx_handler,
+    beekeeper_wallet_api( beekeeper_minimal::beekeeper& bk, beekeeper_minimal::crypto_provider& crypto,
+                          beekeeper_minimal::wallet_storage& storage,
+                          std::shared_ptr<mutex_handler> mtx_handler,
                           appbase::application& app, uint64_t unlock_interval );
     ~beekeeper_wallet_api();
 

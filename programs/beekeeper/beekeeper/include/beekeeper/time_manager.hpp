@@ -3,12 +3,12 @@
 #include <thread>
 #include <atomic>
 #include <condition_variable>
-
-#include <core/time_manager_base.hpp>
+#include <functional>
 
 namespace beekeeper {
 
-class time_manager: public time_manager_base
+/// Background thread that periodically calls a check_timeout callback.
+class time_manager
 {
   private:
 
@@ -18,18 +18,13 @@ class time_manager: public time_manager_base
     std::mutex mtx;
     std::condition_variable cv;
 
+    std::function<void()> check_timeout_fn;
+
   public:
 
-    time_manager();
-    ~time_manager() override;
-
-    void add( const std::string& token, types::lock_method_type&& lock_method ) override;
-    void change( const std::string& token, const types::timepoint_t& time, bool refresh_only_active ) override;
-
-    void run() override;
-    void run( const std::string& token ) override;
-
-    void close( const std::string& token ) override;
+    /// @param check_timeout  Callback invoked every ~200ms to enforce auto-lock.
+    explicit time_manager( std::function<void()> check_timeout );
+    ~time_manager();
 };
 
 } //beekeeper

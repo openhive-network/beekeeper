@@ -7,7 +7,8 @@ add_library(beekeeper_lib STATIC
     beekeeper_wallet_api.cpp
     time_manager.cpp
     extended_api.cpp
-    session_manager.cpp
+    file_storage.cpp
+    api_types.cpp
     ${HEADERS}
 )
 
@@ -16,7 +17,8 @@ target_link_libraries(beekeeper_lib PUBLIC
     webserver_plugin
     app_status_api_plugin
     hive_utilities
-    beekeeper_core
+    beekeeper_core_minimal
+    fc_crypto_bridge
     beekeeper_protocol_config
 )
 

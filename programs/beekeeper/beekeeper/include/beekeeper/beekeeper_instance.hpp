@@ -2,8 +2,6 @@
 
 #include <appbase/application.hpp>
 
-#include <core/beekeeper_instance_base.hpp>
-
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/filesystem/path.hpp>
@@ -11,7 +9,7 @@
 
 namespace beekeeper
 {
-  class beekeeper_instance: public beekeeper_instance_base
+  class beekeeper_instance
   {
     private:
 
@@ -29,7 +27,7 @@ namespace beekeeper
     public:
 
       beekeeper_instance( appbase::application& app, const boost::filesystem::path& wallet_directory );
-      ~beekeeper_instance() override;
+      ~beekeeper_instance();
 
       bool is_instance_started() const { return instance_started; };
 
@@ -38,6 +36,6 @@ namespace beekeeper
         return app;
       }
 
-      bool start() override;
+      bool start();
   };
 }

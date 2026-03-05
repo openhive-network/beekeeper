@@ -474,7 +474,7 @@ BOOST_AUTO_TEST_CASE(session_sign_named_wallet)
 
   // ── minimal beekeeper ──
   beekeeper_minimal::beekeeper bk(crypto, ms, 900);
-  auto token = bk.create_session("test-salt");
+  auto token = bk.create_session();
 
   bk.create_wallet(token, "w1", password);
   bk.import_key("w1", wif_key1, prefix);
