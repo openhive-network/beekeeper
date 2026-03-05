@@ -8,9 +8,6 @@
 
 #include "beekeeper_mgr.hpp"
 
-#include <core/beekeeper_wallet_manager.hpp>
-
-#include <beekeeper/beekeeper_instance.hpp>
 #include <beekeeper/beekeeper_wallet_api.hpp>
 #include <beekeeper/mutex_handler.hpp>
 
@@ -21,8 +18,6 @@
 
 using namespace hive::chain;
 
-using beekeeper_wallet_manager  = beekeeper::beekeeper_wallet_manager;
-using beekeeper_instance        = beekeeper::beekeeper_instance;
 using beekeeper_wallet_api      = beekeeper::beekeeper_wallet_api;
 
 BOOST_FIXTURE_TEST_SUITE( beekeeper_api_tests, json_rpc_database_fixture )
