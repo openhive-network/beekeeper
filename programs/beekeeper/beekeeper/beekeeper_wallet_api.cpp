@@ -8,6 +8,10 @@
 #include <fc/variant_object.hpp>
 #include <fc/reflect/variant.hpp>
 #include <fc/git_revision.hpp>
+#include <fc/exception/exception.hpp>
+
+#include <cctype>
+#include <optional>
 
 namespace beekeeper {
 
@@ -23,6 +27,38 @@ class beekeeper_api_impl
 
     extended_api ex_api;
 
+    static bool is_wallet_name_valid( const std::string& name )
+    {
+      if( name.empty() )
+        return false;
+
+      for( char ch : name )
+      {
+        if( std::isalnum( static_cast<unsigned char>( ch ) ) )
+          continue;
+        if( ch == '.' || ch == '_' || ch == '-' || ch == '@' )
+          continue;
+        return false;
+      }
+      return true;
+    }
+
+    std::optional<beekeeper_minimal::wallet_details> find_session_wallet( const std::string& token, const std::string& name )
+    {
+      auto wallets = _bk.list_wallets( token );
+      for( const auto& w : wallets )
+      {
+        if( w.name == name )
+          return w;
+      }
+      return std::nullopt;
+    }
+
+    void throw_api_error( const std::string& message )
+    {
+      FC_ASSERT( false, "${msg}", ("msg", message) );
+    }
+
     beekeeper_minimal::public_key_type pub_from_string( const std::string& source )
     {
       return _crypto.public_key_from_string( source, prefix );
@@ -33,7 +69,7 @@ class beekeeper_api_impl
                         beekeeper_minimal::wallet_storage& storage,
                         std::shared_ptr<mutex_handler> mtx_handler, appbase::application& app, uint64_t unlock_interval )
                       : prefix( HIVE_ADDRESS_PREFIX ),
-                        ex_api( unlock_interval ), _bk( bk ), _crypto( crypto ), _storage( storage ), _mtx_handler( mtx_handler )
+                        ex_api( unlock_interval ), _bk( bk ), _crypto( crypto ), _storage( storage ), _mtx_handler( mtx_handler ), app( app )
                         {
                           FC_ASSERT( _mtx_handler );
                         }
@@ -69,6 +105,7 @@ class beekeeper_api_impl
     beekeeper_minimal::crypto_provider& _crypto;
     beekeeper_minimal::wallet_storage& _storage;
     std::shared_ptr<mutex_handler> _mtx_handler;
+    appbase::application& app;
 };
 
 DEFINE_API_IMPL( beekeeper_api_impl, create )
@@ -76,6 +113,12 @@ DEFINE_API_IMPL( beekeeper_api_impl, create )
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
+  if( !is_wallet_name_valid( args.wallet_name ) )
+    throw_api_error( "Name of wallet is incorrect." );
+
+  if( _bk.has_wallet( args.wallet_name ) )
+    throw_api_error( "Wallet with name: '" + args.wallet_name + "' already exists" );
+
   auto pw = _bk.create_wallet( args.token, args.wallet_name, args.password.value_or(""), args.is_temporary );
   return { pw };
 }
@@ -121,6 +164,12 @@ DEFINE_API_IMPL( beekeeper_api_impl, lock )
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
+  auto w = find_session_wallet( args.token, args.wallet_name );
+  if( !w )
+    throw_api_error( "Wallet not found: " + args.wallet_name );
+  if( !w->unlocked )
+    throw_api_error( "Unable to lock a locked wallet" );
+
   _bk.lock( args.wallet_name );
   return lock_return();
 }
@@ -131,16 +180,58 @@ DEFINE_API_IMPL( beekeeper_api_impl, unlock )
 
   _bk.validate_token( args.token );
 
+  auto w = find_session_wallet( args.token, args.wallet_name );
+  const bool in_session = static_cast<bool>( w );
+
+  if( !w )
+  {
+    try
+    {
+      _bk.open_wallet( args.token, args.wallet_name );
+      w = find_session_wallet( args.token, args.wallet_name );
+    }
+    catch( const std::exception& )
+    {
+      throw_api_error( "Unable to open file" );
+    }
+  }
+
+  if( w && w->unlocked && in_session )
+    throw_api_error( "Wallet is already unlocked: " + args.wallet_name );
+
   if( ex_api.unlock_allowed() )
   {
+    // If wallet is already unlocked (by another session), only validate password and attach session.
+    if( w && w->unlocked && !in_session )
+    {
+      try
+      {
+        _bk.check_password( args.wallet_name, args.password );
+        return unlock_return();
+      }
+      catch( const std::exception& )
+      {
+        ex_api.was_error();
+        throw_api_error( "Invalid password for wallet: " + args.wallet_name );
+      }
+    }
+
     try
     {
       _bk.unlock( args.wallet_name, args.password );
     }
-    FC_CAPTURE_CALL_LOG_AND_RETHROW(([this]()
-      {
-        ex_api.was_error();
-      }), ());
+    catch( const std::exception& e )
+    {
+      ex_api.was_error();
+
+      const std::string msg = e.what();
+      if( msg.find( "Wallet is already unlocked" ) != std::string::npos )
+        throw_api_error( "Wallet is already unlocked: " + args.wallet_name );
+      if( msg.find( "Invalid password" ) != std::string::npos )
+        throw_api_error( "Invalid password for wallet: " + args.wallet_name );
+
+      throw_api_error( msg );
+    }
   }
   else
     FC_ASSERT(false, "unlock is not accessible");
@@ -153,8 +244,15 @@ DEFINE_API_IMPL( beekeeper_api_impl, import_key )
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
-  auto pub_str = _bk.import_key( args.wallet_name, args.wif_key, prefix );
-  return { pub_str };
+  try
+  {
+    auto pub_str = _bk.import_key( args.wallet_name, args.wif_key, prefix );
+    return { pub_str };
+  }
+  catch( const std::exception& e )
+  {
+    throw_api_error( e.what() );
+  }
 }
 
 DEFINE_API_IMPL( beekeeper_api_impl, import_keys )
@@ -162,8 +260,15 @@ DEFINE_API_IMPL( beekeeper_api_impl, import_keys )
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
-  auto pub_strs = _bk.import_keys( args.wallet_name, args.wif_keys, prefix );
-  return { pub_strs };
+  try
+  {
+    auto pub_strs = _bk.import_keys( args.wallet_name, args.wif_keys, prefix );
+    return { pub_strs };
+  }
+  catch( const std::exception& e )
+  {
+    throw_api_error( e.what() );
+  }
 }
 
 DEFINE_API_IMPL( beekeeper_api_impl, remove_key )
@@ -172,14 +277,22 @@ DEFINE_API_IMPL( beekeeper_api_impl, remove_key )
 
   _bk.validate_token( args.token );
   auto pub = pub_from_string( args.public_key );
-  _bk.remove_key( args.wallet_name, pub );
-  return remove_key_return();
+  try
+  {
+    _bk.remove_key( args.wallet_name, pub );
+    return remove_key_return();
+  }
+  catch( const std::exception& e )
+  {
+    throw_api_error( e.what() );
+  }
 }
 
 DEFINE_API_IMPL( beekeeper_api_impl, list_wallets )
 {
   std::shared_lock guard( _mtx_handler->get_mutex() );
 
+  _bk.validate_token( args.token );
   auto wallets = _bk.list_wallets( args.token );
   flat_set<wallet_details> result;
   for( auto& w : wallets )
@@ -192,10 +305,19 @@ DEFINE_API_IMPL( beekeeper_api_impl, list_created_wallets )
   std::shared_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
-  auto names = _storage.list_dir();
+  auto session_wallets = _bk.list_wallets( args.token );
   flat_set<wallet_details> result;
+
+  std::map<std::string, bool> session_status;
+  for( auto& w : session_wallets )
+    session_status.emplace( w.name, w.unlocked );
+
+  auto names = _storage.list_dir();
   for( auto& name : names )
-    result.insert( wallet_details{ name, false } );
+  {
+    auto it = session_status.find( name );
+    result.insert( wallet_details{ name, it != session_status.end() ? it->second : false } );
+  }
   return { result };
 }
 
@@ -209,6 +331,10 @@ DEFINE_API_IMPL( beekeeper_api_impl, get_public_keys )
 
   if( args.wallet_name.has_value() )
   {
+    auto w = find_session_wallet( args.token, *args.wallet_name );
+    if( !w || !w->unlocked )
+      throw_api_error( "Wallet " + *args.wallet_name + " is locked" );
+
     auto keys = _bk.get_public_keys( *args.wallet_name );
     for( auto& [pub, kd] : keys )
       result.insert( public_key_details{ _crypto.public_key_to_string( pub, kd.second ) } );
@@ -217,15 +343,23 @@ DEFINE_API_IMPL( beekeeper_api_impl, get_public_keys )
   {
     // Get keys from all unlocked wallets in this session
     auto wallets = _bk.list_wallets( args.token );
+    if( wallets.empty() )
+      throw_api_error( "You don't have any wallet" );
+
+    bool has_unlocked = false;
     for( auto& w : wallets )
     {
       if( w.unlocked )
       {
+        has_unlocked = true;
         auto keys = _bk.get_public_keys( w.name );
         for( auto& [pub, kd] : keys )
           result.insert( public_key_details{ _crypto.public_key_to_string( pub, kd.second ) } );
       }
     }
+
+    if( !has_unlocked )
+      throw_api_error( "You don't have any unlocked wallet" );
   }
 
   return { result };
@@ -237,13 +371,27 @@ DEFINE_API_IMPL( beekeeper_api_impl, sign_digest )
 
   _bk.validate_token( args.token );
 
+  if( args.sig_digest.empty() )
+    throw_api_error( "`sig_digest` can't be empty" );
+
   auto digest = _crypto.digest_from_hex( args.sig_digest );
   auto pub = pub_from_string( args.public_key );
 
   if( args.wallet_name.has_value() )
   {
-    auto sig = _bk.sign_digest( *args.wallet_name, digest, pub, prefix );
-    return { _crypto.signature_to_hex( sig ) };
+    auto w = find_session_wallet( args.token, *args.wallet_name );
+    if( !w )
+      throw_api_error( "Public key " + args.public_key + " not found in " + *args.wallet_name + " wallet" );
+
+    try
+    {
+      auto sig = _bk.sign_digest( *args.wallet_name, digest, pub, prefix );
+      return { _crypto.signature_to_hex( sig ) };
+    }
+    catch( const std::exception& )
+    {
+      throw_api_error( "Public key " + args.public_key + " not found in " + *args.wallet_name + " wallet" );
+    }
   }
   else
   {
@@ -261,7 +409,7 @@ DEFINE_API_IMPL( beekeeper_api_impl, sign_digest )
       }
     }
 
-    FC_ASSERT( false, "Public key ${key} not found in any unlocked wallet", ("key", args.public_key) );
+    throw_api_error( "Public key " + args.public_key + " not found in unlocked wallets" );
   }
 }
 
@@ -277,15 +425,37 @@ DEFINE_API_IMPL( beekeeper_api_impl, create_session )
 {
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
-  auto token = _bk.create_session();
-  return { token };
+  constexpr size_t max_sessions = 64;
+  if( _bk.session_count() >= max_sessions )
+    throw_api_error( "Number of concurrent sessions reached a limit ==`" + std::to_string( max_sessions ) + "`" );
+
+  try
+  {
+    auto token = _bk.create_session();
+    return { token };
+  }
+  catch( const std::exception& e )
+  {
+    throw_api_error( e.what() );
+  }
 }
 
 DEFINE_API_IMPL( beekeeper_api_impl, close_session )
 {
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
+  try
+  {
+    _bk.validate_token( args.token );
+  }
+  catch( const std::exception& )
+  {
+    throw_api_error( "A session attached to " + args.token + " doesn't exist" );
+  }
+
   _bk.close_session( args.token );
+  if( _bk.session_count() == 0 )
+    app.generate_interrupt_request();
   return close_session_return();
 }
 

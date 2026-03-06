@@ -153,6 +153,11 @@ bool beekeeper::has_wallet(const std::string& wallet_name) const
   return std::find(names.begin(), names.end(), wallet_name) != names.end();
 }
 
+void beekeeper::check_password(const std::string& wallet_name, const std::string& password) const
+{
+  get_wallet(wallet_name).check_password(password);
+}
+
 std::vector<wallet_details> beekeeper::list_wallets(const std::string& token) const
 {
   std::vector<wallet_details> result;
@@ -166,17 +171,6 @@ std::vector<wallet_details> beekeeper::list_wallets(const std::string& token) co
       if (wit != wallets_.end())
         result.push_back({ name, !wit->second.is_locked() });
     }
-  }
-
-  auto names = storage_.list_dir();
-  for (auto& name : names)
-  {
-    // Include storage wallets not already in session
-    bool already = false;
-    for (auto& r : result)
-      if (r.name == name) { already = true; break; }
-    if (!already)
-      result.push_back({ name, false });
   }
 
   return result;

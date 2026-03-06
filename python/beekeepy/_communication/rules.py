@@ -246,6 +246,7 @@ class WalletIsAlreadyUnlocked(OverseerRule):
     _WALLET_IS_ALREADY_UNLOCKED_REGEXES: ClassVar[list[re.Pattern[str]]] = [
         re.compile(r"_itr->is_locked\(\): Wallet with name: '([\w-]+)' is already unlocked"),
         re.compile(r"_itr->is_locked\(\): Wallet is already unlocked: ([\w-]+)rethrow"),
+        re.compile(r"Wallet is already unlocked: ([\w-]+)"),
     ]
 
     def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
@@ -267,21 +268,27 @@ class WalletIsAlreadyUnlocked(OverseerRule):
 
 
 class UnableToOpenWallet(OverseerRule):
-    _UNABLE_TO_OPEN_WALLET_REGEX: ClassVar[re.Pattern[str]] = re.compile(
-        r"_new_item->load_wallet_file\(\): "
-        r"Unable to open file: " + REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME + r"(?:rethrow)?"
-    )
+    _UNABLE_TO_OPEN_WALLET_REGEXES: ClassVar[list[re.Pattern[str]]] = [
+        re.compile(
+            r"_new_item->load_wallet_file\(\): "
+            r"Unable to open file: " + REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME + r"(?:rethrow)?"
+        ),
+        re.compile(r"Unable to open file"),
+    ]
 
     def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        if (match := self._UNABLE_TO_OPEN_WALLET_REGEX.search(str(parsed_response))) is not None:
-            return [
-                self._construct_exception(
-                    message=f"No such wallet: {match.group(1)}",
-                    response=parsed_response,
-                    request_id=parsed_response.get("id"),
-                    whole_response=whole_response,
-                )
-            ]
+        response_str = str(parsed_response)
+        for regex in self._UNABLE_TO_OPEN_WALLET_REGEXES:
+            if (match := regex.search(response_str)) is not None:
+                wallet_name = match.group(1) if match.lastindex else "unknown"
+                return [
+                    self._construct_exception(
+                        message=f"No such wallet: {wallet_name}",
+                        response=parsed_response,
+                        request_id=parsed_response.get("id"),
+                        whole_response=whole_response,
+                    )
+                ]
         return []
 
     @classmethod
@@ -290,22 +297,27 @@ class UnableToOpenWallet(OverseerRule):
 
 
 class InvalidPassword(OverseerRule):
-    _INVALID_PASSWORD_REGEX: ClassVar[re.Pattern[str]] = re.compile(
-        r"false: Invalid password for wallet: '" + REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME + r"' (?:rethrow)?"
-    )
+    _INVALID_PASSWORD_REGEXES: ClassVar[list[re.Pattern[str]]] = [
+        re.compile(
+            r"false: Invalid password for wallet: '"
+            + REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME
+            + r"' (?:rethrow)?"
+        ),
+        re.compile(r"Invalid password for wallet: ([\w-]+)"),
+    ]
 
     def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        if (
-            match := self._INVALID_PASSWORD_REGEX.search(parsed_response.get("error", {}).get("message", ""))
-        ) is not None:
-            return [
-                self._construct_exception(
-                    message=f"Invalid password for wallet: {match.group(1)}",
-                    response=parsed_response,
-                    request_id=parsed_response.get("id"),
-                    whole_response=whole_response,
-                )
-            ]
+        error_message = parsed_response.get("error", {}).get("message", "")
+        for regex in self._INVALID_PASSWORD_REGEXES:
+            if (match := regex.search(error_message)) is not None:
+                return [
+                    self._construct_exception(
+                        message=f"Invalid password for wallet: {match.group(1)}",
+                        response=parsed_response,
+                        request_id=parsed_response.get("id"),
+                        whole_response=whole_response,
+                    )
+                ]
         return []
 
     @classmethod

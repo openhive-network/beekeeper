@@ -67,6 +67,9 @@ public:
   /// Check if a wallet exists (in-memory or in storage).
   bool has_wallet(const std::string& wallet_name) const;
 
+  /// Validate wallet password without changing lock state.
+  void check_password(const std::string& wallet_name, const std::string& password) const;
+
   /// List wallets belonging to token + storage-only wallets (as locked).
   std::vector<wallet_details> list_wallets(const std::string& token) const;
 
@@ -136,6 +139,9 @@ public:
 
   /// Validate that a session token exists. Throws if not found.
   void validate_token(const std::string& token) const;
+
+  /// Number of currently active sessions.
+  size_t session_count() const { return tokens_.size(); }
 
 private:
   void refresh_timeout();

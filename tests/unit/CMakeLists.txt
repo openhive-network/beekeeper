@@ -42,4 +42,3 @@ target_compile_definitions(beekeeper_test PRIVATE IS_TEST_NET)
 
 # Register with CTest
 add_test(NAME beekeeper_unit_tests COMMAND beekeeper_test --log_level=test_suite)
-

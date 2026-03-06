@@ -6,6 +6,7 @@
 
 #include <hive/plugins/webserver/webserver_plugin.hpp>
 #include <hive/plugins/app_status_api/app_status_api_plugin.hpp>
+#include <hive/plugins/json_rpc/json_rpc_plugin.hpp>
 
 #include <boost/scope_exit.hpp>
 
@@ -178,6 +179,8 @@ uint32_t beekeeper_app::initialize_program_options()
       instance = std::make_shared<beekeeper_instance>( app, _dir );
       mtx_handler = std::make_shared<mutex_handler>();
 
+      instance->start();
+
       crypto_ = std::make_unique<beekeeper_minimal::fc_crypto_provider>();
       storage_ = std::make_unique<beekeeper::file_storage>( _dir );
       bk_ = std::make_unique<beekeeper_minimal::beekeeper>( *crypto_, *storage_, static_cast<uint32_t>(_timeout) );
@@ -209,10 +212,12 @@ uint32_t beekeeper_app::initialize( int argc, char** argv )
 
   app.register_plugin<hive::plugins::webserver::webserver_plugin>();
   app.register_plugin<hive::plugins::app_status_api::app_status_api_plugin>();
+  app.register_plugin<hive::plugins::json_rpc::json_rpc_plugin>();
 
   auto initializationResult = app.initialize<
                                 hive::plugins::webserver::webserver_plugin,
-                                hive::plugins::app_status_api::app_status_api_plugin>
+                                hive::plugins::app_status_api::app_status_api_plugin,
+                                hive::plugins::json_rpc::json_rpc_plugin>
                               ( argc, argv );
   start_loop = initializationResult.should_start_loop();
 
