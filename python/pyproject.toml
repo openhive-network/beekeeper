@@ -140,21 +140,20 @@ pattern = '''beekeeper-v(?P<base>\d+\.\d+\.\d+)(-?(?P<stage>[a-zA-Z]+)\.?(?P<rev
 #   Tag (distance=0, dirty):       1.28.5+dirty
 #   master (distance>0):           1.28.5.post20260130132734
 #   master (dirty):                1.28.5.post20260130132734+dirty
-#   feature branch (distance>0):   1.28.5.dev20260130132734+unstable
-#   feature branch (dirty):        1.28.5.dev20260130132734+unstable.dirty
+#   feature branch (distance>0):   1.28.5.dev20260130132734
+#   feature branch (dirty):        1.28.5.dev20260130132734+dirty
 #   feature branch (distance=0):   1.28.5  (same as tag)
 #
 # Pre-release tag (e.g. beekeeper-v1.28.5rc1):
 #   Tag (distance=0):              1.28.5rc1
 #   master (distance>0):           1.28.5rc1.post20260130132734
-#   feature branch (distance>0):   1.28.5rc1.dev20260130132734+unstable
+#   feature branch (distance>0):   1.28.5rc1.dev20260130132734
 #
 # Logic:
 #   - distance=0           -> exact tag version
 #   - distance>0, stable   -> tag + .post{timestamp} (post-release, after tag)
-#   - distance>0, unstable -> tag + .dev{timestamp}+unstable (pre-release, before tag)
+#   - distance>0, unstable -> tag + .dev{timestamp} (pre-release, before tag)
 #   - dirty                -> + 'dirty' marker
-#   - unstable             -> + 'unstable' marker
 #
 # Stability detection:
 #   - stable: develop/master/main branches OR tag checkout (detached HEAD with distance=0)
@@ -163,8 +162,8 @@ pattern = '''beekeeper-v(?P<base>\d+\.\d+\.\d+)(-?(?P<stage>[a-zA-Z]+)\.?(?P<rev
 #     use CI_COMMIT_REF_NAME env var as fallback for branch detection
 #
 # Version ordering (newest last):
-#   1.28.5.dev20260130132734+unstable < 1.28.5 < 1.28.5.post20260130132734
-#   (feature branch, before tag)        (tag)    (master, after tag)
+#   1.28.5.dev20260130132734 < 1.28.5 < 1.28.5.post20260130132734
+#   (feature branch, before tag)    (tag)    (master, after tag)
 #
 # pip/poetry behavior:
 #   - `poetry update` / `pip install pkg>=1.0` -> selects stable only (ignores .dev pre-releases)
@@ -183,7 +182,7 @@ format-jinja = """
 
     {%- set post = timestamp|int if is_after_tag and not is_feature_branch else none -%}
     {%- set dev = timestamp|int if is_feature_branch else none -%}
-    {%- set local_parts = ['unstable'] if is_feature_branch else [] -%}
+    {%- set local_parts = [] -%}
     {%- set local_parts = local_parts + ['dirty'] if dirty else local_parts -%}
 
     {{ serialize_pep440(base, stage, revision, post=post, dev=dev, metadata=local_parts) }}
