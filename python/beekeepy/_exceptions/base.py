@@ -144,7 +144,11 @@ class CommunicationError(BeekeepyError):
             return [response]
 
         if isinstance(response, dict):
-            message = response.get("error", {}).get("message", None)
+            error = response.get("error", {})
+            data = error.get("data", None)
+            if data is not None:
+                return [str(data)]
+            message = error.get("message", None)
             return [str(message)] if message is not None else []
 
         if isinstance(response, list):

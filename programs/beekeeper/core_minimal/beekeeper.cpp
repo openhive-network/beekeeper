@@ -205,8 +205,20 @@ void beekeeper::open_wallet(const std::string& token, const std::string& wallet_
 
   if (!wallets_.count(wallet_name))
   {
-    auto [it, _] = wallets_.emplace(wallet_name, wallet(crypto_, &storage_, wallet_name));
-    it->second.open();
+    auto [it, inserted] = wallets_.emplace(wallet_name, wallet(crypto_, &storage_, wallet_name));
+    try
+    {
+      it->second.open();
+    }
+    catch(...)
+    {
+      // Remove the partially-constructed entry so has_wallet() does not
+      // report a wallet whose file could not be loaded (e.g. deleted from disk).
+      // Without this cleanup the subsequent create() call would be rejected
+      // with "already exists" and wallet recovery would fail.
+      wallets_.erase(it);
+      throw;
+    }
   }
 
   token_wallets_[token].insert(wallet_name);
