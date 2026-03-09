@@ -124,15 +124,14 @@ void beekeeper_api::remove_key(const std::string& token, const std::string& wall
   bk_.remove_key(wallet_name, pk);
 }
 
-std::vector<std::string> beekeeper_api::get_public_keys(const std::string& token, const std::string& wallet_name)
+emscripten::val beekeeper_api::get_public_keys(const std::string& token, const std::string& wallet_name)
 {
   bk_.validate_token(token);
   auto keys = bk_.get_public_keys(wallet_name);
-  std::vector<std::string> result;
-  result.reserve(keys.size());
+  auto arr = emscripten::val::array();
   for (auto& kv : keys)
-    result.push_back(crypto_.public_key_to_string(kv.first, kv.second.second));
-  return result;
+    arr.call<void>("push", crypto_.public_key_to_string(kv.first, kv.second.second));
+  return arr;
 }
 
 // ── signing ────────────────────────────────────────────────
@@ -183,12 +182,6 @@ bool beekeeper_api::has_wallet(const std::string& token, const std::string& wall
 {
   bk_.validate_token(token);
   return bk_.has_wallet(wallet_name);
-}
-
-std::vector<beekeeper_minimal::wallet_details> beekeeper_api::list_wallets(const std::string& token)
-{
-  bk_.validate_token(token);
-  return bk_.list_wallets(token);
 }
 
 beekeeper_minimal::session_info beekeeper_api::get_info(const std::string& token)

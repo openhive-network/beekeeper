@@ -30,8 +30,10 @@ public:
   sha512_hash ecdh_shared_secret(const private_key_type& privkey,
                                   const public_key_type& pubkey) override;
 
-  std::string base58_encode(const uint8_t* data, size_t len) override;
-  std::vector<uint8_t> base58_decode(const std::string& str) override;
+  size_t base58_encode(const uint8_t* data, size_t data_len,
+                        char* out, size_t out_size) override;
+  size_t base58_decode(const char* str, size_t str_len,
+                        uint8_t* out, size_t out_size) override;
 
   void get_random_bytes(uint8_t* buf, size_t len) override;
 };

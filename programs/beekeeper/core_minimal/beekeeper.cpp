@@ -1,8 +1,27 @@
 #include <core_minimal/beekeeper.hpp>
 
-#include <algorithm>
 #include <ctime>
 #include <stdexcept>
+
+namespace {
+
+// Manual ISO-8601 formatting — avoids pulling in strftime → snprintf → printf_core → fmt_fp (~6 KB in WASM).
+void format_iso8601(char* buf, std::time_t t)
+{
+  auto* tm = std::gmtime(&t);
+  auto write2 = [](char* p, int v) { p[0] = '0' + v / 10; p[1] = '0' + v % 10; };
+  int y = tm->tm_year + 1900;
+  buf[0] = '0' + y / 1000; buf[1] = '0' + (y / 100) % 10;
+  buf[2] = '0' + (y / 10) % 10; buf[3] = '0' + y % 10;
+  buf[4] = '-'; write2(buf + 5, tm->tm_mon + 1);
+  buf[7] = '-'; write2(buf + 8, tm->tm_mday);
+  buf[10] = 'T'; write2(buf + 11, tm->tm_hour);
+  buf[13] = ':'; write2(buf + 14, tm->tm_min);
+  buf[16] = ':'; write2(buf + 17, tm->tm_sec);
+  buf[19] = '\0';
+}
+
+} // anonymous namespace
 
 namespace beekeeper_minimal {
 
@@ -98,7 +117,7 @@ session_info beekeeper::get_info() const
   auto now = std::chrono::system_clock::now();
   auto now_t = std::chrono::system_clock::to_time_t(now);
   char buf[32];
-  std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&now_t));
+  format_iso8601(buf, now_t);
 
   auto remaining = get_remaining_seconds();
   std::string timeout_str;
@@ -111,7 +130,7 @@ session_info beekeeper::get_info() const
     auto timeout_tp = now + remaining;
     auto timeout_t = std::chrono::system_clock::to_time_t(timeout_tp);
     char tbuf[32];
-    std::strftime(tbuf, sizeof(tbuf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&timeout_t));
+    format_iso8601(tbuf, timeout_t);
     timeout_str = std::string(tbuf);
   }
 

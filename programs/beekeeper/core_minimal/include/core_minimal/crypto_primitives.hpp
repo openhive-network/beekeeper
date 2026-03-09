@@ -62,10 +62,16 @@ struct crypto_primitives
   // ── Base58 ───────────────────────────────────────────────────
 
   /// Encode raw bytes as a Base58 string (Bitcoin alphabet, no checksum).
-  virtual std::string base58_encode(const uint8_t* data, size_t len) = 0;
+  /// Writes into out_buf (NUL-terminated). Returns chars written (excl. NUL), 0 on error.
+  /// Safe upper bound for out_size: data_len * 138 / 100 + 2
+  virtual size_t base58_encode(const uint8_t* data, size_t data_len,
+                                char* out, size_t out_size) = 0;
 
   /// Decode a Base58 string back to raw bytes.
-  virtual std::vector<uint8_t> base58_decode(const std::string& str) = 0;
+  /// Returns bytes written, 0 on error (invalid char or buffer too small).
+  /// Safe upper bound for out_size: str_len * 733 / 1000 + 2
+  virtual size_t base58_decode(const char* str, size_t str_len,
+                                uint8_t* out, size_t out_size) = 0;
 
   // ── Random ─────────────────────────────────────────────────
 

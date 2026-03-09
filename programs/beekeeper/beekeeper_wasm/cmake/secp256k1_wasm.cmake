@@ -25,6 +25,7 @@ target_compile_definitions(secp256k1_wasm PRIVATE
     SECP256K1_BUILD
     ECMULT_WINDOW_SIZE=2   # minimal tables for small WASM binary
     ECMULT_GEN_PREC_BITS=2
+    USE_EXTERNAL_DEFAULT_CALLBACKS # avoid fprintf in default callbacks — saves ~3 KB WASM
 )
 
 target_compile_options(secp256k1_wasm PRIVATE -Oz)

@@ -160,16 +160,33 @@ sha512_hash fc_crypto_primitives::ecdh_shared_secret(const private_key_type& pri
 
 // ── Base58 ─────────────────────────────────────────────────────
 
-std::string fc_crypto_primitives::base58_encode(const uint8_t* data, size_t len)
+size_t fc_crypto_primitives::base58_encode(const uint8_t* data, size_t data_len,
+                                            char* out, size_t out_size)
 {
-  return fc::to_base58(reinterpret_cast<const char*>(data),
-                        static_cast<size_t>(len));
+  auto str = fc::to_base58(reinterpret_cast<const char*>(data),
+                            static_cast<size_t>(data_len));
+  if (str.size() >= out_size)
+    return 0;
+  std::memcpy(out, str.data(), str.size());
+  out[str.size()] = '\0';
+  return str.size();
 }
 
-std::vector<uint8_t> fc_crypto_primitives::base58_decode(const std::string& str)
+size_t fc_crypto_primitives::base58_decode(const char* str, size_t str_len,
+                                            uint8_t* out, size_t out_size)
 {
-  auto decoded = fc::from_base58(str);
-  return std::vector<uint8_t>(decoded.begin(), decoded.end());
+  try
+  {
+    auto decoded = fc::from_base58(std::string(str, str_len));
+    if (decoded.size() > out_size)
+      return 0;
+    std::memcpy(out, decoded.data(), decoded.size());
+    return decoded.size();
+  }
+  catch (...)
+  {
+    return 0;
+  }
 }
 
 // ── Random ──────────────────────────────────────────────────

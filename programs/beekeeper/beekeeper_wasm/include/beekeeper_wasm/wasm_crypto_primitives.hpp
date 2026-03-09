@@ -3,7 +3,8 @@
 /// Composite crypto_primitives for WASM builds:
 ///   - sha256, sha512, aes256_cbc_encrypt/decrypt: async JS via SubtleCrypto (val::await)
 ///   - secp256k1 ops: native C compiled to WASM (secp256k1-zkp)
-///   - ripemd160, base58: standalone C++ compiled to WASM
+///   - ripemd160: standalone C++ compiled to WASM
+///   - base58: standalone C compiled to WASM
 ///
 /// JS callbacks return Promises. C++ unwraps them with emscripten::val::await()
 /// which requires the WASM module to be built with -sASYNCIFY.
@@ -56,8 +57,10 @@ public:
   // ── Native standalone (compiled to WASM) ─────────────────────
 
   std::array<uint8_t, 20> ripemd160(const uint8_t* data, size_t len) override;
-  std::string base58_encode(const uint8_t* data, size_t len) override;
-  std::vector<uint8_t> base58_decode(const std::string& str) override;
+  size_t base58_encode(const uint8_t* data, size_t data_len,
+                        char* out, size_t out_size) override;
+  size_t base58_decode(const char* str, size_t str_len,
+                        uint8_t* out, size_t out_size) override;
 
   // ── Random (synchronous JS crypto.getRandomValues) ─────────
 

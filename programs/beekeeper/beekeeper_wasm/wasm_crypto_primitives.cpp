@@ -1,7 +1,7 @@
 #include <beekeeper_wasm/wasm_crypto_primitives.hpp>
 
 #include "standalone_ripemd160.hpp"
-#include "standalone_base58.hpp"
+#include "standalone_base58.h"
 
 #include <secp256k1.h>
 #include <secp256k1_recovery.h>
@@ -225,14 +225,16 @@ std::array<uint8_t, 20> wasm_crypto_primitives::ripemd160(const uint8_t* data, s
   return standalone_ripemd160(data, len);
 }
 
-std::string wasm_crypto_primitives::base58_encode(const uint8_t* data, size_t len)
+size_t wasm_crypto_primitives::base58_encode(const uint8_t* data, size_t data_len,
+                                              char* out, size_t out_size)
 {
-  return standalone_base58_encode(data, len);
+  return standalone_base58_encode_c(data, data_len, out, out_size);
 }
 
-std::vector<uint8_t> wasm_crypto_primitives::base58_decode(const std::string& str)
+size_t wasm_crypto_primitives::base58_decode(const char* str, size_t str_len,
+                                              uint8_t* out, size_t out_size)
 {
-  return standalone_base58_decode(str);
+  return standalone_base58_decode_c(str, str_len, out, out_size);
 }
 
 } // namespace beekeeper_wasm

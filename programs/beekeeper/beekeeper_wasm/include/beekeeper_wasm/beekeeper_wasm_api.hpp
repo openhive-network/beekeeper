@@ -62,7 +62,7 @@ public:
   std::string import_key(const std::string& token, const std::string& wallet_name, const std::string& wif_key);
   void remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
 
-  std::vector<std::string> get_public_keys(const std::string& token, const std::string& wallet_name);
+  emscripten::val get_public_keys(const std::string& token, const std::string& wallet_name);
 
   // ── signing ──────────────────────────────────────────────
 
@@ -81,7 +81,6 @@ public:
 
   bool has_matching_private_key(const std::string& token, const std::string& wallet_name, const std::string& public_key);
   bool has_wallet(const std::string& token, const std::string& wallet_name);
-  std::vector<beekeeper_minimal::wallet_details> list_wallets(const std::string& token);
   beekeeper_minimal::session_info get_info(const std::string& token);
 
 private:

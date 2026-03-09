@@ -9,18 +9,10 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
 
   // ── value types ─────────────────────────────────────────
   // Embind auto-serializes these as plain JS objects (no wrapper class overhead).
-  // register_vector types are JS-iterable via for...of / Array.from() / spread (Emscripten 5.0+).
-
-  value_object<beekeeper_minimal::wallet_details>("WalletDetails")
-    .field("name", &beekeeper_minimal::wallet_details::name)
-    .field("unlocked", &beekeeper_minimal::wallet_details::unlocked);
 
   value_object<beekeeper_minimal::session_info>("SessionInfo")
     .field("now", &beekeeper_minimal::session_info::now)
     .field("timeout_time", &beekeeper_minimal::session_info::timeout_time);
-
-  register_vector<std::string>("StringVector");
-  register_vector<beekeeper_minimal::wallet_details>("WalletDetailsVector");
 
   // ── main API class ──────────────────────────────────────
 
@@ -62,7 +54,6 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
     .function("get_info(token)", &beekeeper_api::get_info)
     .function("has_matching_private_key(token, wallet_name, public_key)", &beekeeper_api::has_matching_private_key)
     .function("has_wallet(token, wallet_name)", &beekeeper_api::has_wallet)
-    .function("list_wallets(token)", &beekeeper_api::list_wallets)
     ;
 }
 

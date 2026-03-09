@@ -66,33 +66,26 @@ std::optional<private_key_type> crypto_provider_impl::wif_to_key(const std::stri
 {
   // WIF format: base58(0x80 + 32-byte-key + 4-byte-checksum)
   // Total raw = 37 bytes
-  std::vector<uint8_t> decoded;
-  try
-  {
-    decoded = prims_.base58_decode(wif);
-  }
-  catch (...)
-  {
-    return std::nullopt;
-  }
+  uint8_t decoded[64];
+  size_t decoded_len = prims_.base58_decode(wif.data(), wif.size(), decoded, sizeof(decoded));
 
-  if (decoded.size() != 37)
+  if (decoded_len != 37)
     return std::nullopt;
 
   if (decoded[0] != 0x80)
     return std::nullopt;
 
   // Verify checksum: double SHA256 of first 33 bytes, take first 4
-  auto hash1 = prims_.sha256(decoded.data(), 33);
+  auto hash1 = prims_.sha256(decoded, 33);
   auto hash2 = prims_.sha256(hash1.data.data(), 32);
 
   // FC accepts either single or double SHA256 for compatibility
-  if (std::memcmp(hash2.data.data(), decoded.data() + 33, 4) != 0 &&
-      std::memcmp(hash1.data.data(), decoded.data() + 33, 4) != 0)
+  if (std::memcmp(hash2.data.data(), decoded + 33, 4) != 0 &&
+      std::memcmp(hash1.data.data(), decoded + 33, 4) != 0)
     return std::nullopt;
 
   private_key_type key;
-  std::memcpy(key.data.data(), decoded.data() + 1, 32);
+  std::memcpy(key.data.data(), decoded + 1, 32);
   return key;
 }
 
@@ -107,7 +100,9 @@ std::string crypto_provider_impl::key_to_wif(const private_key_type& key)
   auto hash2 = prims_.sha256(hash1.data.data(), 32);
   std::memcpy(data + 33, hash2.data.data(), 4);
 
-  return prims_.base58_encode(data, 37);
+  char encoded[64]; // 37 * 138/100 + 2 = 53
+  size_t encoded_len = prims_.base58_encode(data, 37, encoded, sizeof(encoded));
+  return std::string(encoded, encoded_len);
 }
 
 public_key_type crypto_provider_impl::get_public_key(const private_key_type& key)
@@ -125,7 +120,9 @@ std::string crypto_provider_impl::public_key_to_string(const public_key_type& ke
   std::memcpy(data, key.data.data(), 33);
   std::memcpy(data + 33, rmd.data(), 4);
 
-  return prefix + prims_.base58_encode(data, 37);
+  char encoded[64];
+  size_t encoded_len = prims_.base58_encode(data, 37, encoded, sizeof(encoded));
+  return prefix + std::string(encoded, encoded_len);
 }
 
 public_key_type crypto_provider_impl::public_key_from_string(const std::string& str,
@@ -134,17 +131,19 @@ public_key_type crypto_provider_impl::public_key_from_string(const std::string& 
   if (str.size() <= prefix.size() || str.substr(0, prefix.size()) != prefix)
     throw std::invalid_argument("public key requires prefix: " + prefix);
 
-  auto decoded = prims_.base58_decode(str.substr(prefix.size()));
-  if (decoded.size() != 37)
+  auto b58part = str.substr(prefix.size());
+  uint8_t decoded[64];
+  size_t decoded_len = prims_.base58_decode(b58part.data(), b58part.size(), decoded, sizeof(decoded));
+  if (decoded_len != 37)
     throw std::invalid_argument("invalid public key length");
 
   // Verify RIPEMD-160 checksum
-  auto rmd = prims_.ripemd160(decoded.data(), 33);
-  if (std::memcmp(rmd.data(), decoded.data() + 33, 4) != 0)
+  auto rmd = prims_.ripemd160(decoded, 33);
+  if (std::memcmp(rmd.data(), decoded + 33, 4) != 0)
     throw std::invalid_argument("invalid public key checksum");
 
   public_key_type key;
-  std::memcpy(key.data.data(), decoded.data(), 33);
+  std::memcpy(key.data.data(), decoded, 33);
   return key;
 }
 
@@ -275,11 +274,13 @@ std::string crypto_provider_impl::ecdh_encrypt(
 
   // 6. Pack crypto_data::content and Base58-encode
   auto packed = pack_crypto_content(nonce, check, encrypted);
-  auto encoded = prims_.base58_encode(
+  size_t enc_buf_size = packed.size() * 138 / 100 + 2;
+  std::vector<char> enc_buf(enc_buf_size);
+  size_t enc_len = prims_.base58_encode(
     reinterpret_cast<const uint8_t*>(packed.data()),
-    packed.size());
+    packed.size(), enc_buf.data(), enc_buf_size);
 
-  return encoded;
+  return std::string(enc_buf.data(), enc_len);
 }
 
 std::string crypto_provider_impl::ecdh_decrypt(
@@ -287,10 +288,14 @@ std::string crypto_provider_impl::ecdh_decrypt(
     const std::string& encrypted_content)
 {
   // 1. Base58-decode and unpack content
-  auto decoded = prims_.base58_decode(encrypted_content);
+  size_t dec_buf_size = encrypted_content.size() * 733 / 1000 + 2;
+  std::vector<uint8_t> dec_buf(dec_buf_size);
+  size_t dec_len = prims_.base58_decode(
+    encrypted_content.data(), encrypted_content.size(),
+    dec_buf.data(), dec_buf_size);
   auto packed = std::vector<char>(
-    reinterpret_cast<const char*>(decoded.data()),
-    reinterpret_cast<const char*>(decoded.data()) + decoded.size());
+    reinterpret_cast<const char*>(dec_buf.data()),
+    reinterpret_cast<const char*>(dec_buf.data()) + dec_len);
   auto content = unpack_crypto_content(packed);
 
   // 2. Compute shared secret
