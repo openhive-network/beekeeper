@@ -273,7 +273,9 @@ class UnableToOpenWallet(OverseerRule):
             r"_new_item->load_wallet_file\(\): "
             r"Unable to open file: " + REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME + r"(?:rethrow)?"
         ),
+        re.compile(r"Wallet file not found: " + REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME),
         re.compile(r"Unable to open file"),
+        re.compile(r"Wallet file not found"),
     ]
 
     def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:

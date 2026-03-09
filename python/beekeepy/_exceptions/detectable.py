@@ -33,10 +33,13 @@ class WalletWithSuchNameAlreadyExistsError(DetectableError):
         super().__init__(f"wallet with such name already exists: {wallet_name}")
 
     def _is_exception_handled(self, ex: BaseException) -> bool:
-        return (
-            isinstance(ex, overseer_errors.ErrorInResponseError)
-            and f"Assert Exception:!bfs::exists(wallet_filename): Wallet with name: '{self.wallet_name}' already exists"
-            in ex.error
+        return isinstance(ex, overseer_errors.ErrorInResponseError) and any(
+            error_message in ex.error
+            for error_message in [
+                "Assert Exception:!bfs::exists(wallet_filename):"
+                f" Wallet with name: '{self.wallet_name}' already exists",
+                f"Wallet with name: '{self.wallet_name}' already exists",
+            ]
         )
 
 
@@ -77,6 +80,8 @@ class NotExistingKeyError(DetectableError):
             for error_message in [
                 "Assert Exception:false: Key not in wallet",
                 f"Assert Exception:false: Public key {self.public_key} not found in {self.wallet_name} wallet",
+                f"Public key {self.public_key} not found in wallet {self.wallet_name}",
+                f"Public key {self.public_key} not found in {self.wallet_name} wallet",
             ]
         )
 
@@ -140,9 +145,11 @@ class InvalidWalletError(DetectableError):
         return isinstance(ex, overseer_errors.ErrorInResponseError) and any(
             error_message in ex.error
             for error_message in [
-                "Name of wallet is incorrect. Is empty."
-                f"Name of wallet is incorrect. Name: {self.wallet_name}. Only alphanumeric and '._-@' chars are allowed"
-                f"Name of wallet is incorrect. Name: {self.wallet_name}. File creation with given name is impossible."
+                "Name of wallet is incorrect. Is empty.",
+                "Name of wallet is incorrect.",
+                f"Name of wallet is incorrect. Name: {self.wallet_name}."
+                " Only alphanumeric and '._-@' chars are allowed",
+                f"Name of wallet is incorrect. Name: {self.wallet_name}. File creation with given name is impossible.",
             ]
         )
 
