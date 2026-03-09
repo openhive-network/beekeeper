@@ -262,7 +262,10 @@ DEFINE_API_IMPL( beekeeper_api_impl, import_keys )
   _bk.validate_token( args.token );
   try
   {
-    auto pub_strs = _bk.import_keys( args.wallet_name, args.wif_keys, prefix );
+    std::vector<std::string> pub_strs;
+    pub_strs.reserve( args.wif_keys.size() );
+    for( const auto& wif : args.wif_keys )
+      pub_strs.push_back( _bk.import_key( args.wallet_name, wif, prefix ) );
     return { pub_strs };
   }
   catch( const std::exception& e )

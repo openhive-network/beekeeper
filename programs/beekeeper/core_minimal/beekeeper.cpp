@@ -288,18 +288,6 @@ std::string beekeeper::import_key(const std::string& wallet_name,
   return get_wallet(wallet_name).import_key(wif_key, prefix);
 }
 
-std::vector<std::string> beekeeper::import_keys(const std::string& wallet_name,
-                                                const std::vector<std::string>& wif_keys,
-                                                const std::string& prefix)
-{
-  refresh_timeout();
-  auto& w = get_wallet(wallet_name);
-  std::vector<std::string> result;
-  result.reserve(wif_keys.size());
-  for (auto& wif : wif_keys)
-    result.push_back(w.import_key(wif, prefix));
-  return result;
-}
 
 void beekeeper::remove_key(const std::string& wallet_name,
                            const public_key_type& public_key)

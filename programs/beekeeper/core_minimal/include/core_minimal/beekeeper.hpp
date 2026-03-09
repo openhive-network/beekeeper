@@ -97,10 +97,6 @@ public:
                          const std::string& wif_key,
                          const std::string& prefix);
 
-  /// Import multiple keys at once. Returns the corresponding public keys.
-  std::vector<std::string> import_keys(const std::string& wallet_name,
-                                       const std::vector<std::string>& wif_keys,
-                                       const std::string& prefix);
 
   void remove_key(const std::string& wallet_name,
                   const public_key_type& public_key);
