@@ -51,6 +51,11 @@ std::vector<char> file_storage::load(const std::string& name)
   return buffer;
 }
 
+bool file_storage::scan_dir(const std::string& wallet_name)
+{
+  return bfs::exists(wallet_path(wallet_name));
+}
+
 std::vector<std::string> file_storage::list_dir()
 {
   std::vector<std::string> result;

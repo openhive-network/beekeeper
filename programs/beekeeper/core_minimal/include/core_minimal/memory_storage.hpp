@@ -13,7 +13,7 @@ class memory_storage final : public wallet_storage
 public:
   void save(const std::string& name, const std::vector<char>& buffer) override;
   std::vector<char> load(const std::string& name) override;
-  std::vector<std::string> list_dir() override;
+  bool scan_dir(const std::string& wallet_name) override;
 
 private:
   std::map<std::string, std::vector<char>> store_;

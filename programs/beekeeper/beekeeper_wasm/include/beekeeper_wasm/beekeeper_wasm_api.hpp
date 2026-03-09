@@ -22,7 +22,7 @@ public:
 
   void save(const std::string& name, const std::vector<char>& buffer) override;
   std::vector<char> load(const std::string& name) override;
-  std::vector<std::string> list_dir() override;
+  bool scan_dir(const std::string& wallet_name) override;
 
 private:
   emscripten::val save_fn_;

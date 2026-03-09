@@ -17,13 +17,9 @@ std::vector<char> memory_storage::load(const std::string& name)
   return it->second;
 }
 
-std::vector<std::string> memory_storage::list_dir()
+bool memory_storage::scan_dir(const std::string& wallet_name)
 {
-  std::vector<std::string> names;
-  names.reserve(store_.size());
-  for (const auto& [name, _] : store_)
-    names.push_back(name);
-  return names;
+  return store_.count(wallet_name) != 0;
 }
 
 } // namespace beekeeper_minimal

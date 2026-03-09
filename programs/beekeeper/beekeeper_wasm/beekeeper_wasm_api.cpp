@@ -36,16 +36,15 @@ std::vector<char> js_callback_storage::load(const std::string& name)
   return buf;
 }
 
-std::vector<std::string> js_callback_storage::list_dir()
+bool js_callback_storage::scan_dir(const std::string& wallet_name)
 {
   emscripten::val result = list_dir_fn_();
 
   unsigned len = result["length"].as<unsigned>();
-  std::vector<std::string> names;
-  names.reserve(len);
   for (unsigned i = 0; i < len; ++i)
-    names.push_back(result[i].as<std::string>());
-  return names;
+    if (result[i].as<std::string>() == wallet_name)
+      return true;
+  return false;
 }
 
 // ── beekeeper_api ──────────────────────────────────────────

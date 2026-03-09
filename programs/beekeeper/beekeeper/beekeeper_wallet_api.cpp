@@ -1,5 +1,6 @@
 #include <beekeeper/beekeeper_wallet_api.hpp>
 #include <beekeeper/extended_api.hpp>
+#include <beekeeper/file_storage.hpp>
 
 #include <hive/protocol/config.hpp>
 
@@ -315,7 +316,7 @@ DEFINE_API_IMPL( beekeeper_api_impl, list_created_wallets )
   for( auto& w : session_wallets )
     session_status.emplace( w.name, w.unlocked );
 
-  auto names = _storage.list_dir();
+  auto names = static_cast<beekeeper::file_storage&>(_storage).list_dir();
   for( auto& name : names )
   {
     auto it = session_status.find( name );

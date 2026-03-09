@@ -16,8 +16,8 @@ struct wallet_storage
   /// Retrieve a previously-persisted wallet blob. Throws if not found.
   virtual std::vector<char> load(const std::string& path) = 0;
 
-  /// Return names of all wallets currently in storage.
-  virtual std::vector<std::string> list_dir() = 0;
+  /// Check whether a wallet with the given name exists in storage.
+  virtual bool scan_dir(const std::string& wallet_name) = 0;
 };
 
 } // namespace beekeeper_minimal

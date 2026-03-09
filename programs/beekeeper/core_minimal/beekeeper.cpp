@@ -168,8 +168,7 @@ bool beekeeper::has_wallet(const std::string& wallet_name) const
   if (wallets_.count(wallet_name))
     return true;
 
-  auto names = storage_.list_dir();
-  return std::find(names.begin(), names.end(), wallet_name) != names.end();
+  return storage_.scan_dir(wallet_name);
 }
 
 void beekeeper::check_password(const std::string& wallet_name, const std::string& password) const
