@@ -78,7 +78,7 @@
   "size-limit": [
     {
       "brotli": false,
-      "limit": "291 kB",
+      "limit": "273.1 kB",
       "path": "./dist/bundle"
     }
   ],
