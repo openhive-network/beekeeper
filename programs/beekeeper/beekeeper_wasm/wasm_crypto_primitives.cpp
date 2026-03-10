@@ -234,7 +234,9 @@ size_t wasm_crypto_primitives::base58_encode(const uint8_t* data, size_t data_le
 size_t wasm_crypto_primitives::base58_decode(const char* str, size_t str_len,
                                               uint8_t* out, size_t out_size)
 {
-  return standalone_base58_decode_c(str, str_len, out, out_size);
+  return standalone_base58_decode_c(str, str_len, out, out_size, [](const char* error) {
+    throw std::runtime_error(error);
+  });
 }
 
 } // namespace beekeeper_wasm

@@ -90,7 +90,8 @@ size_t standalone_base58_encode_c(const uint8_t* data, size_t data_len,
 }
 
 size_t standalone_base58_decode_c(const char* str, size_t str_len,
-                                  uint8_t* out_buf, size_t out_buf_size)
+                                  uint8_t* out_buf, size_t out_buf_size,
+                                 void (*error_handler)(const char* error))
 {
   size_t zeros = 0;
   uint8_t num_buf[512];
@@ -113,12 +114,16 @@ size_t standalone_base58_decode_c(const char* str, size_t str_len,
     uint32_t carry;
     size_t j;
 
-    if (ch >= 128)
+    if (ch >= 128) {
+      error_handler("Invalid Base58 character");
       return 0; /* invalid character */
+    }
 
     digit = REVERSE[ch];
-    if (digit == 255)
+    if (digit == 255) {
+      error_handler("Invalid Base58 character");
       return 0; /* invalid character */
+    }
 
     /* Multiply existing number by 58 and add digit */
     carry = digit;

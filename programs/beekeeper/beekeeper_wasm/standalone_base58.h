@@ -26,7 +26,8 @@ size_t standalone_base58_encode_c(const uint8_t* data, size_t data_len,
 /// Returns the number of bytes written, or 0 on error (invalid char or buffer too small).
 /// Safe upper bound for out_buf_size: str_len * 733 / 1000 + 2
 size_t standalone_base58_decode_c(const char* str, size_t str_len,
-                                  uint8_t* out_buf, size_t out_buf_size);
+                                  uint8_t* out_buf, size_t out_buf_size,
+                                void (*error_handler)(const char* error));
 
 #ifdef __cplusplus
 }
