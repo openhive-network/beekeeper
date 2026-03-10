@@ -34,8 +34,6 @@ export declare class BeekeeperInstanceHelper {
 
   public hasWallet(token: string, walletName: string): boolean;
 
-  public listWallets(token: string): { wallets: Array<{ name: string; unlocked: boolean }> };
-
   public create(sessionToken: string, walletName: string): Promise<string>;
 
   public create_with_password(sessionToken: string, walletName: string, explicitPassword: string): Promise<string>;

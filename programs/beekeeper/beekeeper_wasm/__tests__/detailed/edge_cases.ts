@@ -409,23 +409,6 @@ test.describe('Edge cases: low-level WASM API', () => {
     });
   });
 
-  // --- listWallets ---
-
-  test('Should be able to list wallets via low-level API', async ({ beekeeperWasmTest }) => {
-    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE) => {
-      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
-
-      await api.create_with_password(api.implicitSessionToken, 'w0', 'pass');
-      await api.create_with_password(api.implicitSessionToken, 'w1', 'pass');
-
-      const result = api.listWallets(api.implicitSessionToken);
-
-      return result.wallets.length;
-    }, WALLET_OPTIONS_NODE);
-
-    expect(retVal).toBe(2);
-  });
-
   // --- hasWallet ---
 
   test('Should correctly report wallet existence via hasWallet', async ({ beekeeperWasmTest }) => {

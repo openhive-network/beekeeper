@@ -111,11 +111,6 @@ export class BeekeeperInstanceHelper {
     return this.instance.has_wallet(token, walletName);
   }
 
-  listWallets(token) {
-    const wallets = Array.from(this.instance.list_wallets(token));
-    return { wallets };
-  }
-
   async create(sessionToken, walletName) {
     const password = await this.instance.create(sessionToken, walletName, "", false);
     BeekeeperInstanceHelper.#setPassword(walletName, password);
