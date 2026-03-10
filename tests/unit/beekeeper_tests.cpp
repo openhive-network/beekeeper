@@ -75,7 +75,8 @@ BOOST_AUTO_TEST_CASE(wallet_test)
   for (int i = 0; i < 4; ++i)
     wifs.push_back(fc::ecc::private_key::generate().key_to_wif());
 
-  bk.import_keys("test", wifs, _prefix);
+  for( const auto& w : wifs )
+    bk.import_key("test", w, _prefix);
   keys = bk.get_public_keys("test");
   BOOST_REQUIRE_EQUAL(5u, keys.size());
 
@@ -1216,7 +1217,8 @@ BOOST_AUTO_TEST_CASE(import_keys)
 
     auto _start = std::chrono::high_resolution_clock::now();
 
-    bk.import_keys( _wallet_name, _keys, _prefix );
+    for( const auto& wif : _keys )
+      bk.import_key( _wallet_name, wif, _prefix );
 
     auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() - _start );
     auto  _time = _duration.count();
@@ -1412,12 +1414,13 @@ BOOST_AUTO_TEST_CASE(wallets_synchronization)
         { "5KKvoNaCPtN9vUEU1Zq9epSAVsEPEtocbJsp7pjZndt9Rn4dNRg", "8mmxXz5BfQc2NJfqhiPkbgcyJm4EvWEr2UAUdr56gEWSN9ZnA5" }
       };
 
-    bk.import_keys( _wallet_name, { _keys[0].first }, _prefix );
+    bk.import_key( _wallet_name, _keys[0].first, _prefix );
     {
       auto _public_keys = bk.get_public_keys( _wallet_name );
       BOOST_REQUIRE_EQUAL( _public_keys.size(), 1 );
     }
-    bk.import_keys( _wallet_name, { _keys[1].first, _keys[2].first }, _prefix );
+    bk.import_key( _wallet_name, _keys[1].first, _prefix );
+    bk.import_key( _wallet_name, _keys[2].first, _prefix );
     {
       auto _public_keys = bk.get_public_keys( _wallet_name );
       BOOST_REQUIRE_EQUAL( _public_keys.size(), 3 );
