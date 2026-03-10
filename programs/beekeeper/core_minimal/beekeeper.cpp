@@ -60,23 +60,21 @@ std::string beekeeper::create_session()
 {
   std::string token = generate_token();
 
-  while (tokens_.count(token))
+  while (token_wallets_.count(token))
     token = generate_token();
 
-  tokens_.insert(token);
   token_wallets_[token];  // create empty set
   return token;
 }
 
 void beekeeper::close_session(const std::string& token)
 {
-  tokens_.erase(token);
   token_wallets_.erase(token);
 }
 
 void beekeeper::validate_token(const std::string& token) const
 {
-  if (!tokens_.count(token))
+  if (!token_wallets_.count(token))
     throw std::runtime_error("Session not found: " + token);
 }
 

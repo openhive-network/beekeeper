@@ -137,7 +137,7 @@ public:
   void validate_token(const std::string& token) const;
 
   /// Number of currently active sessions.
-  size_t session_count() const { return tokens_.size(); }
+  size_t session_count() const { return token_wallets_.size(); }
 
 private:
   void refresh_timeout();
@@ -152,7 +152,6 @@ private:
   crypto_provider&                         crypto_;
   wallet_storage&                          storage_;
   memory_storage                           mem_storage_;
-  std::set<std::string>                    tokens_;
   std::map<std::string, wallet>            wallets_;
   std::map<std::string, std::set<std::string>> token_wallets_;  ///< token → wallet names
 
