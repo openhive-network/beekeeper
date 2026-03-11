@@ -99,6 +99,15 @@ std::vector<uint8_t> wasm_crypto_primitives::aes256_cbc_decrypt(
     to_js_array(iv, 16),
     to_js_array(data, len));
   auto result = promise.await();
+
+  // JS returns null when SubtleCrypto.decrypt() fails (e.g. wrong password / bad padding).
+  // We must check here because Asyncify's val::await() aborts on rejected Promises —
+  // _emval_await (libemval.js) uses bare `await` with no rejection handler.
+  // Note: exceptions thrown after val::await() in an Asyncify context may bypass intermediate
+  // C++ catch(...) blocks during stack unwinding, so we use the final user-facing message here.
+  if (result.isNull())
+    throw std::runtime_error("Invalid password");
+
   return from_js_vector(result);
 }
 

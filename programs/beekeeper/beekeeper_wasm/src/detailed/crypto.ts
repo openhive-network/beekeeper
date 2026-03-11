@@ -16,7 +16,7 @@ export interface ICryptoCallbacks {
   sha256(data: Uint8Array): Promise<Uint8Array>;
   sha512(data: Uint8Array): Promise<Uint8Array>;
   aes256CbcEncrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Promise<Uint8Array>;
-  aes256CbcDecrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Promise<Uint8Array>;
+  aes256CbcDecrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Promise<Uint8Array | null>;
   /** Fill the provided WASM memory view with cryptographically secure random bytes (in place). */
   getRandomBytes(dest: Uint8Array): void;
 }
@@ -42,10 +42,19 @@ export function createCryptoCallbacks(): ICryptoCallbacks {
       return new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv: iv as Uint8Array<ArrayBuffer> }, cryptoKey, data as Uint8Array<ArrayBuffer>));
     },
 
-    async aes256CbcDecrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
+    async aes256CbcDecrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Promise<Uint8Array | null> {
       // SubtleCrypto AES-CBC removes PKCS#7 padding — matches FC's aes_decrypt().
-      const cryptoKey = await crypto.subtle.importKey('raw', key as Uint8Array<ArrayBuffer>, 'AES-CBC', false, ['decrypt']);
-      return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv as Uint8Array<ArrayBuffer> }, cryptoKey, data as Uint8Array<ArrayBuffer>));
+      // On wrong password, SubtleCrypto.decrypt() rejects with OperationError (bad padding).
+      // We MUST catch here because Emscripten's Asyncify-based val::await() has no rejection
+      // handler (_emval_await in libemval.js uses bare `await` with no try/catch). A rejected
+      // Promise becomes an unhandled JS exception that aborts the WASM instance — C++ catch(...)
+      // cannot intercept it. Return null so the C++ side can throw a proper std::runtime_error.
+      try {
+        const cryptoKey = await crypto.subtle.importKey('raw', key as Uint8Array<ArrayBuffer>, 'AES-CBC', false, ['decrypt']);
+        return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv as Uint8Array<ArrayBuffer> }, cryptoKey, data as Uint8Array<ArrayBuffer>));
+      } catch {
+        return null;
+      }
     },
 
     getRandomBytes(dest: Uint8Array): void {
