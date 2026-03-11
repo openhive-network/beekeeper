@@ -806,12 +806,18 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     }, WALLET_OPTIONS_NODE, walletNames)).rejects.toThrowError("Wallet not found: w9");
   });
 
+  // Regression test: wrong password must throw BeekeeperError, not crash/abort WASM.
+  // SubtleCrypto.decrypt() rejects on bad padding; the JS crypto callback catches this
+  // and returns null so the C++ side can throw a proper std::runtime_error instead of
+  // Emscripten's val::await() aborting on the rejected Promise.
   test('Should throw as the password is incorrect', async ({ beekeeperWasmTest }) => {
     await expect(beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, walletNames) => {
       const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
 
-      await api.unlock(api.implicitSessionToken, walletNames[9], 'incorrect');
-    }, WALLET_OPTIONS_NODE, walletNames)).rejects.toThrow();
+      await api.create_with_password(api.implicitSessionToken, walletNames[9], 'correct_password');
+      api.lock(api.implicitSessionToken, walletNames[9]);
+      await api.unlock(api.implicitSessionToken, walletNames[9], 'wrong_password');
+    }, WALLET_OPTIONS_NODE, walletNames)).rejects.toThrow(/Invalid password/);
   });
 
   test('Should throw as the wallet is already unlocked', async ({ beekeeperWasmTest }) => {

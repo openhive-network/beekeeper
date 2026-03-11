@@ -115,6 +115,46 @@ test.describe('Edge cases: high-level factory API', () => {
     expect(retVal.keysAfterUnlock).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
   });
 
+  // --- wrong password must throw, not crash WASM ---
+
+  // Regression test: SubtleCrypto.decrypt() rejects on wrong-password (bad PKCS#7 padding).
+  // Emscripten val::await() aborts on rejected Promises instead of converting them to C++
+  // exceptions. The fix: JS crypto callback catches the rejection and returns null, C++ checks
+  // for null and throws std::runtime_error("AES decryption failed") which propagates normally
+  // through embind as a BeekeeperError.
+  test('Should throw BeekeeperError (not crash WASM) when unlocking with wrong password', async ({ beekeeperTest }) => {
+    await expect(beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      const { wallet } = await session.createWallet('w0', 'correct_password');
+      wallet.lock();
+
+      const locked = session.openWallet('w0');
+      await locked.unlock('wrong_password');
+    })).rejects.toThrow(/Invalid password/);
+  });
+
+  test('Should still work after a failed wrong-password unlock attempt', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      const { wallet } = await session.createWallet('w0', 'correct_password');
+      await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+      wallet.lock();
+
+      const locked = session.openWallet('w0');
+
+      // Wrong password — should throw but leave WASM module intact
+      try { await locked.unlock('wrong_password'); } catch { /* expected */ }
+
+      // Correct password — should succeed, proving WASM wasn't corrupted
+      const unlocked = await locked.unlock('correct_password');
+      return unlocked.getPublicKeys();
+    });
+
+    expect(retVal).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
+  });
+
   // --- auto-generated password ---
 
   test('Should return a generated password starting with PW when no password is provided', async ({ beekeeperTest }) => {
@@ -709,6 +749,45 @@ test.describe('Edge cases: low-level WASM API', () => {
     expect(retVal.w0Locked).toBe(true);
     expect(retVal.w1Keys).toStrictEqual([
       { public_key: 'STM6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa' }
+    ]);
+  });
+
+  // --- wrong password via low-level API ---
+
+  // Same regression test as the high-level version: wrong password must throw, not abort WASM.
+  test('Should throw on wrong password via low-level API (not crash WASM)', async ({ beekeeperWasmTest }) => {
+    await expect(beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+
+      const session = api.createSession('pear');
+      await api.create_with_password(session, 'w0', 'correct_password');
+      await api.importKey(session, 'w0', keys[0][0]);
+
+      api.lock(session, 'w0');
+      await api.unlock(session, 'w0', 'wrong_password');
+    }, WALLET_OPTIONS_NODE, keys)).rejects.toThrow(/Invalid password/);
+  });
+
+  test('Should recover after wrong-password attempt via low-level API', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+
+      const session = api.createSession('pear');
+      await api.create_with_password(session, 'w0', 'correct_password');
+      await api.importKey(session, 'w0', keys[0][0]);
+
+      api.lock(session, 'w0');
+
+      // Wrong password — should throw but not corrupt WASM state
+      try { await api.unlock(session, 'w0', 'wrong_password'); } catch { /* expected */ }
+
+      // Correct password — proves WASM module survived the failed attempt
+      await api.unlock(session, 'w0', 'correct_password');
+      return api.getPublicKeys(session, 'w0').keys;
+    }, WALLET_OPTIONS_NODE, keys);
+
+    expect(retVal).toStrictEqual([
+      { public_key: 'STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh' }
     ]);
   });
 
