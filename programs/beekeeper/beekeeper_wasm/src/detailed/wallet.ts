@@ -23,12 +23,13 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
       () => this.api.api.lock(this.session.token, this.locked.name),
       `wallet '${this.locked.name}' locking`
     );
-    this.locked.unlocked = undefined;
+    this.locked._unlocked = undefined;
 
     return this.locked;
   }
 
   public async importKey(wifKey: string): Promise<TPublicKey> {
+    this.api.refreshTimeout();
     return await safeAsyncWasmCall(
       () => this.api.api.import_key(this.session.token, this.locked.name, wifKey),
       `importing key to wallet '${this.locked.name}'`
@@ -36,6 +37,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   }
 
   public hasMatchingPrivateKey(publicKey: TPublicKey): boolean {
+    this.api.refreshTimeout();
     return safeWasmCall(
       () => this.api.api.has_matching_private_key(this.session.token, this.locked.name, publicKey),
       `checking for matching key '${publicKey}' in wallet '${this.locked.name}'`
@@ -43,6 +45,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   }
 
   public async removeKey(publicKey: TPublicKey): Promise<void> {
+    this.api.refreshTimeout();
     await safeAsyncWasmCall(
       () => this.api.api.remove_key(this.session.token, this.locked.name, publicKey),
       `removing key '${publicKey}' from wallet '${this.locked.name}'`
@@ -50,6 +53,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   }
 
   public async signDigest(publicKey: string, sigDigest: string | Uint8Array): Promise<TSignature> {
+    this.api.refreshTimeout();
     if (sigDigest instanceof Uint8Array) {
       // Convert Uint8Array to hex string
       sigDigest = Array.from(sigDigest).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -62,6 +66,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   }
 
   public getPublicKeys(): TPublicKey[] {
+    this.api.refreshTimeout();
     const vec = safeWasmCall(
       () => this.api.api.get_public_keys(this.session.token, this.locked.name),
       `public keys retrieval from wallet '${this.locked.name}'`
@@ -70,6 +75,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   }
 
   public async encryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): Promise<string> {
+    this.api.refreshTimeout();
     const toKey = anotherKey ?? key;
     return await safeAsyncWasmCall(
       () => this.api.api.encrypt_data(this.session.token, this.locked.name, key, toKey, content, nonce ?? 0),
@@ -78,6 +84,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   }
 
   public async decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): Promise<string> {
+    this.api.refreshTimeout();
     const toKey = anotherKey ?? key;
     return await safeAsyncWasmCall(
       () => this.api.api.decrypt_data(this.session.token, this.locked.name, key, toKey, content),
@@ -91,7 +98,8 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
 }
 
 export class BeekeeperLockedWallet implements IBeekeeperWallet {
-  public unlocked: BeekeeperUnlockedWallet | undefined = undefined;
+  /** @internal Backing field for the unlocked getter. Use the `unlocked` property instead. */
+  public _unlocked: BeekeeperUnlockedWallet | undefined = undefined;
 
   public constructor(
     private readonly api: BeekeeperApi,
@@ -100,19 +108,27 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
     public readonly isTemporary: boolean
   ) {}
 
+  get unlocked(): BeekeeperUnlockedWallet | undefined {
+    if (this._unlocked && this.api.isTimedOut()) {
+      this._unlocked.lock();
+    }
+    return this._unlocked;
+  }
+
   public async unlock(password: string): Promise<IBeekeeperUnlockedWallet> {
+    this.api.refreshTimeout();
     await safeAsyncWasmCall(
       () => this.api.api.unlock(this.session.token, this.name, password),
       `wallet '${this.name}' unlocking`
     );
-    this.unlocked = new BeekeeperUnlockedWallet(this.api, this.session, this);
+    this._unlocked = new BeekeeperUnlockedWallet(this.api, this.session, this);
 
-    return this.unlocked;
+    return this._unlocked;
   }
 
   public close(): IBeekeeperSession {
-    if(typeof this.unlocked !== 'undefined')
-      this.unlocked.lock();
+    if(typeof this._unlocked !== 'undefined')
+      this._unlocked.lock();
 
     this.session.closeWallet(this.name);
 

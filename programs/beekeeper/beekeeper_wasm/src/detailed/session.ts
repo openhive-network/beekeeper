@@ -4,11 +4,6 @@ import { IBeekeeperInfo, IBeekeeperInstance, IBeekeeperSession, IBeekeeperWallet
 import { BeekeeperLockedWallet, BeekeeperUnlockedWallet } from "./wallet.js";
 import { safeAsyncWasmCall, safeWasmCall } from './util/wasm_error.js';
 
-interface IBeekeeperSessionInfo {
-  now: string;
-  timeout_time: string;
-}
-
 export class BeekeeperSession implements IBeekeeperSession {
   public constructor(
     private readonly api: BeekeeperApi,
@@ -18,14 +13,9 @@ export class BeekeeperSession implements IBeekeeperSession {
   public readonly wallets: Map<string, BeekeeperLockedWallet> = new Map();
 
   public getInfo(): IBeekeeperInfo {
-    const result = safeWasmCall(
-      () => this.api.api.get_info(this.token),
-      "session info retrieval"
-    ) as IBeekeeperSessionInfo;
-
     return {
-      now: new Date(`${result.now}Z`),
-      timeoutTime: new Date(`${result.timeout_time}Z`)
+      now: new Date(),
+      timeoutTime: this.api.getTimeoutTime()
     };
   }
 
@@ -52,12 +42,12 @@ export class BeekeeperSession implements IBeekeeperSession {
       password = returnedPassword;
 
     const wallet = new BeekeeperLockedWallet(this.api, this, name, isTemporary);
-    wallet.unlocked = new BeekeeperUnlockedWallet(this.api, this, wallet);
+    wallet._unlocked = new BeekeeperUnlockedWallet(this.api, this, wallet);
 
     this.wallets.set(name, wallet);
 
     return {
-      wallet: wallet.unlocked,
+      wallet: wallet._unlocked!,
       password
     };
   }

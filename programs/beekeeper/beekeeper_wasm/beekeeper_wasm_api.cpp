@@ -186,7 +186,8 @@ bool beekeeper_api::has_wallet(const std::string& token, const std::string& wall
 beekeeper_minimal::session_info beekeeper_api::get_info(const std::string& token)
 {
   bk_.validate_token(token);
-  bk_.check_timeout();
+  // Timeout is enforced by the TS layer (BeekeeperLockedWallet.unlocked getter).
+  // No C++ check_timeout() here — WASM does not use C++ timers.
   return bk_.get_info();
 }
 
