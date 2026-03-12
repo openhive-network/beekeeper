@@ -1074,68 +1074,9 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     expect(retVal).toBeLessThanOrEqual(905);
   });
 
-  test('Should auto-lock wallets after timeout expires', async ({ beekeeperWasmTest }) => {
-    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }) => {
-      const api = new BeekeeperInstanceHelper(provider, ['--wallet-dir', '.beekeeper', '--unlock-timeout', '2']);
-
-      const session = api.createSession('pear');
-      await api.create_with_password(session, 'w0', 'pass');
-      await api.importKey(session, 'w0', '5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
-
-      // Keys visible before timeout
-      const keysBefore = api.getPublicKeys(session);
-
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // get_info triggers check_timeouts which auto-locks all wallets
-      api.getInfo(session);
-
-      // After auto-lock, getPublicKeys throws because wallet is locked
-      let locked = false;
-      try {
-        api.getPublicKeys(session);
-      } catch {
-        locked = true;
-      }
-
-      return {
-        keysBefore: keysBefore.keys.length,
-        locked
-      };
-    });
-
-    expect(retVal.keysBefore).toBe(1);
-    expect(retVal.locked).toBe(true);
-  });
-
-  test('Should refresh timeout on wallet operations', async ({ beekeeperWasmTest }) => {
-    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }) => {
-      const api = new BeekeeperInstanceHelper(provider, ['--wallet-dir', '.beekeeper', '--unlock-timeout', '5']);
-
-      const session = api.createSession('pear');
-      await api.create_with_password(session, 'w0', 'pass');
-      await api.importKey(session, 'w0', '5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
-
-      // Wait 3 seconds (within 5s timeout)
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Perform an operation to refresh timeout (import another key)
-      await api.importKey(session, 'w0', '5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
-
-      // Wait another 3 seconds (6s total, but only 3s since last operation)
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Trigger timeout check
-      api.getInfo(session);
-
-      // Should still have keys since timeout was refreshed at 3s mark
-      const keys = api.getPublicKeys(session);
-      return keys.keys.length;
-    });
-
-    expect(retVal).toBe(2);
-  });
+  // Auto-lock and timeout refresh are enforced by the TS layer
+  // (BeekeeperLockedWallet.unlocked getter), not by C++.
+  // See factory.ts for high-level timeout tests.
 
   test.afterAll(async () => {
     await browser.close();

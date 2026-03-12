@@ -348,27 +348,49 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       // Wait for timeout to expire
       await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // getInfo triggers check_timeouts which auto-locks all wallets
-      session.getInfo();
-
-      // After auto-lock, the wallet is locked — getPublicKeys throws
-      let locked = false;
-      try {
-        wallet.getPublicKeys();
-      } catch {
-        locked = true;
-      }
+      // After timeout, accessing wallet.unlocked auto-locks and returns undefined
+      const walletRef = session.listWallets()[0];
+      const isLocked = walletRef.unlocked === undefined;
 
       await bk.delete();
 
       return {
         keysBefore: keysBefore.length,
-        locked
+        isLocked
       };
     });
 
     expect(retVal.keysBefore).toBe(1);
-    expect(retVal.locked).toBe(true);
+    expect(retVal.isLocked).toBe(true);
+  });
+
+  test('Should refresh timeout on wallet operations', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const bk = await provider.default({ unlockTimeout: 5 });
+      const session = bk.createSession("my.salt");
+      const { wallet } = await session.createWallet('w0', 'mypassword');
+
+      await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      // Wait 3 seconds (within 5s timeout)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Perform an operation to refresh timeout
+      await wallet.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
+
+      // Wait another 3 seconds (6s total, but only 3s since last operation)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Wallet should still be unlocked since timeout was refreshed
+      const walletRef = session.listWallets()[0];
+      const keys = walletRef.unlocked?.getPublicKeys();
+
+      await bk.delete();
+
+      return keys?.length;
+    });
+
+    expect(retVal).toBe(2);
   });
 
   test('Should throw when using a closed session', async ({ beekeeperTest }) => {

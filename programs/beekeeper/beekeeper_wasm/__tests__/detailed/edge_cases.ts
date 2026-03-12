@@ -244,6 +244,85 @@ test.describe('Edge cases: high-level factory API', () => {
     })).rejects.toThrow();
   });
 
+  test('Should throw when calling removeKey on a locked wallet', async ({ beekeeperTest }) => {
+    await expect(beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = await session.createWallet('w0', 'pass');
+
+      const pubKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      wallet.lock();
+
+      await wallet.removeKey(pubKey);
+    })).rejects.toThrow();
+  });
+
+  test('Should throw when calling encryptData on a locked wallet', async ({ beekeeperTest }) => {
+    await expect(beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = await session.createWallet('w0', 'pass');
+
+      const pubKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      wallet.lock();
+
+      await wallet.encryptData("hello", pubKey);
+    })).rejects.toThrow();
+  });
+
+  test('Should throw when calling decryptData on a locked wallet', async ({ beekeeperTest }) => {
+    await expect(beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = await session.createWallet('w0', 'pass');
+
+      const pubKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      const encrypted = await wallet.encryptData("hello", pubKey);
+
+      wallet.lock();
+
+      await wallet.decryptData(encrypted, pubKey);
+    })).rejects.toThrow();
+  });
+
+  test('Should return false from hasMatchingPrivateKey on a locked wallet', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = await session.createWallet('w0', 'pass');
+
+      const pubKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      wallet.lock();
+
+      return wallet.hasMatchingPrivateKey(pubKey);
+    });
+
+    expect(retVal).toBe(false);
+  });
+
+  // --- lockAll + listWallets ---
+
+  test('Should show all wallets as locked in listWallets after lockAll', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      await session.createWallet('w0', 'pass0');
+      await session.createWallet('w1', 'pass1');
+
+      session.lockAll();
+
+      return session.listWallets().map(w => ({
+        name: w.name,
+        isUnlocked: w.unlocked !== undefined
+      }));
+    });
+
+    expect(retVal).toStrictEqual([
+      { name: 'w0', isUnlocked: false },
+      { name: 'w1', isUnlocked: false }
+    ]);
+  });
+
   // --- hasMatchingPrivateKey returns false for missing key ---
 
   test('Should return false from hasMatchingPrivateKey for a key not in wallet', async ({ beekeeperTest }) => {
@@ -351,6 +430,44 @@ test.describe('Edge cases: high-level factory API', () => {
     expect(retVal).toStrictEqual([
       { name: 'w0', isUnlocked: false },
       { name: 'w1', isUnlocked: true }
+    ]);
+  });
+
+  // --- listWallets reflects timeout auto-lock ---
+
+  test('Should auto-lock wallets in listWallets after timeout expires', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const bk = await provider.default({ unlockTimeout: 2 });
+      const session = bk.createSession("my.salt");
+
+      await session.createWallet('w0', 'pass0');
+      await session.createWallet('w1', 'pass1');
+
+      const before = session.listWallets().map(w => ({
+        name: w.name,
+        isUnlocked: w.unlocked !== undefined
+      }));
+
+      // Wait for timeout to expire
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const after = session.listWallets().map(w => ({
+        name: w.name,
+        isUnlocked: w.unlocked !== undefined
+      }));
+
+      await bk.delete();
+
+      return { before, after };
+    });
+
+    expect(retVal.before).toStrictEqual([
+      { name: 'w0', isUnlocked: true },
+      { name: 'w1', isUnlocked: true }
+    ]);
+    expect(retVal.after).toStrictEqual([
+      { name: 'w0', isUnlocked: false },
+      { name: 'w1', isUnlocked: false }
     ]);
   });
 
