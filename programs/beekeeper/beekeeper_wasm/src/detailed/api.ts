@@ -45,6 +45,16 @@ export class BeekeeperApi implements IBeekeeperInstance {
     this.#lastActivity = Date.now();
   }
 
+  /**
+   * Checks if the inactivity timeout has expired and throws if so,
+   * otherwise refreshes the timeout. Call this from unlocked wallet operations.
+   */
+  public throwIfTimedOutAndRefresh(): void {
+    if (this.isTimedOut())
+      throw new BeekeeperError('Wallet locked due to timeout');
+    this.refreshTimeout();
+  }
+
   /** Check if the inactivity timeout has expired. */
   public isTimedOut(): boolean {
     return this.unlockTimeoutMs > 0

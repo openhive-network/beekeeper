@@ -190,7 +190,7 @@ export interface IBeekeeperWallet extends IWallet {
    *
    * @returns {IBeekeeperUnlockedWallet} Unlocked Beekeeper wallet
    *
-   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input etc.)
    */
   unlock(password: string): Promise<IBeekeeperUnlockedWallet>;
 
@@ -236,7 +236,7 @@ export interface IBeekeeperSession {
    *
    * @returns {boolean} `true` if a wallet exists otherwise `false`
    *
-   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input etc.)
    */
   hasWallet(name: string): boolean;
 
@@ -293,7 +293,7 @@ export interface IBeekeeperSession {
    *
    * @returns {Array<IBeekeeperWallet>} array of the locked Beekeeper wallets
    *
-   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input etc.)
    */
   lockAll(): Array<IBeekeeperWallet>;
 
@@ -316,7 +316,7 @@ export interface IBeekeeperInstance {
    *
    * @returns {IBeekeeperSession} a beekeeper session created explicitly. It can be used for further work for example: creating/closing wallets, importing keys, signing transactions etc.
    *
-   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input etc.)
    */
   createSession(salt: string): IBeekeeperSession;
 
@@ -330,7 +330,7 @@ export interface IBeekeeperInstance {
   /**
    * Locks all of the unlocked wallets, closes them, closes opened sessions and deletes the current Beekeeper API instance making it unusable
    *
-   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   * @throws {BeekeeperError} on any beekeeper API-related error (error parsing response, invalid input etc.)
    */
   delete(): Promise<void>;
 }
