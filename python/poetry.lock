@@ -523,13 +523,13 @@ files = [
 
 [[package]]
 name = "hiveio-schemas"
-version = "1.28.2.post20260303084033"
+version = "1.28.2.post20260313095431"
 description = "Tools for checking if message fits expected format"
 optional = false
 python-versions = ">=3.12,<4"
 groups = ["main"]
 files = [
-    {file = "hiveio_schemas-1.28.2.post20260303084033-py3-none-any.whl", hash = "sha256:03886bb6d10de9c631948a6bc013c602802cc9120bdf9f90ddb94d8de72a4755"},
+    {file = "hiveio_schemas-1.28.2.post20260313095431-py3-none-any.whl", hash = "sha256:13d2e47ffafcc654260c15727fef1c22bf8e26d5692b854c63f559d46af52066"},
 ]
 
 [package.dependencies]
