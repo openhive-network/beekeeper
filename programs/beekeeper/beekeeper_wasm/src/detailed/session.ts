@@ -30,6 +30,12 @@ export class BeekeeperSession implements IBeekeeperSession {
     return Array.from(this.wallets.values());
   }
 
+  public listCreatedWallets(): Array<IBeekeeperWallet> {
+    return this.api.listCreatedWallets().map(name =>
+      this.wallets.get(name) ?? new BeekeeperLockedWallet(this.api, this, name, false, false)
+    );
+  }
+
   public async createWallet(name: string, password?: string, isTemporary?: boolean): Promise<IWalletCreated> {
     if (isTemporary === undefined)
       isTemporary = this.api.isInMemory;

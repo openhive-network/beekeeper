@@ -69,6 +69,11 @@ export class BeekeeperApi implements IBeekeeperInstance {
     return new Date(this.#lastActivity + this.unlockTimeoutMs);
   }
 
+  /** Returns the list of wallet names present in persistent storage. */
+  public listCreatedWallets(): string[] {
+    return this.#storage.list_dir_fn();
+  }
+
   public getVersion(): string {
     return process.env.npm_package_version as string;
   }

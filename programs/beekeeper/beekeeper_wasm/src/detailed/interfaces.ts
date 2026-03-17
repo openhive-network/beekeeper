@@ -250,6 +250,14 @@ export interface IBeekeeperSession {
   listWallets(): Array<IBeekeeperWallet>;
 
   /**
+   * Lists all wallets present in the storage, whether or not they are currently opened.
+   * Returned wallet objects support unlock() which will lazily open the wallet if needed.
+   *
+   * @returns {Array<IBeekeeperWallet>} array of Beekeeper wallets found in persistent storage
+   */
+  listCreatedWallets(): Array<IBeekeeperWallet>;
+
+  /**
    * Creates a new Beekeeper wallet object owned by this session.
    * When used in {@link IBeekeeperOptions inMemory} mode, the wallet will be implicitly created as temporary.
    * The wallet will be created as persistent otherwise.

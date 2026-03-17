@@ -105,7 +105,8 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
     private readonly api: BeekeeperApi,
     private readonly session: BeekeeperSession,
     public readonly name: string,
-    public readonly isTemporary: boolean
+    public readonly isTemporary: boolean,
+    private opened: boolean = true
   ) {}
 
   get unlocked(): BeekeeperUnlockedWallet | undefined {
@@ -115,7 +116,20 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
     return this._unlocked;
   }
 
+  /** Opens the wallet in C++ and registers it in the session if not already done. */
+  private ensureOpened(): void {
+    if (!this.opened) {
+      safeWasmCall(
+        () => this.api.api.open(this.session.token, this.name),
+        `wallet '${this.name}' opening`
+      );
+      this.session.wallets.set(this.name, this);
+      this.opened = true;
+    }
+  }
+
   public async unlock(password: string): Promise<IBeekeeperUnlockedWallet> {
+    this.ensureOpened();
     this.api.refreshTimeout();
     await safeAsyncWasmCall(
       () => this.api.api.unlock(this.session.token, this.name, password),
