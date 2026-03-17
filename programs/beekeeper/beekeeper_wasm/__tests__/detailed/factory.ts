@@ -536,6 +536,73 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     });
   });
 
+  // --- wallet persistence across re-initialization ---
+  // All persistence assertions run in a single beekeeperTest.dynamic call so
+  // the clean/setup logic is defined once and closures serialize correctly
+  // for the browser eval context.
+
+  test('Should persist wallets across re-initialization (listCreatedWallets, hasWallet, listWallets, keys)', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider, env }) => {
+      const root = './bk_persist_test';
+
+      const clean = async () => {
+        if (env === 'web') {
+          await new Promise<void>(r => { const req = indexedDB.deleteDatabase(root); req.onsuccess = req.onerror = () => r(); });
+        } else {
+          const m = 'fs'; (await import(m) as any).rmSync(root, { recursive: true, force: true });
+        }
+      };
+
+      await clean();
+
+      try {
+        // First instance: create a wallet with a key and persist it
+        const bk1 = await provider.default({ storageRoot: root });
+        const s1 = bk1.createSession("salt1");
+        const { wallet } = await s1.createWallet('w0', 'mypassword');
+        await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+        s1.close();
+        await bk1.delete();
+
+        // Second instance: same storage, fresh session
+        const bk2 = await provider.default({ storageRoot: root });
+        const s2 = bk2.createSession("salt2");
+
+        // listCreatedWallets must enumerate wallets in storage as wallet objects
+        const createdWallets = s2.listCreatedWallets();
+        const createdNames = createdWallets.map((w: any) => w.name);
+
+        // listWallets must return only opened wallets (none yet)
+        const openedBefore = s2.listWallets().map((w: any) => w.name);
+
+        // hasWallet must detect persisted wallets
+        const hasExisting = s2.hasWallet('w0');
+        const hasMissing = s2.hasWallet('never_created');
+
+        // unlock via wallet object from listCreatedWallets (lazy-opens in C++)
+        const w0 = createdWallets.find((w: any) => w.name === 'w0')!;
+        const unlocked = await w0.unlock('mypassword');
+        const keys = unlocked.getPublicKeys();
+
+        // after lazy-open via unlock, listWallets must include it
+        const openedAfter = s2.listWallets().map((w: any) => w.name);
+
+        await bk2.delete();
+
+        return { createdNames, openedBefore, openedAfter, hasExisting, hasMissing, keys };
+      } finally {
+        await clean();
+      }
+    });
+
+    expect(retVal.createdNames).toContain('w0');
+    expect(retVal.openedBefore).not.toContain('w0');
+    expect(retVal.openedAfter).toContain('w0');
+    expect(retVal.hasExisting).toBe(true);
+    expect(retVal.hasMissing).toBe(false);
+    expect(retVal.keys).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
+  });
+
   test.afterAll(async () => {
     await browser.close();
   });
