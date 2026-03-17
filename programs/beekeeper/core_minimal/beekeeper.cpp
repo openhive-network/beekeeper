@@ -279,10 +279,11 @@ void beekeeper::unlock(const std::string& wallet_name, const std::string& passwo
 
 std::string beekeeper::import_key(const std::string& wallet_name,
                                   const std::string& wif_key,
-                                  const std::string& prefix)
+                                  const std::string& prefix,
+                                  bool flush)
 {
   refresh_timeout();
-  return get_wallet(wallet_name).import_key(wif_key, prefix);
+  return get_wallet(wallet_name).import_key(wif_key, prefix, flush);
 }
 
 

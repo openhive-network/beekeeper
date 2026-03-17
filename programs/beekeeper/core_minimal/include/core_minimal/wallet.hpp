@@ -46,7 +46,7 @@ public:
 
   /// Import a WIF-encoded private key. Returns the public key string (with prefix).
   /// Persists to storage automatically.
-  std::string import_key(const std::string& wif_key, const std::string& prefix);
+  std::string import_key(const std::string& wif_key, const std::string& prefix, bool flush = true);
 
   /// Remove a key by its public key.  Persists to storage automatically.
   void        remove_key(const public_key_type& public_key);
@@ -78,6 +78,7 @@ private:
   keys_map           keys_;          // plaintext keys (empty when locked)
   std::string        password_;      // stored while unlocked, cleared on lock
   bool               unlocked_{false};
+  bool               dirty_{false};    // true when keys_ changed but not yet saved
 };
 
 } // namespace beekeeper_minimal

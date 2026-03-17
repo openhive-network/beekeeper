@@ -91,7 +91,7 @@ void wallet::check_password(const std::string& password) const
 
 // ── key management ───────────────────────────────────────────
 
-std::string wallet::import_key(const std::string& wif_key, const std::string& prefix)
+std::string wallet::import_key(const std::string& wif_key, const std::string& prefix, bool flush)
 {
   if (is_locked())
     throw std::runtime_error("Wallet is locked: " + name_);
@@ -103,12 +103,19 @@ std::string wallet::import_key(const std::string& wif_key, const std::string& pr
   auto pub = crypto_.get_public_key(*priv);
   std::string pub_str = crypto_.public_key_to_string(pub, prefix);
 
+  bool inserted = false;
   if (keys_.find(pub) == keys_.end())
   {
     keys_.emplace(pub, key_data(*priv, prefix));
-    encrypt_and_save();
+    inserted = true;
+    dirty_ = true;
   }
 
+  if (flush && dirty_)
+  {
+    encrypt_and_save();
+    dirty_ = false;
+  }
   return pub_str;
 }
 

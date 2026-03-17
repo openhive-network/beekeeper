@@ -95,7 +95,8 @@ public:
 
   std::string import_key(const std::string& wallet_name,
                          const std::string& wif_key,
-                         const std::string& prefix);
+                         const std::string& prefix,
+                         bool flush = true);
 
 
   void remove_key(const std::string& wallet_name,

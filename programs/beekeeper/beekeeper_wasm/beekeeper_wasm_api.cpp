@@ -113,7 +113,7 @@ void beekeeper_api::unlock(const std::string& token, const std::string& wallet_n
 std::string beekeeper_api::import_key(const std::string& token, const std::string& wallet_name, const std::string& wif_key)
 {
   bk_.validate_token(token);
-  return bk_.import_key(wallet_name, wif_key, prefix_);
+  return bk_.import_key(wallet_name, wif_key, prefix_, true);
 }
 
 void beekeeper_api::remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key)
