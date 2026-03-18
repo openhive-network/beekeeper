@@ -33,12 +33,14 @@ class RunnableHandleSettings(RemoteHandleSettings):
         PROPAGATE_SIGINT: ClassVar[str] = "BEEKEEPY_PROPAGATE_SIGINT"
         CLOSE_TIMEOUT: ClassVar[str] = "BEEKEEPY_CLOSE_TIMEOUT"
         INITIALIZATION_TIMEOUT: ClassVar[str] = "BEEKEEPY_INITIALIZATION_TIMEOUT"
+        UNLOCK_TIMEOUT: ClassVar[str] = "BEEKEEPY_UNLOCK_TIMEOUT"
 
     class Defaults(RemoteHandleSettings.Defaults):
         WORKING_DIRECTORY: ClassVar[Path] = Path.cwd()
         PROPAGATE_SIGINT: ClassVar[bool] = True
         CLOSE_TIMEOUT: ClassVar[timedelta] = timedelta(seconds=10.0)
         INITIALIZATION_TIMEOUT: ClassVar[timedelta] = timedelta(seconds=5.0)
+        UNLOCK_TIMEOUT: ClassVar[int] = 900
 
     working_directory: Path | None = None
     """Path, where beekeeper binary will store all it's data and logs."""
@@ -72,6 +74,12 @@ class RunnableHandleSettings(RemoteHandleSettings):
         lambda x: (RunnableHandleSettings.Defaults.INITIALIZATION_TIMEOUT if x is None else timedelta(seconds=int(x))),
     )
     """Affects time handle waits for beekeeper to start."""
+
+    unlock_timeout: int = Defaults.default_factory(
+        EnvironNames.UNLOCK_TIMEOUT,
+        lambda x: (RunnableHandleSettings.Defaults.UNLOCK_TIMEOUT if x is None else int(x)),
+    )
+    """Inactivity timeout in seconds before wallets are automatically locked. Default: 900 (15 minutes)."""
 
     @property
     def ensured_working_directory(self) -> Path:

@@ -43,6 +43,7 @@ class RunnableBeekeeper(
     def _unify_cli_arguments(self, working_directory: Path, http_endpoint: HttpUrl) -> None:
         self.arguments.data_dir = working_directory
         self.arguments.webserver_http_endpoint = http_endpoint
+        self.arguments.unlock_timeout = self._get_settings().unlock_timeout
 
     def _unify_config(self, working_directory: Path, http_endpoint: HttpUrl) -> None:  # noqa: ARG002
         self.config.webserver_http_endpoint = http_endpoint
