@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 from typing import TYPE_CHECKING, Any, Callable
 
 from beekeepy._interface.abc.asynchronous.session import Password
@@ -81,6 +82,11 @@ class Session(SessionInterface, StateInvalidator):
         return await self.wallets
 
     async def set_timeout(self, seconds: int) -> None:
+        warnings.warn(
+            "set_timeout is deprecated. Use `unlock_timeout` parameter in `InterfaceSettings` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         validate_timeout(time=seconds)
         await self.__beekeeper.api.set_timeout(seconds=seconds, token=await self.token)
 
