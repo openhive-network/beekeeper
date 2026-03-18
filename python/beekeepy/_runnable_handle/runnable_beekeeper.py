@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeVar
 
-from beekeepy._executable.beekeeper_arguments import BeekeeperArguments
+from beekeepy._executable.beekeeper_arguments import BeekeeperArguments, BeekeeperArgumentsDefaults
 from beekeepy._executable.beekeeper_config import BeekeeperConfig
 from beekeepy._executable.beekeeper_executable import BeekeeperExecutable
 from beekeepy._runnable_handle.runnable_handle import RunnableHandle
@@ -43,7 +43,8 @@ class RunnableBeekeeper(
     def _unify_cli_arguments(self, working_directory: Path, http_endpoint: HttpUrl) -> None:
         self.arguments.data_dir = working_directory
         self.arguments.webserver_http_endpoint = http_endpoint
-        self.arguments.unlock_timeout = self._get_settings().unlock_timeout
+        if self.arguments.unlock_timeout == BeekeeperArgumentsDefaults.DEFAULT_UNLOCK_TIMEOUT:
+            self.arguments.unlock_timeout = self._get_settings().unlock_timeout
 
     def _unify_config(self, working_directory: Path, http_endpoint: HttpUrl) -> None:  # noqa: ARG002
         self.config.webserver_http_endpoint = http_endpoint
