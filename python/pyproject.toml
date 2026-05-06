@@ -40,7 +40,7 @@ requests = "^2.32.3"
 hiveio-schemas = "^1.28.2-post.0"
 
 [tool.poetry.group.static-analysis.dependencies]
-mypy = "^1.13.0"
+mypy = "^2.0.0"
 pre-commit = "^4.0.0"
 ruff = "^0.6.5"
 types-psutil = "^7.0.0"
