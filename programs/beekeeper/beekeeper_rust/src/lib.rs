@@ -30,6 +30,12 @@ impl RustStorageProtocol {
         let path = self.wallet_dir.join(format!("{name}{LEGACY_WALLET_EXT}"));
         fs::write(path, data).map_err(|_| BeekeeperError::WalletWriteFailed { name: name.into() })
     }
+
+    fn cpp_scan_dir(&mut self, name: &str) -> bool {
+        self.wallet_dir
+            .join(format!("{name}{LEGACY_WALLET_EXT}"))
+            .is_file()
+    }
 }
 
 #[cxx::bridge(namespace = "cpp")]
@@ -52,6 +58,11 @@ pub mod ffi {
             name: &str,
             data: &[u8],
         ) -> Result<()>;
+
+        fn cpp_scan_dir(
+            self: &mut RustStorageProtocol,
+            name: &str,
+        ) -> bool;
     }
 
     unsafe extern "C++" {
