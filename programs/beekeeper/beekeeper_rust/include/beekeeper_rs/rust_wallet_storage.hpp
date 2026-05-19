@@ -16,6 +16,7 @@ namespace beekeeper_rs {
 		~rust_wallet_storage() override;
 
 		std::vector<char> load(const std::string& path) override;
+		void save(const std::string& path, const std::vector<char>& buffer) override;
 
 	private:
 		rust::Box<cpp::RustStorageProtocol> impl_;
