@@ -37,6 +37,10 @@ fn main() {
     build.compile("beekeeper_rust_ffi");
 
     println!("cargo:rerun-if-changed=src/lib.rs");
-    println!("cargo:rerun-if-changed=include/beekeeper_rs/rust_crypto_provider.hpp");
-    println!("cargo:rerun-if-changed=include/beekeeper_rs/rust_wallet_storage.hpp");
+    println!(
+        "cargo:rerun-if-changed=include/beekeeper_rs/rust_crypto_provider.hpp"
+    );
+    println!(
+        "cargo:rerun-if-changed=include/beekeeper_rs/rust_wallet_storage.hpp"
+    );
 }
