@@ -66,10 +66,6 @@ namespace beekeeper_rs {
 		bk_->lock_all();
 	}
 
-	void beekeeper_holder::set_timeout(uint32_t seconds) {
-		bk_->set_timeout(seconds);
-	}
-
 	void beekeeper_holder::sync_storage() {
 		if (rust_storage_) rust_storage_->sync();
 	}

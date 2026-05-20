@@ -51,7 +51,6 @@ namespace beekeeper_rs {
 		void         unlock(rust::Str name, rust::Str password);
 		void         lock(rust::Str name);
 		void         lock_all();
-		void         set_timeout(uint32_t seconds);
 
 		void         sync_storage();
 		void         close_storage();

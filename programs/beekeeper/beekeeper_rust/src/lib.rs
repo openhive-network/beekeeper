@@ -156,7 +156,6 @@ pub mod ffi {
         ) -> Result<()>;
         fn lock(self: Pin<&mut BeekeeperHolder>, name: &str) -> Result<()>;
         fn lock_all(self: Pin<&mut BeekeeperHolder>) -> Result<()>;
-        fn set_timeout(self: Pin<&mut BeekeeperHolder>, seconds: u32);
         fn sync_storage(self: Pin<&mut BeekeeperHolder>);
         fn close_storage(self: Pin<&mut BeekeeperHolder>);
 
