@@ -39,6 +39,8 @@ pub mod ffi {
         ) -> Result<()>;
 
         fn cpp_scan_dir(self: &mut RustStorageProtocol, name: &str) -> bool;
+        fn cpp_sync(self: &mut RustStorageProtocol);
+        fn cpp_close(self: &mut RustStorageProtocol);
 
         fn cpp_sha256(
             self: &mut RustCryptoProtocol,
@@ -155,6 +157,8 @@ pub mod ffi {
         fn lock(self: Pin<&mut BeekeeperHolder>, name: &str) -> Result<()>;
         fn lock_all(self: Pin<&mut BeekeeperHolder>) -> Result<()>;
         fn set_timeout(self: Pin<&mut BeekeeperHolder>, seconds: u32);
+        fn sync_storage(self: Pin<&mut BeekeeperHolder>);
+        fn close_storage(self: Pin<&mut BeekeeperHolder>);
 
         fn list_wallets(
             self: &BeekeeperHolder,

@@ -40,4 +40,8 @@ impl RustStorageProtocol {
             .join(format!("{name}{LEGACY_WALLET_EXT}"))
             .is_file()
     }
+
+    pub(crate) fn cpp_sync(&mut self) {}
+
+    pub(crate) fn cpp_close(&mut self) {}
 }

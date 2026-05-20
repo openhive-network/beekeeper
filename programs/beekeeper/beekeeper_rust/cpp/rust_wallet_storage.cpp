@@ -30,4 +30,12 @@ namespace beekeeper_rs {
 	bool rust_wallet_storage::scan_dir(const std::string& wallet_name) {
 		return impl_->cpp_scan_dir(rust::Str{wallet_name});
 	}
+
+	void rust_wallet_storage::sync() {
+		impl_->cpp_sync();
+	}
+
+	void rust_wallet_storage::close() {
+		impl_->cpp_close();
+	}
 }

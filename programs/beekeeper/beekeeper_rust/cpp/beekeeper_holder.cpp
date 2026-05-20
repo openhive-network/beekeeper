@@ -13,8 +13,9 @@ namespace beekeeper_rs {
 		uint32_t unlock_timeout_sec
 	) : crypto_prims_(std::make_unique<rust_crypto_primitives>(std::move(crypto_impl))),
 	    crypto_provider_(std::make_unique<beekeeper_minimal::crypto_provider_impl>(*crypto_prims_)),
-	    storage_(std::make_unique<rust_wallet_storage>(std::move(storage_impl))),
-	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *storage_, unlock_timeout_sec))
+	    rust_storage_(std::make_unique<rust_wallet_storage>(std::move(storage_impl))),
+	    mem_storage_(nullptr),
+	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *rust_storage_, unlock_timeout_sec))
 	{}
 
 	beekeeper_holder::beekeeper_holder(
@@ -22,8 +23,9 @@ namespace beekeeper_rs {
 		uint32_t unlock_timeout_sec
 	) : crypto_prims_(std::make_unique<rust_crypto_primitives>(std::move(crypto_impl))),
 	    crypto_provider_(std::make_unique<beekeeper_minimal::crypto_provider_impl>(*crypto_prims_)),
-	    storage_(std::make_unique<beekeeper_minimal::memory_storage>()),
-	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *storage_, unlock_timeout_sec))
+	    rust_storage_(nullptr),
+	    mem_storage_(std::make_unique<beekeeper_minimal::memory_storage>()),
+	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *mem_storage_, unlock_timeout_sec))
 	{}
 
 	beekeeper_holder::~beekeeper_holder() = default;
@@ -66,6 +68,14 @@ namespace beekeeper_rs {
 
 	void beekeeper_holder::set_timeout(uint32_t seconds) {
 		bk_->set_timeout(seconds);
+	}
+
+	void beekeeper_holder::sync_storage() {
+		if (rust_storage_) rust_storage_->sync();
+	}
+
+	void beekeeper_holder::close_storage() {
+		if (rust_storage_) rust_storage_->close();
 	}
 
 	rust::Vec<cpp::WalletDetails>

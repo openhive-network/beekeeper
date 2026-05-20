@@ -22,6 +22,11 @@ namespace beekeeper_rs {
 		) override;
 		bool scan_dir(const std::string& wallet_name) override;
 
+		/// Lifecycle hooks — not part of the wallet_storage base interface,
+		/// called explicitly from beekeeper_holder during delete().
+		void sync();
+		void close();
+
 	private:
 		rust::Box<cpp::RustStorageProtocol> impl_;
 	};

@@ -165,6 +165,8 @@ impl BeekeeperApi {
             self.holder.pin_mut().close_session(&token)?;
         }
         self.wallets_meta.clear();
+        self.holder.pin_mut().sync_storage();
+        self.holder.pin_mut().close_storage();
 
         Ok(())
     }

@@ -53,6 +53,9 @@ namespace beekeeper_rs {
 		void         lock_all();
 		void         set_timeout(uint32_t seconds);
 
+		void         sync_storage();
+		void         close_storage();
+
 		rust::Vec<cpp::WalletDetails> list_wallets(rust::Str token) const;
 
 		rust::String import_key(rust::Str name, rust::Str wif_key, rust::Str prefix);
@@ -79,7 +82,10 @@ namespace beekeeper_rs {
 	private:
 		std::unique_ptr<rust_crypto_primitives>                  crypto_prims_;
 		std::unique_ptr<beekeeper_minimal::crypto_provider_impl> crypto_provider_;
-		std::unique_ptr<beekeeper_minimal::wallet_storage>       storage_;
+		/// Persistent backend; null in in-memory mode.
+		std::unique_ptr<rust_wallet_storage>                     rust_storage_;
+		/// In-memory backend; null in persistent mode.
+		std::unique_ptr<beekeeper_minimal::wallet_storage>       mem_storage_;
 		std::unique_ptr<beekeeper_minimal::beekeeper>            bk_;
 	};
 
