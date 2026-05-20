@@ -119,6 +119,12 @@ pub mod ffi {
             unlock_timeout_sec: u32,
         ) -> UniquePtr<BeekeeperHolder>;
 
+        #[namespace = "beekeeper_rs"]
+        fn new_beekeeper_holder_in_memory(
+            crypto_impl: Box<RustCryptoProtocol>,
+            unlock_timeout_sec: u32,
+        ) -> UniquePtr<BeekeeperHolder>;
+
         fn create_session(self: Pin<&mut BeekeeperHolder>) -> Result<String>;
         fn close_session(
             self: Pin<&mut BeekeeperHolder>,

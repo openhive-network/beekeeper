@@ -26,12 +26,26 @@ pub struct BeekeeperApi {
 
 impl BeekeeperApi {
     pub fn new(options: BeekeeperOptions) -> Self {
-        let wallet_dir =
-            Path::new(&options.storage_root).join(LEGACY_WALLET_DIR);
-        let storage = new_rust_storage_protocol(&options.storage_root);
         let crypto = Box::new(RustCryptoProtocol);
-        let holder =
-            ffi::new_beekeeper_holder(crypto, storage, options.unlock_timeout);
+        let (holder, wallet_dir) = if options.in_memory {
+            (
+                ffi::new_beekeeper_holder_in_memory(
+                    crypto,
+                    options.unlock_timeout,
+                ),
+                PathBuf::new(),
+            )
+        } else {
+            let wallet_dir =
+                Path::new(&options.storage_root).join(LEGACY_WALLET_DIR);
+            let storage = new_rust_storage_protocol(&options.storage_root);
+            let holder = ffi::new_beekeeper_holder(
+                crypto,
+                storage,
+                options.unlock_timeout,
+            );
+            (holder, wallet_dir)
+        };
 
         Self {
             holder,
@@ -78,6 +92,9 @@ impl BeekeeperApi {
     }
 
     pub fn list_created_wallets(&self) -> Vec<String> {
+        if self.is_in_memory {
+            return Vec::new();
+        }
         let Ok(entries) = fs::read_dir(&self.wallet_dir) else {
             return Vec::new();
         };

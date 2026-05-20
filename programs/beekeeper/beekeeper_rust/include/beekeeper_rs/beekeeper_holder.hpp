@@ -5,6 +5,7 @@
 
 #include <core_minimal/beekeeper.hpp>
 #include <core_minimal/crypto_provider_impl.hpp>
+#include <core_minimal/wallet_storage.hpp>
 
 #include <rust/cxx.h>
 
@@ -21,9 +22,15 @@ namespace beekeeper_rs {
 	class beekeeper_holder
 	{
 	public:
+		/// Persistent backend (Rust-backed file storage).
 		beekeeper_holder(
 			rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 			rust::Box<cpp::RustStorageProtocol> storage_impl,
+			uint32_t unlock_timeout_sec
+		);
+		/// In-memory backend (core_minimal::memory_storage). Wallets vanish at destruction.
+		beekeeper_holder(
+			rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 			uint32_t unlock_timeout_sec
 		);
 		~beekeeper_holder();
@@ -72,13 +79,18 @@ namespace beekeeper_rs {
 	private:
 		std::unique_ptr<rust_crypto_primitives>                  crypto_prims_;
 		std::unique_ptr<beekeeper_minimal::crypto_provider_impl> crypto_provider_;
-		std::unique_ptr<rust_wallet_storage>                     storage_;
+		std::unique_ptr<beekeeper_minimal::wallet_storage>       storage_;
 		std::unique_ptr<beekeeper_minimal::beekeeper>            bk_;
 	};
 
 	std::unique_ptr<beekeeper_holder> new_beekeeper_holder(
 		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 		rust::Box<cpp::RustStorageProtocol> storage_impl,
+		uint32_t unlock_timeout_sec
+	);
+
+	std::unique_ptr<beekeeper_holder> new_beekeeper_holder_in_memory(
+		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 		uint32_t unlock_timeout_sec
 	);
 }

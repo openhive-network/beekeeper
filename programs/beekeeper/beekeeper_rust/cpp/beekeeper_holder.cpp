@@ -2,6 +2,8 @@
 
 #include "beekeeper_rust/src/lib.rs.h"
 
+#include <core_minimal/memory_storage.hpp>
+
 #include <string>
 
 namespace beekeeper_rs {
@@ -12,6 +14,15 @@ namespace beekeeper_rs {
 	) : crypto_prims_(std::make_unique<rust_crypto_primitives>(std::move(crypto_impl))),
 	    crypto_provider_(std::make_unique<beekeeper_minimal::crypto_provider_impl>(*crypto_prims_)),
 	    storage_(std::make_unique<rust_wallet_storage>(std::move(storage_impl))),
+	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *storage_, unlock_timeout_sec))
+	{}
+
+	beekeeper_holder::beekeeper_holder(
+		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
+		uint32_t unlock_timeout_sec
+	) : crypto_prims_(std::make_unique<rust_crypto_primitives>(std::move(crypto_impl))),
+	    crypto_provider_(std::make_unique<beekeeper_minimal::crypto_provider_impl>(*crypto_prims_)),
+	    storage_(std::make_unique<beekeeper_minimal::memory_storage>()),
 	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *storage_, unlock_timeout_sec))
 	{}
 
@@ -134,6 +145,16 @@ namespace beekeeper_rs {
 		return std::make_unique<beekeeper_holder>(
 			std::move(crypto_impl),
 			std::move(storage_impl),
+			unlock_timeout_sec
+		);
+	}
+
+	std::unique_ptr<beekeeper_holder> new_beekeeper_holder_in_memory(
+		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
+		uint32_t unlock_timeout_sec
+	) {
+		return std::make_unique<beekeeper_holder>(
+			std::move(crypto_impl),
 			unlock_timeout_sec
 		);
 	}
