@@ -8,4 +8,6 @@ pub enum BeekeeperError {
     WalletNotFound { name: String },
     #[error("Failed to write wallet: {name}")]
     WalletWriteFailed { name: String },
+    #[error("Crypto error: {0}")]
+    Crypto(String),
 }

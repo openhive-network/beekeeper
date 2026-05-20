@@ -11,6 +11,7 @@ use crate::{
 pub mod api;
 pub mod session;
 mod consts;
+mod crypto;
 mod errors;
 
 pub struct RustCryptoProtocol;
@@ -68,6 +69,53 @@ pub mod ffi {
         ) -> Result<()>;
 
         fn cpp_scan_dir(self: &mut RustStorageProtocol, name: &str) -> bool;
+
+        fn cpp_sha256(self: &mut RustCryptoProtocol, data: &[u8], out: &mut [u8]);
+        fn cpp_sha512(self: &mut RustCryptoProtocol, data: &[u8], out: &mut [u8]);
+        fn cpp_ripemd160(self: &mut RustCryptoProtocol, data: &[u8], out: &mut [u8]);
+
+        fn cpp_aes256_cbc_encrypt(
+            self: &mut RustCryptoProtocol,
+            key: &[u8],
+            iv: &[u8],
+            data: &[u8],
+        ) -> Result<Vec<u8>>;
+        fn cpp_aes256_cbc_decrypt(
+            self: &mut RustCryptoProtocol,
+            key: &[u8],
+            iv: &[u8],
+            data: &[u8],
+        ) -> Result<Vec<u8>>;
+
+        fn cpp_generate_private_key(
+            self: &mut RustCryptoProtocol,
+            out: &mut [u8],
+        );
+        fn cpp_get_public_key(
+            self: &mut RustCryptoProtocol,
+            privkey: &[u8],
+            out: &mut [u8],
+        ) -> Result<()>;
+        fn cpp_sign_compact(
+            self: &mut RustCryptoProtocol,
+            privkey: &[u8],
+            digest: &[u8],
+            out: &mut [u8],
+        ) -> Result<()>;
+        fn cpp_ecdh_shared_secret(
+            self: &mut RustCryptoProtocol,
+            privkey: &[u8],
+            pubkey: &[u8],
+            out: &mut [u8],
+        ) -> Result<()>;
+
+        fn cpp_base58_encode(self: &mut RustCryptoProtocol, data: &[u8]) -> String;
+        fn cpp_base58_decode(
+            self: &mut RustCryptoProtocol,
+            s: &str,
+        ) -> Result<Vec<u8>>;
+
+        fn cpp_get_random_bytes(self: &mut RustCryptoProtocol, out: &mut [u8]);
     }
 
     unsafe extern "C++" {
