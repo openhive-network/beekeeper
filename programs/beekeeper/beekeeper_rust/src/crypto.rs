@@ -1,3 +1,23 @@
+//! Pure-Rust implementation of the crypto callbacks consumed by the C++
+//! wallet manager.
+//!
+//! The C++ `beekeeper_minimal::crypto_provider_impl` calls into
+//! [`RustCryptoProtocol`] over the `cxx` bridge for every primitive it needs:
+//! hashing, AES-256-CBC, secp256k1 key generation / signing / ECDH, base58
+//! and the random-byte source.
+//!
+//! # Difference from TS
+//!
+//! The TS package implements the same callbacks in JavaScript and injects
+//! them via `ICryptoCallbacks`. In the Rust facade there is nothing to
+//! inject — the implementation is fixed and lives in this module. Output
+//! formats and behaviour intentionally match the TS implementation:
+//!
+//! - `sign_compact` writes the 65-byte fc `compact_signature` layout
+//!   (`recid + 27 + 4`, then 64-byte R||S).
+//! - `ecdh_shared_secret` applies SHA-512 to the raw 32-byte X coordinate
+//!   (this is fc's convention; *not* libsecp256k1's hashed output).
+
 use aes::Aes256;
 use cbc::cipher::{
     BlockDecryptMut, BlockEncryptMut, KeyIvInit, block_padding::Pkcs7,
@@ -13,6 +33,12 @@ use sha2::{Sha256, Sha512};
 
 use crate::errors::BeekeeperError;
 
+/// Zero-sized marker type registered with the `cxx` bridge.
+///
+/// A `Box<RustCryptoProtocol>` is handed to C++ when the
+/// [`BeekeeperApi`](crate::api::BeekeeperApi) is constructed. All the
+/// `cpp_*` methods on this type are invoked exclusively from C++; Rust
+/// code never needs to call them directly.
 pub struct RustCryptoProtocol;
 
 type Aes256CbcEnc = cbc::Encryptor<Aes256>;

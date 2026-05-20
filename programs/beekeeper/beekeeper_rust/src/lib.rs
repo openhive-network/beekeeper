@@ -1,3 +1,75 @@
+//! Rust bindings for the Beekeeper wallet daemon.
+//!
+//! This crate exposes the same wallet-management surface as the
+//! `@hiveio/beekeeper` npm package (`programs/beekeeper/beekeeper_wasm`),
+//! but as a native Rust library. The underlying wallet logic still lives in
+//! the shared C++ `core/` library and is reached through a [`cxx`] bridge
+//! ([`ffi::BeekeeperHolder`]). Crypto primitives (sha2, ripemd, AES-256-CBC,
+//! secp256k1, base58, RNG) are implemented in pure Rust and injected into the
+//! C++ wallet manager via the [`RustCryptoProtocol`] callback object.
+//!
+//! # Quick start
+//!
+//! ```no_run
+//! use beekeeper_rust::{BeekeeperApi, BeekeeperOptions};
+//!
+//! let mut bk = BeekeeperApi::new(
+//!     BeekeeperOptions::new("./storage_root-rust").unlock_timeout(900),
+//! );
+//! let token = bk.create_session().unwrap();
+//! let created = bk.session(&token)
+//!     .create_wallet("my-wallet", Some("password"), None)
+//!     .unwrap();
+//! let mut wallet = created.wallet;
+//! let pubkey = wallet.import_key("5J...wif...").unwrap();
+//! let sig = wallet.sign_digest(&pubkey, "deadbeef...").unwrap();
+//! ```
+//!
+//! # Mapping to the TypeScript package
+//!
+//! Each module mirrors a TypeScript file under
+//! `programs/beekeeper/beekeeper_wasm/src/detailed/`:
+//!
+//! | Rust module       | TypeScript file        |
+//! |-------------------|------------------------|
+//! | [`api`]           | `api.ts`               |
+//! | [`session`]       | `session.ts`           |
+//! | [`wallet`]        | `wallet.ts`            |
+//! | [`options`]       | `interfaces.ts`        |
+//! | [`BeekeeperError`] | `errors.ts`            |
+//!
+//! # Cross-language differences
+//!
+//! Behaviour matches the TypeScript binding wherever practical. The notable
+//! divergences are:
+//!
+//! - **Synchronous API.** All Rust calls are blocking; TS marks
+//!   `createWallet`, `unlock`, `importKey`, `removeKey`, `signDigest`,
+//!   `encryptData`, `decryptData`, and `delete` as `async`/`Promise<...>`
+//!   because WASM dispatches them on a worker.
+//! - **No `salt` for `create_session`.** TS requires a salt string; the C++
+//!   holder used here derives its own token, so the Rust signature drops the
+//!   parameter.
+//! - **No injectable storage / crypto callbacks.** TS lets callers supply
+//!   `IStorageCallbacks` / `ICryptoCallbacks`; Rust always uses the bundled
+//!   filesystem-backed [`storage::RustStorageProtocol`] and pure-Rust
+//!   [`RustCryptoProtocol`]. In-memory mode is selected through
+//!   [`BeekeeperOptions::in_memory`] instead.
+//! - **Key-prefix is hard-coded to `"STM"`** in [`wallet::DEFAULT_KEY_PREFIX`].
+//!   The C++ ABI still accepts a prefix, but the Rust facade doesn't expose
+//!   it (TS doesn't either).
+//! - **`sign_digest` takes a hex string only.** TS additionally accepts
+//!   `Uint8Array`; Rust callers should hex-encode themselves.
+//! - **Move-based wallet state machine.** `unlock`/`lock`/`close` consume
+//!   the wallet handle and return the new state, leaning on Rust's ownership
+//!   to prevent use of stale handles. TS keeps `BeekeeperLockedWallet`
+//!   mutable and tracks the unlocked counterpart on an internal field.
+//! - **`Session::list_wallets`** asks the C++ holder for every wallet in the
+//!   session and recombines it with locally tracked `is_temporary` metadata.
+//!   TS returns only the session's in-memory `wallets` map.
+//! - **`get_version`** returns `CARGO_PKG_VERSION` instead of
+//!   `npm_package_version`.
+
 pub mod api;
 pub mod options;
 pub mod session;
@@ -9,11 +81,28 @@ mod errors;
 mod storage;
 
 pub use crypto::RustCryptoProtocol;
+pub use errors::BeekeeperError;
 pub use options::BeekeeperOptions;
 pub use storage::{RustStorageProtocol, new_rust_storage_protocol};
 
+/// `cxx`-generated FFI between Rust and the C++ `beekeeper_rs::beekeeper_holder`.
+///
+/// Items in this module are produced by the [`cxx::bridge`] macro and are
+/// considered an implementation detail of the crate. They are public so that
+/// the higher-level wrappers in [`api`], [`session`] and [`wallet`] can hold
+/// `UniquePtr<BeekeeperHolder>` fields, but new code outside of those modules
+/// should prefer the safe wrappers.
+///
+/// All `cpp_*` methods on [`RustCryptoProtocol`] and [`RustStorageProtocol`]
+/// are reachable from C++ only — they are listed here purely to satisfy the
+/// bridge contract.
 #[cxx::bridge(namespace = "cpp")]
 pub mod ffi {
+    /// Plain-data summary of a wallet returned by C++ `list_wallets`.
+    ///
+    /// Equivalent of the per-entry record in `list_wallets` on the C++ side.
+    /// The Rust facade widens this to [`wallet::WalletInfo`] with the extra
+    /// `is_temporary` flag tracked by [`api::BeekeeperApi`].
     pub struct WalletDetails {
         pub name: String,
         pub unlocked: bool,

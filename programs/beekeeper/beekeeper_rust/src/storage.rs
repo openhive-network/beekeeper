@@ -1,3 +1,18 @@
+//! Filesystem-backed wallet storage used by the C++ wallet manager.
+//!
+//! The wallet manager calls into this struct over the `cxx` bridge
+//! whenever it needs to load, persist, probe, sync, or close a wallet file.
+//!
+//! # Difference from TS
+//!
+//! TS exposes a structural `IStorageCallbacks` interface so applications can
+//! plug in IndexedDB, FS Access API, in-memory maps, or anything else. The
+//! Rust facade has no such extension point — the storage backend is always
+//! this filesystem implementation, and in-memory mode is handled by selecting
+//! a different *C++* storage backend
+//! ([`ffi::new_beekeeper_holder_in_memory`](crate::ffi::new_beekeeper_holder_in_memory))
+//! rather than by swapping this struct.
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -8,10 +23,21 @@ use crate::{
     errors::{BeekeeperError, Res},
 };
 
+/// Filesystem storage backend handed to C++ as a `Box<RustStorageProtocol>`.
+///
+/// Construct via [`new_rust_storage_protocol`]; the struct field is exposed
+/// at `pub(crate)` solely so the higher-level [`api`](crate::api) module can
+/// reuse `wallet_dir` for its own directory scan.
 pub struct RustStorageProtocol {
     pub(crate) wallet_dir: PathBuf,
 }
 
+/// Build a [`RustStorageProtocol`] rooted at `storage_root`.
+///
+/// Creates `<storage_root>/.beekeeper/` if missing (errors are swallowed —
+/// the directory may already exist and `cpp_save` will surface any real
+/// problem later). Free function (rather than `RustStorageProtocol::new`)
+/// because the signature must match what the `cxx` bridge expects.
 pub fn new_rust_storage_protocol(
     storage_root: &str,
 ) -> Box<RustStorageProtocol> {
