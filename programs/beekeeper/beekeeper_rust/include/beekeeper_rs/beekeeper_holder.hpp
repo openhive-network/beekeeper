@@ -14,15 +14,10 @@
 namespace cpp {
 	struct RustCryptoProtocol;
 	struct RustStorageProtocol;
+	struct WalletDetails;
 }
 
 namespace beekeeper_rs {
-	/// Owns the four C++ objects bound by reference to each other:
-	///   crypto_prims_   (raw primitives, Rust-backed)
-	///   crypto_provider_ (high-level, holds ref to crypto_prims_)
-	///   storage_         (Rust-backed)
-	///   bk_              (beekeeper_minimal::beekeeper, holds refs to crypto_provider_ + storage_)
-	/// Field order matches construction; reverse order = destruction.
 	class beekeeper_holder
 	{
 	public:
@@ -35,6 +30,7 @@ namespace beekeeper_rs {
 
 		rust::String create_session();
 		void         close_session(rust::Str token);
+
 		bool         has_wallet(rust::Str name) const;
 		rust::String create_wallet(
 			rust::Str token,
@@ -44,9 +40,19 @@ namespace beekeeper_rs {
 		);
 		void         open_wallet(rust::Str token, rust::Str name);
 		void         close_wallet(rust::Str name);
+
 		void         unlock(rust::Str name, rust::Str password);
+		void         lock(rust::Str name);
 		void         lock_all();
 		void         set_timeout(uint32_t seconds);
+
+		rust::Vec<cpp::WalletDetails> list_wallets(rust::Str token) const;
+
+		rust::String import_key(rust::Str name, rust::Str wif_key, rust::Str prefix);
+		void         remove_key(rust::Str name, rust::Str public_key, rust::Str prefix);
+		bool         has_matching_private_key(rust::Str name, rust::Str public_key, rust::Str prefix) const;
+		rust::String sign_digest(rust::Str name, rust::Str digest_hex, rust::Str public_key, rust::Str prefix);
+		rust::Vec<rust::String> get_public_keys(rust::Str name, rust::Str prefix) const;
 
 	private:
 		std::unique_ptr<rust_crypto_primitives>                  crypto_prims_;

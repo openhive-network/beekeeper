@@ -12,7 +12,6 @@ use crate::{
     consts::{LEGACY_WALLET_DIR, LEGACY_WALLET_EXT},
     errors::BeekeeperError,
     ffi, new_rust_storage_protocol,
-    session::Session,
 };
 
 pub struct BeekeeperApi {
@@ -35,6 +34,7 @@ impl BeekeeperApi {
         let crypto = Box::new(RustCryptoProtocol);
         let holder =
             ffi::new_beekeeper_holder(crypto, storage, unlock_timeout_sec);
+
         Self {
             holder,
             sessions: HashSet::new(),
@@ -45,19 +45,8 @@ impl BeekeeperApi {
         }
     }
 
-    pub fn version(&self) -> &'static str {
-        env!("CARGO_PKG_VERSION")
-    }
-
-    pub fn get_timeout_time(&self) -> SystemTime {
-        if self.unlock_timeout_ms == 0 {
-            return SystemTime::UNIX_EPOCH
-                + Duration::from_secs(60 * 60 * 24 * 365 * 100);
-        }
-        let elapsed = self.last_activity.elapsed();
-        let remaining = Duration::from_millis(u64::from(self.unlock_timeout_ms))
-            .saturating_sub(elapsed);
-        SystemTime::now() + remaining
+    pub fn refresh_timeout(&mut self) {
+        self.last_activity = Instant::now();
     }
 
     pub fn throw_if_timed_out_and_refresh(
@@ -67,7 +56,27 @@ impl BeekeeperApi {
             return Err(BeekeeperError::TimedOut);
         }
         self.refresh_timeout();
+
         Ok(())
+    }
+
+    pub fn is_timed_out(&self) -> bool {
+        self.unlock_timeout_ms > 0
+            && self.last_activity.elapsed().as_millis() as u64
+                >= u64::from(self.unlock_timeout_ms)
+    }
+
+    pub fn get_timeout_time(&self) -> SystemTime {
+        if self.unlock_timeout_ms == 0 {
+            return SystemTime::UNIX_EPOCH
+                + Duration::from_secs(60 * 60 * 24 * 365 * 100);
+        }
+        let elapsed = self.last_activity.elapsed();
+        let remaining =
+            Duration::from_millis(u64::from(self.unlock_timeout_ms))
+                .saturating_sub(elapsed);
+
+        SystemTime::now() + remaining
     }
 
     pub fn list_created_wallets(&self) -> Vec<String> {
@@ -85,60 +94,30 @@ impl BeekeeperApi {
             .collect()
     }
 
-    pub fn close(&mut self) -> Result<(), BeekeeperError> {
-        let tokens: Vec<String> = self.sessions.drain().collect();
-        for token in tokens {
-            self.holder.pin_mut().close_session(&token)?;
-        }
-        Ok(())
-    }
-
-    pub fn is_in_memory(&self) -> bool {
-        self.is_in_memory
-    }
-
-    pub fn is_timed_out(&self) -> bool {
-        self.unlock_timeout_ms > 0
-            && self.last_activity.elapsed().as_millis() as u64
-                >= u64::from(self.unlock_timeout_ms)
-    }
-
-    pub fn refresh_timeout(&mut self) {
-        self.last_activity = Instant::now();
+    pub fn version(&self) -> &'static str {
+        env!("CARGO_PKG_VERSION")
     }
 
     pub fn create_session(&mut self) -> Result<String, BeekeeperError> {
         let token = self.holder.pin_mut().create_session()?;
         self.sessions.insert(token.clone());
+
         Ok(token)
     }
 
     pub fn close_session(&mut self, token: &str) -> Result<(), BeekeeperError> {
         self.holder.pin_mut().close_session(token)?;
         self.sessions.remove(token);
+
         Ok(())
     }
 
-    pub fn session<'a>(&'a mut self, token: &'a str) -> Session<'a> {
-        Session { bk: self, token }
-    }
+    pub fn delete(&mut self) -> Result<(), BeekeeperError> {
+        let tokens: Vec<String> = self.sessions.drain().collect();
+        for token in tokens {
+            self.holder.pin_mut().close_session(&token)?;
+        }
 
-    pub fn lock_all(&mut self) -> Result<(), BeekeeperError> {
-        self.holder.pin_mut().lock_all()?;
         Ok(())
-    }
-
-    pub fn unlock(
-        &mut self,
-        name: &str,
-        password: &str,
-    ) -> Result<(), BeekeeperError> {
-        self.holder.pin_mut().unlock(name, password)?;
-        Ok(())
-    }
-
-    pub fn set_timeout(&mut self, seconds: u32) {
-        self.holder.pin_mut().set_timeout(seconds);
-        self.unlock_timeout_ms = seconds.saturating_mul(1000);
     }
 }

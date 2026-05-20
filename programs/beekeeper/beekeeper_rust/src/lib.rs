@@ -9,10 +9,11 @@ use crate::{
 };
 
 pub mod api;
-pub mod session;
 mod consts;
 mod crypto;
 mod errors;
+pub mod session;
+pub mod wallet;
 
 pub struct RustCryptoProtocol;
 
@@ -23,6 +24,7 @@ pub struct RustStorageProtocol {
 fn new_rust_storage_protocol(storage_root: &str) -> Box<RustStorageProtocol> {
     let wallet_dir = Path::new(storage_root).join(LEGACY_WALLET_DIR);
     fs::create_dir_all(&wallet_dir).ok();
+
     Box::new(RustStorageProtocol { wallet_dir })
 }
 
@@ -49,6 +51,11 @@ impl RustStorageProtocol {
 
 #[cxx::bridge(namespace = "cpp")]
 pub mod ffi {
+    pub struct WalletDetails {
+        pub name: String,
+        pub unlocked: bool,
+    }
+
     extern "Rust" {
         type RustCryptoProtocol;
         type RustStorageProtocol;
@@ -70,9 +77,21 @@ pub mod ffi {
 
         fn cpp_scan_dir(self: &mut RustStorageProtocol, name: &str) -> bool;
 
-        fn cpp_sha256(self: &mut RustCryptoProtocol, data: &[u8], out: &mut [u8]);
-        fn cpp_sha512(self: &mut RustCryptoProtocol, data: &[u8], out: &mut [u8]);
-        fn cpp_ripemd160(self: &mut RustCryptoProtocol, data: &[u8], out: &mut [u8]);
+        fn cpp_sha256(
+            self: &mut RustCryptoProtocol,
+            data: &[u8],
+            out: &mut [u8],
+        );
+        fn cpp_sha512(
+            self: &mut RustCryptoProtocol,
+            data: &[u8],
+            out: &mut [u8],
+        );
+        fn cpp_ripemd160(
+            self: &mut RustCryptoProtocol,
+            data: &[u8],
+            out: &mut [u8],
+        );
 
         fn cpp_aes256_cbc_encrypt(
             self: &mut RustCryptoProtocol,
@@ -109,7 +128,10 @@ pub mod ffi {
             out: &mut [u8],
         ) -> Result<()>;
 
-        fn cpp_base58_encode(self: &mut RustCryptoProtocol, data: &[u8]) -> String;
+        fn cpp_base58_encode(
+            self: &mut RustCryptoProtocol,
+            data: &[u8],
+        ) -> String;
         fn cpp_base58_decode(
             self: &mut RustCryptoProtocol,
             s: &str,
@@ -161,7 +183,43 @@ pub mod ffi {
             name: &str,
             password: &str,
         ) -> Result<()>;
+        fn lock(self: Pin<&mut BeekeeperHolder>, name: &str) -> Result<()>;
         fn lock_all(self: Pin<&mut BeekeeperHolder>) -> Result<()>;
         fn set_timeout(self: Pin<&mut BeekeeperHolder>, seconds: u32);
+
+        fn list_wallets(
+            self: &BeekeeperHolder,
+            token: &str,
+        ) -> Result<Vec<WalletDetails>>;
+        fn import_key(
+            self: Pin<&mut BeekeeperHolder>,
+            name: &str,
+            wif_key: &str,
+            prefix: &str,
+        ) -> Result<String>;
+        fn remove_key(
+            self: Pin<&mut BeekeeperHolder>,
+            name: &str,
+            public_key: &str,
+            prefix: &str,
+        ) -> Result<()>;
+        fn has_matching_private_key(
+            self: &BeekeeperHolder,
+            name: &str,
+            public_key: &str,
+            prefix: &str,
+        ) -> Result<bool>;
+        fn sign_digest(
+            self: Pin<&mut BeekeeperHolder>,
+            name: &str,
+            digest_hex: &str,
+            public_key: &str,
+            prefix: &str,
+        ) -> Result<String>;
+        fn get_public_keys(
+            self: &BeekeeperHolder,
+            name: &str,
+            prefix: &str,
+        ) -> Result<Vec<String>>;
     }
 }

@@ -1,5 +1,7 @@
 #include <beekeeper_rs/beekeeper_holder.hpp>
 
+#include "beekeeper_rust/src/lib.rs.h"
+
 #include <string>
 
 namespace beekeeper_rs {
@@ -43,12 +45,58 @@ namespace beekeeper_rs {
 		bk_->unlock(std::string(name), std::string(password));
 	}
 
+	void beekeeper_holder::lock(rust::Str name) {
+		bk_->lock(std::string(name));
+	}
+
 	void beekeeper_holder::lock_all() {
 		bk_->lock_all();
 	}
 
 	void beekeeper_holder::set_timeout(uint32_t seconds) {
 		bk_->set_timeout(seconds);
+	}
+
+	rust::Vec<cpp::WalletDetails>
+	beekeeper_holder::list_wallets(rust::Str token) const {
+		auto wds = bk_->list_wallets(std::string(token));
+		rust::Vec<cpp::WalletDetails> result;
+		for (const auto& wd : wds) {
+			cpp::WalletDetails out{rust::String(wd.name), wd.unlocked};
+			result.push_back(std::move(out));
+		}
+		return result;
+	}
+
+	rust::String beekeeper_holder::import_key(rust::Str name, rust::Str wif_key, rust::Str prefix) {
+		return bk_->import_key(std::string(name), std::string(wif_key), std::string(prefix));
+	}
+
+	void beekeeper_holder::remove_key(rust::Str name, rust::Str public_key, rust::Str prefix) {
+		auto pk = crypto_provider_->public_key_from_string(std::string(public_key), std::string(prefix));
+		bk_->remove_key(std::string(name), pk);
+	}
+
+	bool beekeeper_holder::has_matching_private_key(rust::Str name, rust::Str public_key, rust::Str prefix) const {
+		auto pk = crypto_provider_->public_key_from_string(std::string(public_key), std::string(prefix));
+		return bk_->has_private_key(std::string(name), pk);
+	}
+
+	rust::String beekeeper_holder::sign_digest(rust::Str name, rust::Str digest_hex, rust::Str public_key, rust::Str prefix) {
+		auto digest = crypto_provider_->digest_from_hex(std::string(digest_hex));
+		auto pk = crypto_provider_->public_key_from_string(std::string(public_key), std::string(prefix));
+		auto sig = bk_->sign_digest(std::string(name), digest, pk, std::string(prefix));
+		return crypto_provider_->signature_to_hex(sig);
+	}
+
+	rust::Vec<rust::String>
+	beekeeper_holder::get_public_keys(rust::Str name, rust::Str prefix) const {
+		auto keys = bk_->get_public_keys(std::string(name));
+		rust::Vec<rust::String> result;
+		for (const auto& [pubkey, _] : keys) {
+			result.push_back(crypto_provider_->public_key_to_string(pubkey, std::string(prefix)));
+		}
+		return result;
 	}
 
 	std::unique_ptr<beekeeper_holder> new_beekeeper_holder(

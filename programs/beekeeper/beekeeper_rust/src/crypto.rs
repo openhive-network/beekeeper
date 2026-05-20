@@ -1,17 +1,17 @@
 use aes::Aes256;
 use cbc::cipher::{
-    block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit,
+    BlockDecryptMut, BlockEncryptMut, KeyIvInit, block_padding::Pkcs7,
 };
 use k256::{
+    PublicKey, SecretKey,
     ecdsa::SigningKey,
     elliptic_curve::{ecdh::diffie_hellman, sec1::ToEncodedPoint},
-    PublicKey, SecretKey,
 };
 use rand::RngCore;
 use ripemd::Ripemd160;
 use sha2::{Sha256, Sha512};
 
-use crate::{errors::BeekeeperError, RustCryptoProtocol};
+use crate::{RustCryptoProtocol, errors::BeekeeperError};
 
 type Aes256CbcEnc = cbc::Encryptor<Aes256>;
 type Aes256CbcDec = cbc::Decryptor<Aes256>;
@@ -42,7 +42,8 @@ impl RustCryptoProtocol {
         iv: &[u8],
         data: &[u8],
     ) -> Result<Vec<u8>, BeekeeperError> {
-        let cipher = Aes256CbcEnc::new_from_slices(key, iv).map_err(crypto_err)?;
+        let cipher =
+            Aes256CbcEnc::new_from_slices(key, iv).map_err(crypto_err)?;
         Ok(cipher.encrypt_padded_vec_mut::<Pkcs7>(data))
     }
 
@@ -52,7 +53,8 @@ impl RustCryptoProtocol {
         iv: &[u8],
         data: &[u8],
     ) -> Result<Vec<u8>, BeekeeperError> {
-        let cipher = Aes256CbcDec::new_from_slices(key, iv).map_err(crypto_err)?;
+        let cipher =
+            Aes256CbcDec::new_from_slices(key, iv).map_err(crypto_err)?;
         cipher
             .decrypt_padded_vec_mut::<Pkcs7>(data)
             .map_err(crypto_err)
