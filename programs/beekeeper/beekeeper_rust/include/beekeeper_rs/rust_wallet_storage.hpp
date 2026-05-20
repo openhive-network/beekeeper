@@ -16,7 +16,10 @@ namespace beekeeper_rs {
 		~rust_wallet_storage() override;
 
 		std::vector<char> load(const std::string& path) override;
-		void save(const std::string& path, const std::vector<char>& buffer) override;
+		void save(
+			const std::string& path,
+			const std::vector<char>& buffer
+		) override;
 		bool scan_dir(const std::string& wallet_name) override;
 
 	private:

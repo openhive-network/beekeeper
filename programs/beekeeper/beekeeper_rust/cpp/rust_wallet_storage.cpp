@@ -9,14 +9,15 @@ namespace beekeeper_rs {
 
 	rust_wallet_storage::~rust_wallet_storage() = default;
 
-	std::vector<char> rust_wallet_storage::load(const std::string& path)
-	{
+	std::vector<char> rust_wallet_storage::load(const std::string& path) {
 		auto bytes = impl_->cpp_load(rust::Str{path});
 		return std::vector<char>(bytes.begin(), bytes.end());
 	}
 
-	void rust_wallet_storage::save(const std::string& path, const std::vector<char>& buffer)
-	{
+	void rust_wallet_storage::save(
+		const std::string& path,
+		const std::vector<char>& buffer
+	) {
 		impl_->cpp_save(
 			rust::Str{path},
 			rust::Slice<const uint8_t>{
@@ -26,8 +27,7 @@ namespace beekeeper_rs {
 		);
 	}
 
-	bool rust_wallet_storage::scan_dir(const std::string& wallet_name)
-	{
+	bool rust_wallet_storage::scan_dir(const std::string& wallet_name) {
 		return impl_->cpp_scan_dir(rust::Str{wallet_name});
 	}
 }

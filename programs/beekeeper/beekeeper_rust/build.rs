@@ -26,6 +26,7 @@ fn main() {
     for src in [
         "cpp/rust_crypto_provider.cpp",
         "cpp/rust_wallet_storage.cpp",
+        "cpp/beekeeper_holder.cpp",
     ] {
         let path = manifest_dir.join(src);
         if path.exists() {
@@ -42,5 +43,8 @@ fn main() {
     );
     println!(
         "cargo:rerun-if-changed=include/beekeeper_rs/rust_wallet_storage.hpp"
+    );
+    println!(
+        "cargo:rerun-if-changed=include/beekeeper_rs/beekeeper_holder.hpp"
     );
 }
