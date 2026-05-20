@@ -1,4 +1,5 @@
 pub mod api;
+pub mod options;
 pub mod session;
 pub mod wallet;
 
@@ -8,6 +9,7 @@ mod errors;
 mod storage;
 
 pub use crypto::RustCryptoProtocol;
+pub use options::BeekeeperOptions;
 pub use storage::{RustStorageProtocol, new_rust_storage_protocol};
 
 #[cxx::bridge(namespace = "cpp")]

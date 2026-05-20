@@ -12,6 +12,7 @@ use crate::{
     consts::{LEGACY_WALLET_DIR, LEGACY_WALLET_EXT},
     errors::BeekeeperError,
     ffi, new_rust_storage_protocol,
+    options::BeekeeperOptions,
 };
 
 pub struct BeekeeperApi {
@@ -24,22 +25,19 @@ pub struct BeekeeperApi {
 }
 
 impl BeekeeperApi {
-    pub fn new(
-        storage_root: &str,
-        unlock_timeout_sec: u32,
-        is_in_memory: bool,
-    ) -> Self {
-        let wallet_dir = Path::new(storage_root).join(LEGACY_WALLET_DIR);
-        let storage = new_rust_storage_protocol(storage_root);
+    pub fn new(options: BeekeeperOptions) -> Self {
+        let wallet_dir =
+            Path::new(&options.storage_root).join(LEGACY_WALLET_DIR);
+        let storage = new_rust_storage_protocol(&options.storage_root);
         let crypto = Box::new(RustCryptoProtocol);
         let holder =
-            ffi::new_beekeeper_holder(crypto, storage, unlock_timeout_sec);
+            ffi::new_beekeeper_holder(crypto, storage, options.unlock_timeout);
 
         Self {
             holder,
             sessions: HashSet::new(),
-            is_in_memory,
-            unlock_timeout_ms: unlock_timeout_sec.saturating_mul(1000),
+            is_in_memory: options.in_memory,
+            unlock_timeout_ms: options.unlock_timeout.saturating_mul(1000),
             last_activity: Instant::now(),
             wallet_dir,
         }
