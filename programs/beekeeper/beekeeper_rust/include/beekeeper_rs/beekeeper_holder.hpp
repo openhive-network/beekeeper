@@ -1,9 +1,10 @@
 #pragma once
 
-#include <beekeeper_rs/rust_crypto_provider.hpp>
+#include <beekeeper_rs/rust_crypto_primitives.hpp>
 #include <beekeeper_rs/rust_wallet_storage.hpp>
 
 #include <core_minimal/beekeeper.hpp>
+#include <core_minimal/crypto_provider_impl.hpp>
 
 #include <rust/cxx.h>
 
@@ -16,6 +17,12 @@ namespace cpp {
 }
 
 namespace beekeeper_rs {
+	/// Owns the four C++ objects bound by reference to each other:
+	///   crypto_prims_   (raw primitives, Rust-backed)
+	///   crypto_provider_ (high-level, holds ref to crypto_prims_)
+	///   storage_         (Rust-backed)
+	///   bk_              (beekeeper_minimal::beekeeper, holds refs to crypto_provider_ + storage_)
+	/// Field order matches construction; reverse order = destruction.
 	class beekeeper_holder
 	{
 	public:
@@ -42,9 +49,10 @@ namespace beekeeper_rs {
 		void         set_timeout(uint32_t seconds);
 
 	private:
-		std::unique_ptr<rust_crypto_provider>          crypto_;
-		std::unique_ptr<rust_wallet_storage>           storage_;
-		std::unique_ptr<beekeeper_minimal::beekeeper>  bk_;
+		std::unique_ptr<rust_crypto_primitives>                  crypto_prims_;
+		std::unique_ptr<beekeeper_minimal::crypto_provider_impl> crypto_provider_;
+		std::unique_ptr<rust_wallet_storage>                     storage_;
+		std::unique_ptr<beekeeper_minimal::beekeeper>            bk_;
 	};
 
 	std::unique_ptr<beekeeper_holder> new_beekeeper_holder(

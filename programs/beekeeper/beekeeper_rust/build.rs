@@ -24,7 +24,7 @@ fn main() {
     }
 
     for src in [
-        "cpp/rust_crypto_provider.cpp",
+        "cpp/rust_crypto_primitives.cpp",
         "cpp/rust_wallet_storage.cpp",
         "cpp/beekeeper_holder.cpp",
     ] {
@@ -39,7 +39,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!(
-        "cargo:rerun-if-changed=include/beekeeper_rs/rust_crypto_provider.hpp"
+        "cargo:rerun-if-changed=include/beekeeper_rs/rust_crypto_primitives.hpp"
     );
     println!(
         "cargo:rerun-if-changed=include/beekeeper_rs/rust_wallet_storage.hpp"

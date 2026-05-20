@@ -7,9 +7,10 @@ namespace beekeeper_rs {
 		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 		rust::Box<cpp::RustStorageProtocol> storage_impl,
 		uint32_t unlock_timeout_sec
-	) : crypto_(std::make_unique<rust_crypto_provider>(std::move(crypto_impl))),
+	) : crypto_prims_(std::make_unique<rust_crypto_primitives>(std::move(crypto_impl))),
+	    crypto_provider_(std::make_unique<beekeeper_minimal::crypto_provider_impl>(*crypto_prims_)),
 	    storage_(std::make_unique<rust_wallet_storage>(std::move(storage_impl))),
-	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_, *storage_, unlock_timeout_sec))
+	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *storage_, unlock_timeout_sec))
 	{}
 
 	beekeeper_holder::~beekeeper_holder() = default;

@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub mod api;
+pub mod session;
 mod consts;
 mod errors;
 
@@ -70,48 +71,49 @@ pub mod ffi {
     }
 
     unsafe extern "C++" {
-        include!("beekeeper_rs/rust_crypto_provider.hpp");
+        include!("beekeeper_rs/rust_crypto_primitives.hpp");
         include!("beekeeper_rs/rust_wallet_storage.hpp");
         include!("beekeeper_rs/beekeeper_holder.hpp");
 
         #[namespace = "beekeeper_rs"]
-        type beekeeper_holder;
+        #[cxx_name = "beekeeper_holder"]
+        type BeekeeperHolder;
 
         #[namespace = "beekeeper_rs"]
         fn new_beekeeper_holder(
             crypto_impl: Box<RustCryptoProtocol>,
             storage_impl: Box<RustStorageProtocol>,
             unlock_timeout_sec: u32,
-        ) -> UniquePtr<beekeeper_holder>;
+        ) -> UniquePtr<BeekeeperHolder>;
 
-        fn create_session(self: Pin<&mut beekeeper_holder>) -> Result<String>;
+        fn create_session(self: Pin<&mut BeekeeperHolder>) -> Result<String>;
         fn close_session(
-            self: Pin<&mut beekeeper_holder>,
+            self: Pin<&mut BeekeeperHolder>,
             token: &str,
         ) -> Result<()>;
-        fn has_wallet(self: &beekeeper_holder, name: &str) -> Result<bool>;
+        fn has_wallet(self: &BeekeeperHolder, name: &str) -> Result<bool>;
         fn create_wallet(
-            self: Pin<&mut beekeeper_holder>,
+            self: Pin<&mut BeekeeperHolder>,
             token: &str,
             name: &str,
             password: &str,
             is_temporary: bool,
         ) -> Result<String>;
         fn open_wallet(
-            self: Pin<&mut beekeeper_holder>,
+            self: Pin<&mut BeekeeperHolder>,
             token: &str,
             name: &str,
         ) -> Result<()>;
         fn close_wallet(
-            self: Pin<&mut beekeeper_holder>,
+            self: Pin<&mut BeekeeperHolder>,
             name: &str,
         ) -> Result<()>;
         fn unlock(
-            self: Pin<&mut beekeeper_holder>,
+            self: Pin<&mut BeekeeperHolder>,
             name: &str,
             password: &str,
         ) -> Result<()>;
-        fn lock_all(self: Pin<&mut beekeeper_holder>) -> Result<()>;
-        fn set_timeout(self: Pin<&mut beekeeper_holder>, seconds: u32);
+        fn lock_all(self: Pin<&mut BeekeeperHolder>) -> Result<()>;
+        fn set_timeout(self: Pin<&mut BeekeeperHolder>, seconds: u32);
     }
 }
