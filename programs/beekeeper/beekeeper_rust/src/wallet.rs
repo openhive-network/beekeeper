@@ -2,6 +2,12 @@ use crate::{api::BeekeeperApi, errors::BeekeeperError};
 
 pub const DEFAULT_KEY_PREFIX: &str = "STM";
 
+pub struct WalletInfo {
+    pub name: String,
+    pub unlocked: bool,
+    pub is_temporary: bool,
+}
+
 pub struct WalletCreated<'a> {
     pub wallet: UnlockedWallet<'a>,
     pub password: String,

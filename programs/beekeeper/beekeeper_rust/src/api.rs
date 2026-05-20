@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     time::{Duration, Instant, SystemTime},
@@ -15,9 +15,15 @@ use crate::{
     options::BeekeeperOptions,
 };
 
+#[derive(Clone, Copy)]
+pub(crate) struct WalletMeta {
+    pub is_temporary: bool,
+}
+
 pub struct BeekeeperApi {
     pub(super) holder: UniquePtr<ffi::BeekeeperHolder>,
     sessions: HashSet<String>,
+    pub(crate) wallets_meta: HashMap<(String, String), WalletMeta>,
     pub(super) is_in_memory: bool,
     unlock_timeout_ms: u32,
     last_activity: Instant,
@@ -50,11 +56,36 @@ impl BeekeeperApi {
         Self {
             holder,
             sessions: HashSet::new(),
+            wallets_meta: HashMap::new(),
             is_in_memory: options.in_memory,
             unlock_timeout_ms: options.unlock_timeout.saturating_mul(1000),
             last_activity: Instant::now(),
             wallet_dir,
         }
+    }
+
+    pub(crate) fn register_wallet(
+        &mut self,
+        token: &str,
+        name: &str,
+        is_temporary: bool,
+    ) {
+        self.wallets_meta.insert(
+            (token.to_string(), name.to_string()),
+            WalletMeta { is_temporary },
+        );
+    }
+
+    pub(crate) fn unregister_wallet(&mut self, token: &str, name: &str) {
+        self.wallets_meta
+            .remove(&(token.to_string(), name.to_string()));
+    }
+
+    pub(crate) fn wallet_is_temporary(&self, token: &str, name: &str) -> bool {
+        self.wallets_meta
+            .get(&(token.to_string(), name.to_string()))
+            .map(|meta| meta.is_temporary)
+            .unwrap_or(false)
     }
 
     pub fn refresh_timeout(&mut self) {
@@ -123,6 +154,7 @@ impl BeekeeperApi {
     pub fn close_session(&mut self, token: &str) -> Result<(), BeekeeperError> {
         self.holder.pin_mut().close_session(token)?;
         self.sessions.remove(token);
+        self.wallets_meta.retain(|(t, _), _| t != token);
 
         Ok(())
     }
@@ -132,6 +164,7 @@ impl BeekeeperApi {
         for token in tokens {
             self.holder.pin_mut().close_session(&token)?;
         }
+        self.wallets_meta.clear();
 
         Ok(())
     }
