@@ -1,13 +1,31 @@
-use crate::{api::Beekeeper, errors::BeekeeperError};
+use std::time::SystemTime;
+
+use crate::{api::BeekeeperApi, errors::BeekeeperError};
+
+pub struct SessionInfo {
+    pub now: SystemTime,
+    pub timeout_time: SystemTime,
+}
 
 pub struct Session<'a> {
-    pub(super) bk: &'a mut Beekeeper,
+    pub(super) bk: &'a mut BeekeeperApi,
     pub(super) token: &'a str,
 }
 
 impl<'a> Session<'a> {
     pub fn token(&self) -> &str {
         self.token
+    }
+
+    pub fn get_info(&self) -> SessionInfo {
+        SessionInfo {
+            now: SystemTime::now(),
+            timeout_time: self.bk.get_timeout_time(),
+        }
+    }
+
+    pub fn list_created_wallets(&self) -> Vec<String> {
+        self.bk.list_created_wallets()
     }
 
     pub fn has_wallet(&self, name: &str) -> Result<bool, BeekeeperError> {

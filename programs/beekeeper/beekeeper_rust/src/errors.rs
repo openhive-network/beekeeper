@@ -10,6 +10,8 @@ pub enum BeekeeperError {
     WalletWriteFailed { name: String },
     #[error("Crypto error: {0}")]
     Crypto(String),
+    #[error("Wallet locked due to timeout")]
+    TimedOut,
     #[error(transparent)]
     Cxx(#[from] cxx::Exception),
 }

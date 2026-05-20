@@ -1,26 +1,36 @@
-use std::{collections::HashSet, time::Instant};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+    time::{Duration, Instant, SystemTime},
+};
 
 use cxx::UniquePtr;
 
 use crate::{
-    RustCryptoProtocol, errors::BeekeeperError, ffi, new_rust_storage_protocol,
+    RustCryptoProtocol,
+    consts::{LEGACY_WALLET_DIR, LEGACY_WALLET_EXT},
+    errors::BeekeeperError,
+    ffi, new_rust_storage_protocol,
     session::Session,
 };
 
-pub struct Beekeeper {
+pub struct BeekeeperApi {
     pub(super) holder: UniquePtr<ffi::BeekeeperHolder>,
     sessions: HashSet<String>,
     pub(super) is_in_memory: bool,
     unlock_timeout_ms: u32,
     last_activity: Instant,
+    wallet_dir: PathBuf,
 }
 
-impl Beekeeper {
+impl BeekeeperApi {
     pub fn new(
         storage_root: &str,
         unlock_timeout_sec: u32,
         is_in_memory: bool,
     ) -> Self {
+        let wallet_dir = Path::new(storage_root).join(LEGACY_WALLET_DIR);
         let storage = new_rust_storage_protocol(storage_root);
         let crypto = Box::new(RustCryptoProtocol);
         let holder =
@@ -31,7 +41,56 @@ impl Beekeeper {
             is_in_memory,
             unlock_timeout_ms: unlock_timeout_sec.saturating_mul(1000),
             last_activity: Instant::now(),
+            wallet_dir,
         }
+    }
+
+    pub fn version(&self) -> &'static str {
+        env!("CARGO_PKG_VERSION")
+    }
+
+    pub fn get_timeout_time(&self) -> SystemTime {
+        if self.unlock_timeout_ms == 0 {
+            return SystemTime::UNIX_EPOCH
+                + Duration::from_secs(60 * 60 * 24 * 365 * 100);
+        }
+        let elapsed = self.last_activity.elapsed();
+        let remaining = Duration::from_millis(u64::from(self.unlock_timeout_ms))
+            .saturating_sub(elapsed);
+        SystemTime::now() + remaining
+    }
+
+    pub fn throw_if_timed_out_and_refresh(
+        &mut self,
+    ) -> Result<(), BeekeeperError> {
+        if self.is_timed_out() {
+            return Err(BeekeeperError::TimedOut);
+        }
+        self.refresh_timeout();
+        Ok(())
+    }
+
+    pub fn list_created_wallets(&self) -> Vec<String> {
+        let Ok(entries) = fs::read_dir(&self.wallet_dir) else {
+            return Vec::new();
+        };
+        entries
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                e.file_name()
+                    .to_str()?
+                    .strip_suffix(LEGACY_WALLET_EXT)
+                    .map(String::from)
+            })
+            .collect()
+    }
+
+    pub fn close(&mut self) -> Result<(), BeekeeperError> {
+        let tokens: Vec<String> = self.sessions.drain().collect();
+        for token in tokens {
+            self.holder.pin_mut().close_session(&token)?;
+        }
+        Ok(())
     }
 
     pub fn is_in_memory(&self) -> bool {
