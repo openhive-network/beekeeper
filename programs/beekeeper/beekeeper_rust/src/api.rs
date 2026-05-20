@@ -2,7 +2,10 @@ use std::{collections::HashSet, time::Instant};
 
 use cxx::UniquePtr;
 
-use crate::{RustCryptoProtocol, ffi, new_rust_storage_protocol, session::Session};
+use crate::{
+    RustCryptoProtocol, errors::BeekeeperError, ffi, new_rust_storage_protocol,
+    session::Session,
+};
 
 pub struct Beekeeper {
     pub(super) holder: UniquePtr<ffi::BeekeeperHolder>,
@@ -45,13 +48,13 @@ impl Beekeeper {
         self.last_activity = Instant::now();
     }
 
-    pub fn create_session(&mut self) -> Result<String, cxx::Exception> {
+    pub fn create_session(&mut self) -> Result<String, BeekeeperError> {
         let token = self.holder.pin_mut().create_session()?;
         self.sessions.insert(token.clone());
         Ok(token)
     }
 
-    pub fn close_session(&mut self, token: &str) -> Result<(), cxx::Exception> {
+    pub fn close_session(&mut self, token: &str) -> Result<(), BeekeeperError> {
         self.holder.pin_mut().close_session(token)?;
         self.sessions.remove(token);
         Ok(())
@@ -61,16 +64,18 @@ impl Beekeeper {
         Session { bk: self, token }
     }
 
-    pub fn lock_all(&mut self) -> Result<(), cxx::Exception> {
-        self.holder.pin_mut().lock_all()
+    pub fn lock_all(&mut self) -> Result<(), BeekeeperError> {
+        self.holder.pin_mut().lock_all()?;
+        Ok(())
     }
 
     pub fn unlock(
         &mut self,
         name: &str,
         password: &str,
-    ) -> Result<(), cxx::Exception> {
-        self.holder.pin_mut().unlock(name, password)
+    ) -> Result<(), BeekeeperError> {
+        self.holder.pin_mut().unlock(name, password)?;
+        Ok(())
     }
 
     pub fn set_timeout(&mut self, seconds: u32) {
