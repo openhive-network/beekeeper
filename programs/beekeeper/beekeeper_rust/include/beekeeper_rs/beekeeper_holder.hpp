@@ -53,6 +53,21 @@ namespace beekeeper_rs {
 		bool         has_matching_private_key(rust::Str name, rust::Str public_key, rust::Str prefix) const;
 		rust::String sign_digest(rust::Str name, rust::Str digest_hex, rust::Str public_key, rust::Str prefix);
 		rust::Vec<rust::String> get_public_keys(rust::Str name, rust::Str prefix) const;
+		rust::String encrypt_data(
+			rust::Str name,
+			rust::Str from_key,
+			rust::Str to_key,
+			rust::Str content,
+			rust::Str prefix,
+			uint64_t nonce
+		);
+		rust::String decrypt_data(
+			rust::Str name,
+			rust::Str from_key,
+			rust::Str to_key,
+			rust::Str encrypted_content,
+			rust::Str prefix
+		);
 
 	private:
 		std::unique_ptr<rust_crypto_primitives>                  crypto_prims_;

@@ -99,6 +99,33 @@ namespace beekeeper_rs {
 		return result;
 	}
 
+	rust::String beekeeper_holder::encrypt_data(
+		rust::Str name,
+		rust::Str from_key,
+		rust::Str to_key,
+		rust::Str content,
+		rust::Str prefix,
+		uint64_t nonce
+	) {
+		auto prefix_s = std::string(prefix);
+		auto from = crypto_provider_->public_key_from_string(std::string(from_key), prefix_s);
+		auto to   = crypto_provider_->public_key_from_string(std::string(to_key),   prefix_s);
+		return bk_->encrypt_data(std::string(name), from, to, std::string(content), prefix_s, nonce);
+	}
+
+	rust::String beekeeper_holder::decrypt_data(
+		rust::Str name,
+		rust::Str from_key,
+		rust::Str to_key,
+		rust::Str encrypted_content,
+		rust::Str prefix
+	) {
+		auto prefix_s = std::string(prefix);
+		auto from = crypto_provider_->public_key_from_string(std::string(from_key), prefix_s);
+		auto to   = crypto_provider_->public_key_from_string(std::string(to_key),   prefix_s);
+		return bk_->decrypt_data(std::string(name), from, to, std::string(encrypted_content), prefix_s);
+	}
+
 	std::unique_ptr<beekeeper_holder> new_beekeeper_holder(
 		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 		rust::Box<cpp::RustStorageProtocol> storage_impl,

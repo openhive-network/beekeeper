@@ -119,6 +119,40 @@ impl<'a> UnlockedWallet<'a> {
             .get_public_keys(&self.name, DEFAULT_KEY_PREFIX)?)
     }
 
+    pub fn encrypt_data(
+        &mut self,
+        from_key: &str,
+        to_key: Option<&str>,
+        content: &str,
+        nonce: u64,
+    ) -> Result<String, BeekeeperError> {
+        self.bk.throw_if_timed_out_and_refresh()?;
+        Ok(self.bk.holder.pin_mut().encrypt_data(
+            &self.name,
+            from_key,
+            to_key.unwrap_or(from_key),
+            content,
+            DEFAULT_KEY_PREFIX,
+            nonce,
+        )?)
+    }
+
+    pub fn decrypt_data(
+        &mut self,
+        from_key: &str,
+        to_key: Option<&str>,
+        encrypted_content: &str,
+    ) -> Result<String, BeekeeperError> {
+        self.bk.throw_if_timed_out_and_refresh()?;
+        Ok(self.bk.holder.pin_mut().decrypt_data(
+            &self.name,
+            from_key,
+            to_key.unwrap_or(from_key),
+            encrypted_content,
+            DEFAULT_KEY_PREFIX,
+        )?)
+    }
+
     pub fn close(self) -> Result<(), BeekeeperError> {
         let locked = self.lock()?;
         locked.close()

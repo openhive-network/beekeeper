@@ -11,7 +11,9 @@ use rand::RngCore;
 use ripemd::Ripemd160;
 use sha2::{Sha256, Sha512};
 
-use crate::{RustCryptoProtocol, errors::BeekeeperError};
+use crate::errors::BeekeeperError;
+
+pub struct RustCryptoProtocol;
 
 type Aes256CbcEnc = cbc::Encryptor<Aes256>;
 type Aes256CbcDec = cbc::Decryptor<Aes256>;

@@ -1,53 +1,14 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
-
-use crate::{
-    consts::{LEGACY_WALLET_DIR, LEGACY_WALLET_EXT},
-    errors::{BeekeeperError, Res},
-};
-
 pub mod api;
-mod consts;
-mod crypto;
-mod errors;
 pub mod session;
 pub mod wallet;
 
-pub struct RustCryptoProtocol;
+mod consts;
+mod crypto;
+mod errors;
+mod storage;
 
-pub struct RustStorageProtocol {
-    wallet_dir: PathBuf,
-}
-
-fn new_rust_storage_protocol(storage_root: &str) -> Box<RustStorageProtocol> {
-    let wallet_dir = Path::new(storage_root).join(LEGACY_WALLET_DIR);
-    fs::create_dir_all(&wallet_dir).ok();
-
-    Box::new(RustStorageProtocol { wallet_dir })
-}
-
-impl RustStorageProtocol {
-    fn cpp_load(&mut self, name: &str) -> Res<Vec<u8>> {
-        let path = self.wallet_dir.join(format!("{name}{LEGACY_WALLET_EXT}"));
-        fs::read(path)
-            .map_err(|_| BeekeeperError::WalletNotFound { name: name.into() })
-    }
-
-    fn cpp_save(&mut self, name: &str, data: &[u8]) -> Res<()> {
-        let path = self.wallet_dir.join(format!("{name}{LEGACY_WALLET_EXT}"));
-        fs::write(path, data).map_err(|_| BeekeeperError::WalletWriteFailed {
-            name: name.into(),
-        })
-    }
-
-    fn cpp_scan_dir(&mut self, name: &str) -> bool {
-        self.wallet_dir
-            .join(format!("{name}{LEGACY_WALLET_EXT}"))
-            .is_file()
-    }
-}
+pub use crypto::RustCryptoProtocol;
+pub use storage::{RustStorageProtocol, new_rust_storage_protocol};
 
 #[cxx::bridge(namespace = "cpp")]
 pub mod ffi {
@@ -221,5 +182,22 @@ pub mod ffi {
             name: &str,
             prefix: &str,
         ) -> Result<Vec<String>>;
+        fn encrypt_data(
+            self: Pin<&mut BeekeeperHolder>,
+            name: &str,
+            from_key: &str,
+            to_key: &str,
+            content: &str,
+            prefix: &str,
+            nonce: u64,
+        ) -> Result<String>;
+        fn decrypt_data(
+            self: Pin<&mut BeekeeperHolder>,
+            name: &str,
+            from_key: &str,
+            to_key: &str,
+            encrypted_content: &str,
+            prefix: &str,
+        ) -> Result<String>;
     }
 }
