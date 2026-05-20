@@ -151,6 +151,13 @@ impl BeekeeperApi {
         Ok(token)
     }
 
+    pub fn session<'a>(
+        &'a mut self,
+        token: &'a str,
+    ) -> crate::session::Session<'a> {
+        crate::session::Session { bk: self, token }
+    }
+
     pub fn close_session(&mut self, token: &str) -> Result<(), BeekeeperError> {
         self.holder.pin_mut().close_session(token)?;
         self.sessions.remove(token);
