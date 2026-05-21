@@ -15,7 +15,6 @@ use std::{
 use cxx::UniquePtr;
 
 use crate::{
-    RustCryptoProtocol,
     consts::{LEGACY_WALLET_DIR, LEGACY_WALLET_EXT},
     errors::BeekeeperError,
     ffi, new_rust_storage_protocol,
@@ -72,24 +71,17 @@ impl BeekeeperApi {
     /// (`createBeekeeper(...)`) that resolves a `wasmLocation`. Here the
     /// constructor is the entry point; just call it.
     pub fn new(options: BeekeeperOptions) -> Self {
-        let crypto = Box::new(RustCryptoProtocol);
         let (holder, wallet_dir) = if options.in_memory {
             (
-                ffi::new_beekeeper_holder_in_memory(
-                    crypto,
-                    options.unlock_timeout,
-                ),
+                ffi::new_beekeeper_holder_in_memory(options.unlock_timeout),
                 PathBuf::new(),
             )
         } else {
             let wallet_dir =
                 Path::new(&options.storage_root).join(LEGACY_WALLET_DIR);
             let storage = new_rust_storage_protocol(&options.storage_root);
-            let holder = ffi::new_beekeeper_holder(
-                crypto,
-                storage,
-                options.unlock_timeout,
-            );
+            let holder =
+                ffi::new_beekeeper_holder(storage, options.unlock_timeout);
             (holder, wallet_dir)
         };
 

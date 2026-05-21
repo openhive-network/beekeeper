@@ -8,21 +8,16 @@
 
 namespace beekeeper_rs {
 	beekeeper_holder::beekeeper_holder(
-		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 		rust::Box<cpp::RustStorageProtocol> storage_impl,
 		uint32_t unlock_timeout_sec
-	) : crypto_prims_(std::make_unique<rust_crypto_primitives>(std::move(crypto_impl))),
-	    crypto_provider_(std::make_unique<beekeeper_minimal::crypto_provider_impl>(*crypto_prims_)),
+	) : crypto_provider_(std::make_unique<beekeeper_minimal::fc_crypto_provider>()),
 	    rust_storage_(std::make_unique<rust_wallet_storage>(std::move(storage_impl))),
 	    mem_storage_(nullptr),
 	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *rust_storage_, unlock_timeout_sec))
 	{}
 
-	beekeeper_holder::beekeeper_holder(
-		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
-		uint32_t unlock_timeout_sec
-	) : crypto_prims_(std::make_unique<rust_crypto_primitives>(std::move(crypto_impl))),
-	    crypto_provider_(std::make_unique<beekeeper_minimal::crypto_provider_impl>(*crypto_prims_)),
+	beekeeper_holder::beekeeper_holder(uint32_t unlock_timeout_sec)
+	  : crypto_provider_(std::make_unique<beekeeper_minimal::fc_crypto_provider>()),
 	    rust_storage_(nullptr),
 	    mem_storage_(std::make_unique<beekeeper_minimal::memory_storage>()),
 	    bk_(std::make_unique<beekeeper_minimal::beekeeper>(*crypto_provider_, *mem_storage_, unlock_timeout_sec))
@@ -144,24 +139,18 @@ namespace beekeeper_rs {
 	}
 
 	std::unique_ptr<beekeeper_holder> new_beekeeper_holder(
-		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 		rust::Box<cpp::RustStorageProtocol> storage_impl,
 		uint32_t unlock_timeout_sec
 	) {
 		return std::make_unique<beekeeper_holder>(
-			std::move(crypto_impl),
 			std::move(storage_impl),
 			unlock_timeout_sec
 		);
 	}
 
 	std::unique_ptr<beekeeper_holder> new_beekeeper_holder_in_memory(
-		rust::Box<cpp::RustCryptoProtocol> crypto_impl,
 		uint32_t unlock_timeout_sec
 	) {
-		return std::make_unique<beekeeper_holder>(
-			std::move(crypto_impl),
-			unlock_timeout_sec
-		);
+		return std::make_unique<beekeeper_holder>(unlock_timeout_sec);
 	}
 }

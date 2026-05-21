@@ -2,11 +2,11 @@
 //!
 //! This crate exposes the same wallet-management surface as the
 //! `@hiveio/beekeeper` npm package (`programs/beekeeper/beekeeper_wasm`),
-//! but as a native Rust library. The underlying wallet logic still lives in
-//! the shared C++ `core/` library and is reached through a [`cxx`] bridge
-//! ([`ffi::BeekeeperHolder`]). Crypto primitives (sha2, ripemd, AES-256-CBC,
-//! secp256k1, base58, RNG) are implemented in pure Rust and injected into the
-//! C++ wallet manager via the [`RustCryptoProtocol`] callback object.
+//! but as a native Rust library. The underlying wallet logic and crypto
+//! primitives live in the shared C++ `core/` library and the FC-backed
+//! `fc_crypto_bridge`, reached through a [`cxx`] bridge
+//! ([`ffi::BeekeeperHolder`]). Storage callbacks are still injected from
+//! Rust via [`RustStorageProtocol`].
 //!
 //! # Quick start
 //!
@@ -52,9 +52,9 @@
 //!   parameter.
 //! - **No injectable storage / crypto callbacks.** TS lets callers supply
 //!   `IStorageCallbacks` / `ICryptoCallbacks`; Rust always uses the bundled
-//!   filesystem-backed [`storage::RustStorageProtocol`] and pure-Rust
-//!   [`RustCryptoProtocol`]. In-memory mode is selected through
-//!   [`BeekeeperOptions::in_memory`] instead.
+//!   filesystem-backed [`storage::RustStorageProtocol`] and the FC-backed
+//!   crypto provider linked from `fc_crypto_bridge`. In-memory mode is
+//!   selected through [`BeekeeperOptions::in_memory`] instead.
 //! - **Key-prefix is hard-coded to `"STM"`** in [`wallet::DEFAULT_KEY_PREFIX`].
 //!   The C++ ABI still accepts a prefix, but the Rust facade doesn't expose
 //!   it (TS doesn't either).
@@ -76,11 +76,9 @@ pub mod session;
 pub mod wallet;
 
 mod consts;
-mod crypto;
 mod errors;
 mod storage;
 
-pub use crypto::RustCryptoProtocol;
 pub use errors::BeekeeperError;
 pub use options::BeekeeperOptions;
 pub use storage::{RustStorageProtocol, new_rust_storage_protocol};
@@ -93,9 +91,8 @@ pub use storage::{RustStorageProtocol, new_rust_storage_protocol};
 /// `UniquePtr<BeekeeperHolder>` fields, but new code outside of those modules
 /// should prefer the safe wrappers.
 ///
-/// All `cpp_*` methods on [`RustCryptoProtocol`] and [`RustStorageProtocol`]
-/// are reachable from C++ only — they are listed here purely to satisfy the
-/// bridge contract.
+/// All `cpp_*` methods on [`RustStorageProtocol`] are reachable from C++
+/// only — they are listed here purely to satisfy the bridge contract.
 #[cxx::bridge(namespace = "cpp")]
 pub mod ffi {
     /// Plain-data summary of a wallet returned by C++ `list_wallets`.
@@ -109,7 +106,6 @@ pub mod ffi {
     }
 
     extern "Rust" {
-        type RustCryptoProtocol;
         type RustStorageProtocol;
 
         fn new_rust_storage_protocol(
@@ -130,74 +126,11 @@ pub mod ffi {
         fn cpp_scan_dir(self: &mut RustStorageProtocol, name: &str) -> bool;
         fn cpp_sync(self: &mut RustStorageProtocol);
         fn cpp_close(self: &mut RustStorageProtocol);
-
-        fn cpp_sha256(
-            self: &mut RustCryptoProtocol,
-            data: &[u8],
-            out: &mut [u8],
-        );
-        fn cpp_sha512(
-            self: &mut RustCryptoProtocol,
-            data: &[u8],
-            out: &mut [u8],
-        );
-        fn cpp_ripemd160(
-            self: &mut RustCryptoProtocol,
-            data: &[u8],
-            out: &mut [u8],
-        );
-
-        fn cpp_aes256_cbc_encrypt(
-            self: &mut RustCryptoProtocol,
-            key: &[u8],
-            iv: &[u8],
-            data: &[u8],
-        ) -> Result<Vec<u8>>;
-        fn cpp_aes256_cbc_decrypt(
-            self: &mut RustCryptoProtocol,
-            key: &[u8],
-            iv: &[u8],
-            data: &[u8],
-        ) -> Result<Vec<u8>>;
-
-        fn cpp_generate_private_key(
-            self: &mut RustCryptoProtocol,
-            out: &mut [u8],
-        );
-        fn cpp_get_public_key(
-            self: &mut RustCryptoProtocol,
-            privkey: &[u8],
-            out: &mut [u8],
-        ) -> Result<()>;
-        fn cpp_sign_compact(
-            self: &mut RustCryptoProtocol,
-            privkey: &[u8],
-            digest: &[u8],
-            out: &mut [u8],
-        ) -> Result<()>;
-        fn cpp_ecdh_shared_secret(
-            self: &mut RustCryptoProtocol,
-            privkey: &[u8],
-            pubkey: &[u8],
-            out: &mut [u8],
-        ) -> Result<()>;
-
-        fn cpp_base58_encode(
-            self: &mut RustCryptoProtocol,
-            data: &[u8],
-        ) -> String;
-        fn cpp_base58_decode(
-            self: &mut RustCryptoProtocol,
-            s: &str,
-        ) -> Result<Vec<u8>>;
-
-        fn cpp_get_random_bytes(self: &mut RustCryptoProtocol, out: &mut [u8]);
     }
 
     unsafe extern "C++" {
-        include!("beekeeper_rs/rust_crypto_primitives.hpp");
-        include!("beekeeper_rs/rust_wallet_storage.hpp");
         include!("beekeeper_rs/beekeeper_holder.hpp");
+        include!("beekeeper_rs/rust_wallet_storage.hpp");
 
         #[namespace = "beekeeper_rs"]
         #[cxx_name = "beekeeper_holder"]
@@ -205,14 +138,12 @@ pub mod ffi {
 
         #[namespace = "beekeeper_rs"]
         fn new_beekeeper_holder(
-            crypto_impl: Box<RustCryptoProtocol>,
             storage_impl: Box<RustStorageProtocol>,
             unlock_timeout_sec: u32,
         ) -> UniquePtr<BeekeeperHolder>;
 
         #[namespace = "beekeeper_rs"]
         fn new_beekeeper_holder_in_memory(
-            crypto_impl: Box<RustCryptoProtocol>,
             unlock_timeout_sec: u32,
         ) -> UniquePtr<BeekeeperHolder>;
 
