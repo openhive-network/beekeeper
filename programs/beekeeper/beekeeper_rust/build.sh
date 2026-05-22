@@ -33,7 +33,7 @@ if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
     GENERATOR="Unix Makefiles"
     if command -v ninja >/dev/null 2>&1; then GENERATOR="Ninja"; fi
     cmake -S "$REPO_ROOT" -B "$BUILD_DIR" \
-        -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+        -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -G "$GENERATOR"
 fi
 
@@ -67,7 +67,7 @@ export BEEKEEPER_FC_CRYPTO_BRIDGE_INCLUDE_DIR="$REPO_ROOT/programs/beekeeper/fc_
 BEEKEEPER_FC_LINK_FLAGS=""
 BEEKEEPER_FC_LINK_FLAGS+=" -L$(dirname "$FC_LIB") -lfc"
 BEEKEEPER_FC_LINK_FLAGS+=" -L$(dirname "$SECP_LIB") -lsecp256k1"
-BEEKEEPER_FC_LINK_FLAGS+=" -lboost_chrono -lboost_date_time -lboost_filesystem -lboost_system -lboost_thread"
+BEEKEEPER_FC_LINK_FLAGS+=" -lboost_chrono -lboost_context -lboost_coroutine -lboost_date_time -lboost_filesystem -lboost_system -lboost_thread"
 BEEKEEPER_FC_LINK_FLAGS+=" -lssl -lcrypto"
 BEEKEEPER_FC_LINK_FLAGS+=" -lz -lbz2"
 BEEKEEPER_FC_LINK_FLAGS+=" -lpthread -lrt -ldl"
