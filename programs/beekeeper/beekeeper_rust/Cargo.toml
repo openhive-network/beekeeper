@@ -9,6 +9,7 @@ thiserror = "2.0.18"
 
 [build-dependencies]
 cxx-build = "1.0.194"
+cmake = "0.1"
 
 [dev-dependencies]
 tempfile = "3"

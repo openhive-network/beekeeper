@@ -79,6 +79,7 @@ mod consts;
 mod errors;
 mod storage;
 
+pub use api::BeekeeperApi;
 pub use errors::BeekeeperError;
 pub use options::BeekeeperOptions;
 pub use storage::{RustStorageProtocol, new_rust_storage_protocol};
