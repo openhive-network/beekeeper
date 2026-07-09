@@ -30,6 +30,12 @@ variables:
   CI_BASE_IMAGE_TAG: ":pypa_2_28-4"
   CI_BASE_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${CI_BASE_IMAGE_TAG}"
 
+  # wax-rust-builder: stable Rust toolchain + cargo-edit on top of the wax
+  # ci-base-image (CMake, static Boost/OpenSSL via BOOST_ROOT/OPENSSL_ROOT_DIR),
+  # reused from hive/wax for the beekeeper_rust crate jobs. Keep the tag in
+  # sync with WAX_RUST_BUILDER_IMAGE_TAG in hive/wax .gitlab-ci.yml.
+  WAX_RUST_BUILDER_IMAGE: "registry.gitlab.syncad.com/hive/wax/wax-rust-builder:pypa_2_28-13-rust2"
+
   # colors
   TXT_BLUE: "\e[1;34m"
   TXT_CLEAR: "\e[0m"
@@ -119,6 +125,94 @@ beekeeper_native_check_static_linking:
   - ./scripts/check-static-linking.sh ./build/programs/beekeeper/beekeeper/beekeeper
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| NATIVE BUILD/TEST |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| RUST BUILD/TEST/DEPLOY |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+beekeeper_rust_build:
+  stage: build
+  image: ${WAX_RUST_BUILDER_IMAGE}
+  needs: []  # Start immediately, don't wait for static_code_analysis
+  before_script:
+  - git config --global --add safe.directory '*'
+  - !reference [.submodule_init, script]
+  script:
+  # Compiles the C++ (fc_crypto_bridge + fc, secp256k1 from the plugins
+  # submodule) under BEEKEEPER_FROM_SOURCE=1, prelinks it into a single
+  # self-contained bundle, verifies it (leak check, exported-symbol check,
+  # link-and-run smoke test) and installs it at lib/libbeekeeper_native.a —
+  # the file build.rs links on every regular `cargo build`.
+  - cd "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_rust"
+  - ./prelink_bundle.sh release
+  artifacts:
+    when: always
+    paths:
+    - ${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_rust/lib
+    expire_in: 1 week
+
+beekeeper_rust_test:
+  stage: test
+  image: ${WAX_RUST_BUILDER_IMAGE}
+  needs:
+  # The bundle artifact makes build.rs take its prebuilt path: the test job
+  # compiles no C++ and needs no submodules — exactly what crate consumers do.
+  - job: beekeeper_rust_build
+    artifacts: true
+  before_script:
+  - git config --global --add safe.directory '*'
+  script:
+  - cd "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_rust"
+  - cargo test --release
+
+deploy_rust_crate_to_crates_io:
+  stage: publish
+  image: ${WAX_RUST_BUILDER_IMAGE}
+  needs:
+  - job: beekeeper_rust_build
+    artifacts: true
+  - job: beekeeper_rust_test
+  rules:
+  - if: $SKIP_PRODUCTION_DEPLOY == "true"
+    when: never
+  - if: '$CI_COMMIT_TAG && $CI_COMMIT_REF_PROTECTED == "true"'
+    when: manual
+    allow_failure: true
+  before_script:
+  - git config --global --add safe.directory '*'
+  script:
+  - ./programs/beekeeper/beekeeper_rust/generate_version.sh "$CI_COMMIT_REF_PROTECTED" "$CI_COMMIT_TAG"
+  - cd programs/beekeeper/beekeeper_rust
+  - cargo publish --allow-dirty
+
+deploy_rust_crate_to_gitlab:
+  stage: publish
+  image: ${WAX_RUST_BUILDER_IMAGE}
+  needs:
+  - job: beekeeper_rust_build
+    artifacts: true
+  - job: beekeeper_rust_test
+  rules:
+  - if: $SKIP_PRODUCTION_DEPLOY == "true"
+    when: never
+  - when: on_success
+  before_script:
+  - git config --global --add safe.directory '*'
+  script:
+  - ./programs/beekeeper/beekeeper_rust/generate_version.sh "$CI_COMMIT_REF_PROTECTED" "$CI_COMMIT_TAG"
+  - cd programs/beekeeper/beekeeper_rust
+  - VERSION=$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+  - cargo package --allow-dirty
+  # --fail-with-body needs curl >= 7.76 and the pypa_2_28 image ships 7.61,
+  # so replicate it: print the response body, fail on non-2xx.
+  - |
+    HTTP_CODE=$(curl --silent --show-error --write-out "%{http_code}" \
+      --output upload_response.txt \
+      --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+      --upload-file "target/package/hiveio-beekeeper-${VERSION}.crate" \
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/hiveio-beekeeper/${VERSION}/hiveio-beekeeper-${VERSION}.crate")
+    cat upload_response.txt; echo
+    [ "${HTTP_CODE}" -ge 200 ] && [ "${HTTP_CODE}" -lt 300 ]
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| RUST BUILD/TEST/DEPLOY |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| WASM BUILD/TEST |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
