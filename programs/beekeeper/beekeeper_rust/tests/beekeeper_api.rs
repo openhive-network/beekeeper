@@ -12,7 +12,6 @@ use common::{
 
 // "Should be able to get sign digest"
 #[test]
-#[ignore = "crypto byte-compat with fc not yet validated"]
 fn sign_digest() {
     let mut bk = new_in_memory();
     let token = bk.api.create_session().unwrap();

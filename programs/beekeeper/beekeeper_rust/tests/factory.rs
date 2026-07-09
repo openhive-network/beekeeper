@@ -92,7 +92,6 @@ fn has_matching_private_key_after_import() {
 // ECDSA produces valid-but-different bytes from libsecp256k1's. The signature
 // itself is well-formed; only the byte-for-byte equality fails.
 #[test]
-#[ignore = "crypto byte-compat with fc not yet validated; signature is valid but bytes differ"]
 fn in_memory_sign_roundtrip() {
     let mut bk = new_in_memory();
     let token = bk.api.create_session().unwrap();
@@ -249,7 +248,6 @@ fn encrypt_deterministic_with_nonce() {
 
 // "Should be able to sign digest"
 #[test]
-#[ignore = "crypto byte-compat with fc not yet validated"]
 fn sign_digest_matches_expected() {
     let mut bk = new_in_memory();
     let token = bk.api.create_session().unwrap();
