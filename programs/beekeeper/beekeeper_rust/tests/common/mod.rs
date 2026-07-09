@@ -3,7 +3,7 @@
 
 #![allow(dead_code)]
 
-use beekeeper_rust::{api::BeekeeperApi, options::BeekeeperOptions};
+use beekeeper::{api::BeekeeperApi, options::BeekeeperOptions};
 use tempfile::TempDir;
 
 pub struct Bk {

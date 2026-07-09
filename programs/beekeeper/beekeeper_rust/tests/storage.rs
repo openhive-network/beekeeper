@@ -8,7 +8,7 @@
 //! - isolation between separate dirs
 //! - file persistence with and without explicit `delete()`
 
-use beekeeper_rust::{api::BeekeeperApi, options::BeekeeperOptions};
+use beekeeper::{api::BeekeeperApi, options::BeekeeperOptions};
 use tempfile::TempDir;
 
 mod common;

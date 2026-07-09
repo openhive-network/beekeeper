@@ -1,6 +1,6 @@
 #include <beekeeper_rs/rust_wallet_storage.hpp>
 
-#include "beekeeper_rust/src/lib.rs.h"
+#include "beekeeper/src/lib.rs.h"
 
 namespace beekeeper_rs {
 	rust_wallet_storage::rust_wallet_storage(

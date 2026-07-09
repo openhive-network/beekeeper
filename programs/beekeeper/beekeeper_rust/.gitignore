@@ -1,2 +1,5 @@
+# Prelinked native bundle installed by prelink_bundle.sh; generated per
+# machine/target, shipped only inside the published .crate file.
+/lib/
 target/
 todo.md

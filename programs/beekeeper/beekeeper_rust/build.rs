@@ -9,6 +9,49 @@ fn main() {
     let manifest_dir = PathBuf::from(
         env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR set by cargo"),
     );
+
+    // Three modes:
+    //  * Prebuilt (default) — link the prelinked native bundle at
+    //    lib/libbeekeeper_native.a; needs no C++ toolchain, CMake, Boost or
+    //    OpenSSL. This is what crate consumers (and the published package)
+    //    build.
+    //  * Standalone from-source — BEEKEEPER_FROM_SOURCE=1: compile the C++
+    //    from the beekeeper tree and prelink it into a bundle; only set by
+    //    prelink_bundle.sh to (re)generate lib/libbeekeeper_native.a.
+    //  * Orchestrated — the outer beekeeper CMake build has already built
+    //    fc_crypto_bridge and passes its location via
+    //    BEEKEEPER_FC_CRYPTO_BRIDGE_LIB_DIR (+ BEEKEEPER_FC_LINK_FLAGS).
+    println!("cargo:rerun-if-env-changed=BEEKEEPER_FROM_SOURCE");
+    println!("cargo:rerun-if-env-changed=BEEKEEPER_FC_CRYPTO_BRIDGE_LIB_DIR");
+
+    if env::var_os("BEEKEEPER_FROM_SOURCE").is_none()
+        && env::var_os("BEEKEEPER_FC_CRYPTO_BRIDGE_LIB_DIR").is_none()
+    {
+        link_prebuilt(&manifest_dir);
+        return;
+    }
+
+    build_from_source(&manifest_dir);
+}
+
+fn link_prebuilt(manifest_dir: &Path) {
+    let lib_dir = manifest_dir.join("lib");
+    let bundle = lib_dir.join("libbeekeeper_native.a");
+    assert!(
+        bundle.is_file(),
+        "prebuilt bundle missing: {}; run prelink_bundle.sh first",
+        bundle.display()
+    );
+
+    println!("cargo:rustc-link-search=native={}", lib_dir.display());
+    println!("cargo:rustc-link-lib=static=beekeeper_native");
+    // The bundle statically contains fc, secp256k1, Boost, OpenSSL, zlib and
+    // bz2; only the system C++ runtime stays dynamic.
+    println!("cargo:rustc-link-lib=stdc++");
+    println!("cargo:rerun-if-changed={}", bundle.display());
+}
+
+fn build_from_source(manifest_dir: &Path) {
     let local_include = manifest_dir.join("include");
     let core_minimal_dir = manifest_dir.join("../core_minimal");
     let core_minimal_include = core_minimal_dir.join("include");
@@ -18,12 +61,20 @@ fn main() {
             .map(PathBuf::from)
             .unwrap_or_else(|_| fc_crypto_bridge_dir.join("include"));
 
+    // The C++ shims include the generated bridge header as
+    // "beekeeper/src/lib.rs.h"; pin the prefix so it doesn't follow the
+    // crates.io package name (hiveio-beekeeper).
+    cxx_build::CFG.include_prefix = "beekeeper";
     let mut build = cxx_build::bridge("src/lib.rs");
     build
         .include(&local_include)
         .include(&core_minimal_include)
         .include(&fc_crypto_bridge_include)
         .std("c++17")
+        // The native code ships prebuilt inside the published crate, so
+        // optimize for size rather than speed (crates.io enforces a 10 MB
+        // package limit).
+        .opt_level_str("s")
         // STB_GNU_UNIQUE symbols (guard variables, inline-function statics)
         // cannot be localized by objcopy and would collide with other
         // prelinked bundles (e.g. wax's) at final link.
@@ -57,16 +108,11 @@ fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR set by cargo"));
     let ffi_archive = out_dir.join("libbeekeeper_rust_ffi.a");
 
-    // Link fc_crypto_bridge and its transitive deps (fc, secp256k1, OpenSSL, …).
-    //
-    // Two modes:
-    //  * Orchestrated build — the outer beekeeper CMake build has already built
-    //    fc_crypto_bridge and passes its location via BEEKEEPER_FC_CRYPTO_BRIDGE_LIB_DIR
-    //    plus a shell-style "-Ldir -llib …" string in BEEKEEPER_FC_LINK_FLAGS.
-    //  * Standalone build — a plain `cargo build`/`cargo test` with no env vars:
-    //    build.rs drives CMake itself, then prelinks everything into a single
-    //    localized bundle so beekeeper_rust is a self-contained crate.
-    println!("cargo:rerun-if-env-changed=BEEKEEPER_FC_CRYPTO_BRIDGE_LIB_DIR");
+    // Link fc_crypto_bridge and its transitive deps (fc, secp256k1, OpenSSL, …):
+    // orchestrated mode links the archives the outer CMake build produced
+    // (BEEKEEPER_FC_CRYPTO_BRIDGE_LIB_DIR plus a shell-style "-Ldir -llib …"
+    // string in BEEKEEPER_FC_LINK_FLAGS); standalone mode drives CMake itself,
+    // then prelinks everything into a single localized bundle.
     println!("cargo:rerun-if-env-changed=BEEKEEPER_FC_CRYPTO_BRIDGE_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=BEEKEEPER_FC_LINK_FLAGS");
 
@@ -115,8 +161,11 @@ fn prelink_native_bundle(manifest_dir: &Path, out_dir: &Path, ffi_archive: &Path
     cfg.build_target("fc_crypto_bridge")
         .profile("Release")
         .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
+        // The native code ships prebuilt inside the published crate, so
+        // optimize for size rather than speed (default Release flags are -O3).
         // -fno-gnu-unique for the same reason as on the bridge build above.
-        .define("CMAKE_CXX_FLAGS_RELEASE", "-O3 -DNDEBUG -fno-gnu-unique")
+        .define("CMAKE_C_FLAGS_RELEASE", "-Os -DNDEBUG")
+        .define("CMAKE_CXX_FLAGS_RELEASE", "-Os -DNDEBUG -fno-gnu-unique")
         // fc declares cmake_minimum_required(2.8.12), rejected by modern CMake
         // unless the policy floor is lowered.
         .define("CMAKE_POLICY_VERSION_MINIMUM", "3.5");
@@ -185,7 +234,10 @@ fn prelink_native_bundle(manifest_dir: &Path, out_dir: &Path, ffi_archive: &Path
     let exports_file = prelink_dir.join("exported_symbols.txt");
     let undefined_flags: String = roots.iter().map(|s| format!("--undefined={s}\n")).collect();
     std::fs::write(&roots_file, undefined_flags).expect("write gc roots");
-    std::fs::write(&exports_file, roots.join("\n")).expect("write exported symbols");
+    // Trailing newline: prelink_bundle.sh counts these entries with `wc -l`.
+    let mut exports = roots.join("\n");
+    exports.push('\n');
+    std::fs::write(&exports_file, exports).expect("write exported symbols");
 
     let bundle = prelink_dir.join("beekeeper_native.o");
     let mut ld = Command::new("ld");
@@ -205,6 +257,12 @@ fn prelink_native_bundle(manifest_dir: &Path, out_dir: &Path, ffi_archive: &Path
         .arg("-o")
         .arg(&bundle);
     run(&mut ld);
+
+    // Strip debug info and unneeded local symbols before localizing — the
+    // bundle ships inside the published crate, so size matters.
+    let mut strip = Command::new("objcopy");
+    strip.arg("--strip-debug").arg("--strip-unneeded").arg(&bundle);
+    run(&mut strip);
 
     let mut objcopy = Command::new("objcopy");
     objcopy

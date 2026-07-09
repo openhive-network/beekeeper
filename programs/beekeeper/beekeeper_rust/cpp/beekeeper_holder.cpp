@@ -1,6 +1,6 @@
 #include <beekeeper_rs/beekeeper_holder.hpp>
 
-#include "beekeeper_rust/src/lib.rs.h"
+#include "beekeeper/src/lib.rs.h"
 
 #include <core_minimal/memory_storage.hpp>
 

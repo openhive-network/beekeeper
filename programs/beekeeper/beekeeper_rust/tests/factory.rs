@@ -11,7 +11,7 @@
 
 mod common;
 
-use beekeeper_rust::{api::BeekeeperApi, options::BeekeeperOptions};
+use beekeeper::{api::BeekeeperApi, options::BeekeeperOptions};
 use common::{
     EXPECTED_SIG_0, KEYS, PUBKEY_KEY3, SIG_DIGEST_0, new_in_memory,
     new_persistent,

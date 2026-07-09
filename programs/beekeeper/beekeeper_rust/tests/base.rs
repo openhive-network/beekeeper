@@ -8,7 +8,7 @@
 //! We add a second test for persistent-backend construction since Rust covers
 //! both paths through one type and we want them both smoke-tested.
 
-use beekeeper_rust::{api::BeekeeperApi, options::BeekeeperOptions};
+use beekeeper::{api::BeekeeperApi, options::BeekeeperOptions};
 use tempfile::TempDir;
 
 /// Port of "Should be able to create instance of beekeeper_api".

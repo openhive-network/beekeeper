@@ -11,7 +11,7 @@
 //! # Quick start
 //!
 //! ```no_run
-//! use beekeeper_rust::{BeekeeperApi, BeekeeperOptions};
+//! use beekeeper::{BeekeeperApi, BeekeeperOptions};
 //!
 //! let mut bk = BeekeeperApi::new(
 //!     BeekeeperOptions::new("./storage_root-rust").unlock_timeout(900),
