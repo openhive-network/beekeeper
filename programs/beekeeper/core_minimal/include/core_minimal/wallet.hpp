@@ -69,6 +69,7 @@ public:
 
 private:
   void encrypt_and_save();
+  void encrypt_and_save(const std::string& password, const keys_map& keys);
 
   crypto_provider&   crypto_;
   wallet_storage*    storage_;

@@ -2,12 +2,15 @@
 
 #include <fc/crypto/elliptic.hpp>
 #include <fc/crypto/aes.hpp>
+#include <fc/crypto/hmac.hpp>
 #include <fc/crypto/sha256.hpp>
 #include <fc/crypto/sha512.hpp>
 #include <fc/crypto/ripemd160.hpp>
 #include <fc/crypto/hex.hpp>
 #include <fc/crypto/base58.hpp>
 #include <fc/crypto/rand.hpp>
+
+#include <openssl/evp.h>
 
 #include <cstring>
 #include <stdexcept>
@@ -36,8 +39,8 @@ namespace beekeeper_minimal {
 
 // ── fc_crypto_provider (just wires primitives → impl) ──────────
 
-fc_crypto_provider::fc_crypto_provider()
-  : crypto_provider_impl(prims_)
+fc_crypto_provider::fc_crypto_provider(uint32_t kdf_iterations)
+  : crypto_provider_impl(prims_, kdf_iterations)
 {
 }
 
@@ -68,6 +71,32 @@ std::array<uint8_t, 20> fc_crypto_primitives::ripemd160(const uint8_t* data, siz
   std::array<uint8_t, 20> result;
   std::memcpy(result.data(), h.data(), 20);
   return result;
+}
+
+digest_type fc_crypto_primitives::hmac_sha256(const uint8_t* key, size_t key_len,
+                                              const uint8_t* data, size_t data_len)
+{
+  fc::hmac_sha256 mac;
+  auto h = mac.digest(reinterpret_cast<const char*>(key), static_cast<uint32_t>(key_len),
+                      reinterpret_cast<const char*>(data), static_cast<uint32_t>(data_len));
+  digest_type result;
+  std::memcpy(result.data.data(), h.data(), 32);
+  return result;
+}
+
+std::vector<uint8_t> fc_crypto_primitives::pbkdf2_hmac_sha512(
+    const uint8_t* password, size_t password_len,
+    const uint8_t* salt, size_t salt_len,
+    uint32_t iterations, size_t dk_len)
+{
+  std::vector<uint8_t> out(dk_len);
+  if (PKCS5_PBKDF2_HMAC(reinterpret_cast<const char*>(password),
+                        static_cast<int>(password_len),
+                        salt, static_cast<int>(salt_len),
+                        static_cast<int>(iterations), EVP_sha512(),
+                        static_cast<int>(dk_len), out.data()) != 1)
+    throw std::runtime_error("PBKDF2 key derivation failed");
+  return out;
 }
 
 // ── AES ────────────────────────────────────────────────────────

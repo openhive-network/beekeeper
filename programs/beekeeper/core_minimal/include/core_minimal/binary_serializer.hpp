@@ -55,17 +55,19 @@ public:
 
   void pack_uint32(uint32_t v)
   {
-    // little-endian
+    // explicitly little-endian, independent of host byte order
     char tmp[4];
-    std::memcpy(tmp, &v, 4);
+    for (int i = 0; i < 4; ++i)
+      tmp[i] = static_cast<char>((v >> (8 * i)) & 0xFF);
     write(tmp, 4);
   }
 
   void pack_uint64(uint64_t v)
   {
-    // little-endian
+    // explicitly little-endian, independent of host byte order
     char tmp[8];
-    std::memcpy(tmp, &v, 8);
+    for (int i = 0; i < 8; ++i)
+      tmp[i] = static_cast<char>((v >> (8 * i)) & 0xFF);
     write(tmp, 8);
   }
 
@@ -123,6 +125,11 @@ public:
       throw std::runtime_error("binary_serializer: unexpected end of data");
   }
 
+  size_t remaining() const
+  {
+    return static_cast<size_t>(end - ptr);
+  }
+
   void read(void* dst, size_t len)
   {
     check(len);
@@ -156,15 +163,21 @@ public:
 
   uint32_t unpack_uint32()
   {
-    uint32_t v;
-    read(&v, 4);
+    uint8_t tmp[4];
+    read(tmp, 4);
+    uint32_t v = 0;
+    for (int i = 0; i < 4; ++i)
+      v |= static_cast<uint32_t>(tmp[i]) << (8 * i);
     return v;
   }
 
   uint64_t unpack_uint64()
   {
-    uint64_t v;
-    read(&v, 8);
+    uint8_t tmp[8];
+    read(tmp, 8);
+    uint64_t v = 0;
+    for (int i = 0; i < 8; ++i)
+      v |= static_cast<uint64_t>(tmp[i]) << (8 * i);
     return v;
   }
 

@@ -19,6 +19,9 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
   class_<beekeeper_api>("beekeeper_api")
 
     .constructor<val, val, uint32_t>()
+    // Optional 4th arg: PBKDF2 work factor for newly encrypted wallets
+    // (0 = library default). Decryption always honors the wallet header.
+    .constructor<val, val, uint32_t, uint32_t>()
 
     // ── session ─────────────────────────────────────────
 

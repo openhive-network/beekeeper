@@ -26,6 +26,20 @@ struct crypto_primitives
   /// RIPEMD-160 hash (20 bytes). Used for public key checksums.
   virtual std::array<uint8_t, 20> ripemd160(const uint8_t* data, size_t len) = 0;
 
+  /// HMAC-SHA256 (RFC 2104). Returns the 32-byte authentication tag.
+  /// Used for wallet-blob integrity / password verification (encrypt-then-MAC).
+  virtual digest_type hmac_sha256(const uint8_t* key, size_t key_len,
+                                  const uint8_t* data, size_t data_len) = 0;
+
+  // ── Key derivation ───────────────────────────────────────────
+
+  /// PBKDF2-HMAC-SHA512 (RFC 8018). Derives dk_len bytes from a password + salt.
+  /// Used to derive the wallet cipher/MAC keys from the wallet password.
+  virtual std::vector<uint8_t> pbkdf2_hmac_sha512(
+      const uint8_t* password, size_t password_len,
+      const uint8_t* salt, size_t salt_len,
+      uint32_t iterations, size_t dk_len) = 0;
+
   // ── AES-256-CBC (PKCS#7 padding) ────────────────────────────
 
   /// Encrypt data with AES-256-CBC + PKCS#7 padding.

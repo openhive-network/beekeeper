@@ -82,8 +82,13 @@ export class BeekeeperInstanceHelper {
     const { unlockTimeout } = BeekeeperInstanceHelper.#parseOptions(options);
     const storage = storageFns || BeekeeperInstanceHelper.createInMemoryStorage();
     const crypto = BeekeeperInstanceHelper.cryptoCallbacks;
+    // Low PBKDF2 work factor keeps the suite fast — some tests re-encrypt
+    // wallets hundreds of times. The production default is exercised by
+    // __tests__/detailed/wallet_format.ts, which constructs beekeeper_api
+    // without this argument.
+    const testKdfIterations = 1024;
     if (crypto)
-      this.#instance = new provider.beekeeper_api(storage, crypto, unlockTimeout);
+      this.#instance = new provider.beekeeper_api(storage, crypto, unlockTimeout, testKdfIterations);
     else
       this.#instance = new provider.beekeeper_api(storage, unlockTimeout);
     this.#implicitSessionToken = this.createSessionWithoutSalt();

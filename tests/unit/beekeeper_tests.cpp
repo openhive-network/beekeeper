@@ -19,6 +19,7 @@
 
 #include <beekeeper/extended_api.hpp>
 
+#include <cstring>
 #include <thread>
 #include <condition_variable>
 
@@ -1489,6 +1490,424 @@ BOOST_AUTO_TEST_CASE(is_wallet_unlocked)
 
   } FC_LOG_AND_RETHROW()
 }
+
+// ── Wallet-at-rest KDF format (v1) ─────────────────────────────
+
+namespace {
+
+constexpr char v1_magic[] = "BEEKWLT"; // 7 bytes, see crypto_provider_impl.cpp
+constexpr size_t v1_iterations_offset = 9;  // magic[7] + version + kdf_id
+constexpr size_t v1_salt_offset       = 14; // ... + iterations u32 + salt_len
+
+bool blob_has_v1_magic(const std::vector<char>& blob)
+{
+  return blob.size() >= 7 && std::memcmp(blob.data(), v1_magic, 7) == 0;
+}
+
+uint32_t blob_iterations(const std::vector<char>& blob)
+{
+  uint32_t iterations = 0;
+  std::memcpy(&iterations, blob.data() + v1_iterations_offset, 4);
+  return iterations;
+}
+
+/// Reproduces the pre-v1 wallet scheme byte-for-byte: AES-256-CBC keyed by one
+/// unsalted SHA-512 of the password, plaintext = sha512(password) || keys.
+std::vector<char> make_legacy_wallet_blob(const std::string& password,
+                                          const beekeeper_minimal::keys_map& keys)
+{
+  beekeeper_minimal::fc_crypto_primitives prims;
+  auto pw = prims.sha512(reinterpret_cast<const uint8_t*>(password.data()), password.size());
+  auto plain = beekeeper_minimal::pack_plain_keys(pw, keys);
+  auto ct = prims.aes256_cbc_encrypt(pw.data.data(), pw.data.data() + 32,
+                                     reinterpret_cast<const uint8_t*>(plain.data()), plain.size());
+  return std::vector<char>(reinterpret_cast<const char*>(ct.data()),
+                           reinterpret_cast<const char*>(ct.data()) + ct.size());
+}
+
+} // anonymous namespace
+
+BOOST_AUTO_TEST_CASE(wallet_kdf_v1_format)
+{ try {
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+
+  bk.create_wallet(_token, "v1", "pass", false);
+  auto priv = fc::ecc::private_key::generate();
+  auto wif = priv.key_to_wif();
+  bk.import_key("v1", wif, "STM");
+
+  // Stored blob is the self-describing v1 format with the provider's work factor.
+  auto blob = b_mgr.read_wallet_blob("v1");
+  BOOST_REQUIRE(blob_has_v1_magic(blob));
+  BOOST_REQUIRE_EQUAL(1, static_cast<int>(blob[7])); // format version
+  BOOST_REQUIRE_EQUAL(1, static_cast<int>(blob[8])); // kdf id: PBKDF2-HMAC-SHA512
+  BOOST_REQUIRE_EQUAL(test_utils::beekeeper_mgr::test_kdf_iterations, blob_iterations(blob));
+
+  // Wallet files are written owner-only.
+  auto perms = boost::filesystem::status(b_mgr.dir / "v1.wallet").permissions();
+  BOOST_REQUIRE_EQUAL(static_cast<int>(perms & boost::filesystem::all_all),
+                      static_cast<int>(boost::filesystem::owner_read | boost::filesystem::owner_write));
+
+  // Full persistence roundtrip.
+  bk.close_wallet("v1");
+  bk.open_wallet(_token, "v1");
+  BOOST_REQUIRE_THROW(bk.unlock("v1", "wrong"), std::exception);
+  bk.unlock("v1", "pass");
+  auto keys = bk.get_public_keys("v1");
+  BOOST_REQUIRE_EQUAL(1u, keys.size());
+  BOOST_REQUIRE_EQUAL(wif, b_mgr.crypto.key_to_wif(keys.begin()->second.first));
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_legacy_migration)
+{ try {
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+
+  // Plant a wallet file written exactly as the legacy scheme wrote it.
+  auto wif = fc::ecc::private_key::generate().key_to_wif();
+  auto priv = b_mgr.crypto.wif_to_key(wif);
+  BOOST_REQUIRE(priv.has_value());
+  auto pub = b_mgr.crypto.get_public_key(*priv);
+  beekeeper_minimal::keys_map keys;
+  keys.emplace(pub, beekeeper_minimal::key_data(*priv, "STM"));
+
+  auto legacy_blob = make_legacy_wallet_blob("legacy-pass", keys);
+  BOOST_REQUIRE(!blob_has_v1_magic(legacy_blob));
+  b_mgr.write_wallet_blob("legacy", legacy_blob);
+
+  // Wrong password on the legacy path is rejected and must not migrate.
+  bk.open_wallet(_token, "legacy");
+  BOOST_REQUIRE_THROW(bk.unlock("legacy", "wrong-legacy-pass"), std::exception);
+  BOOST_REQUIRE(!blob_has_v1_magic(b_mgr.read_wallet_blob("legacy")));
+
+  // The legacy wallet unlocks with the correct password...
+  bk.unlock("legacy", "legacy-pass");
+  auto loaded = bk.get_public_keys("legacy");
+  BOOST_REQUIRE_EQUAL(1u, loaded.size());
+  BOOST_REQUIRE_EQUAL(wif, b_mgr.crypto.key_to_wif(loaded.begin()->second.first));
+
+  // ...and the file was transparently re-encrypted with the v1 format.
+  auto migrated = b_mgr.read_wallet_blob("legacy");
+  BOOST_REQUIRE(blob_has_v1_magic(migrated));
+
+  // The migrated wallet behaves like any other: wrong password rejected,
+  // correct password recovers the same key.
+  bk.close_wallet("legacy");
+  bk.open_wallet(_token, "legacy");
+  BOOST_REQUIRE_THROW(bk.unlock("legacy", "bad"), std::exception);
+  bk.unlock("legacy", "legacy-pass");
+  loaded = bk.get_public_keys("legacy");
+  BOOST_REQUIRE_EQUAL(wif, b_mgr.crypto.key_to_wif(loaded.begin()->second.first));
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_v1_tamper_detection)
+{ try {
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+
+  bk.create_wallet(_token, "tamper", "pass", false);
+  bk.import_key("tamper", fc::ecc::private_key::generate().key_to_wif(), "STM");
+  auto good = b_mgr.read_wallet_blob("tamper");
+  bk.close_wallet("tamper");
+
+  // Flipping a single bit anywhere — salt, ciphertext or tag — must be rejected.
+  const size_t probes[] = { v1_salt_offset + 3,  // inside salt
+                            good.size() - 40,    // inside ciphertext
+                            good.size() - 1 };   // inside HMAC tag
+  for (auto pos : probes)
+  {
+    auto bad = good;
+    bad[pos] = static_cast<char>(bad[pos] ^ 0x01);
+    b_mgr.write_wallet_blob("tamper", bad);
+    bk.open_wallet(_token, "tamper");
+    BOOST_REQUIRE_THROW(bk.unlock("tamper", "pass"), std::exception);
+    bk.close_wallet("tamper");
+  }
+
+  // The untampered blob still unlocks.
+  b_mgr.write_wallet_blob("tamper", good);
+  bk.open_wallet(_token, "tamper");
+  bk.unlock("tamper", "pass");
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_v1_salt_uniqueness)
+{ try {
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+
+  // Identical password and identical (empty) key set must never produce
+  // identical files — salt and IV are drawn fresh for every encryption.
+  bk.create_wallet(_token, "salt_a", "same-pass", false);
+  bk.create_wallet(_token, "salt_b", "same-pass", false);
+  auto blob_a = b_mgr.read_wallet_blob("salt_a");
+  auto blob_b = b_mgr.read_wallet_blob("salt_b");
+  BOOST_REQUIRE(blob_a != blob_b);
+
+  // Re-encrypting the same wallet refreshes the salt as well.
+  bk.import_key("salt_a", fc::ecc::private_key::generate().key_to_wif(), "STM");
+  auto blob_a2 = b_mgr.read_wallet_blob("salt_a");
+  BOOST_REQUIRE(!std::equal(blob_a.begin() + v1_salt_offset, blob_a.begin() + v1_salt_offset + 16,
+                            blob_a2.begin() + v1_salt_offset));
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_v1_kdf_iteration_bounds)
+{ try {
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+
+  bk.create_wallet(_token, "bounds", "pass", false);
+  auto good = b_mgr.read_wallet_blob("bounds");
+  bk.close_wallet("bounds");
+
+  // Iteration counts of zero or beyond the sanity cap are rejected while the
+  // header is parsed — before any KDF work is attempted, so a hostile file
+  // cannot turn unlock into a multi-minute stall. The message assertion pins
+  // the parse-time rejection: a KDF/MAC failure would say "Invalid password".
+  auto is_iteration_range_error = [](const std::exception& e) {
+    return std::string(e.what()).find("iteration count out of range") != std::string::npos;
+  };
+  for (uint32_t bad_iterations : { 0u, 10'000'001u, 0xFFFFFFFFu })
+  {
+    auto bad = good;
+    std::memcpy(bad.data() + v1_iterations_offset, &bad_iterations, 4);
+    b_mgr.write_wallet_blob("bounds", bad);
+    bk.open_wallet(_token, "bounds");
+    BOOST_REQUIRE_EXCEPTION(bk.unlock("bounds", "pass"), std::exception, is_iteration_range_error);
+    bk.close_wallet("bounds");
+  }
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_v1_header_rejections)
+{ try {
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+
+  bk.create_wallet(_token, "hdr", "pass", false);
+  auto good = b_mgr.read_wallet_blob("hdr");
+  bk.close_wallet("hdr");
+
+  auto expect_rejection = [&](std::vector<char> bad, const std::string& message_part)
+  {
+    b_mgr.write_wallet_blob("hdr", bad);
+    bk.open_wallet(_token, "hdr");
+    BOOST_REQUIRE_EXCEPTION(bk.unlock("hdr", "pass"), std::exception,
+      [&](const std::exception& e) {
+        return std::string(e.what()).find(message_part) != std::string::npos;
+      });
+    bk.close_wallet("hdr");
+  };
+
+  // Every unknown/invalid header field is rejected with a distinct error,
+  // before any KDF work.
+  { auto bad = good; bad[7]  = 2;   expect_rejection(bad, "format version"); }
+  { auto bad = good; bad[8]  = 2;   expect_rejection(bad, "Unsupported wallet KDF"); }
+  { auto bad = good; bad[13] = 7;   expect_rejection(bad, "salt length out of range"); }
+  { auto bad = good; bad[13] = 65;  expect_rejection(bad, "salt length out of range"); }
+  { auto bad = good; bad[30] = 15;  expect_rejection(bad, "IV length invalid"); }
+  { auto bad = good; bad.resize(60);            expect_rejection(bad, "truncated"); }
+  { auto bad = good; bad.resize(47 + 32 + 17);  expect_rejection(bad, "ciphertext length invalid"); }
+
+  // The pristine blob still unlocks after all those rejections.
+  b_mgr.write_wallet_blob("hdr", good);
+  bk.open_wallet(_token, "hdr");
+  bk.unlock("hdr", "pass");
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_legacy_empty_password)
+{ try {
+  // Historical beekeeper allowed creating wallets with an explicitly empty
+  // password. Such wallets must keep unlocking, migrate cleanly, and stay
+  // writable afterwards.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+
+  auto wif = fc::ecc::private_key::generate().key_to_wif();
+  auto priv = b_mgr.crypto.wif_to_key(wif);
+  BOOST_REQUIRE(priv.has_value());
+  beekeeper_minimal::keys_map keys;
+  keys.emplace(b_mgr.crypto.get_public_key(*priv), beekeeper_minimal::key_data(*priv, "STM"));
+
+  b_mgr.write_wallet_blob("legacy_empty", make_legacy_wallet_blob("", keys));
+
+  bk.open_wallet(_token, "legacy_empty");
+  bk.unlock("legacy_empty", "");
+  BOOST_REQUIRE_EQUAL(1u, bk.get_public_keys("legacy_empty").size());
+  BOOST_REQUIRE(blob_has_v1_magic(b_mgr.read_wallet_blob("legacy_empty")));
+
+  // State-changing operations (each re-encrypts) still work...
+  bk.import_key("legacy_empty", fc::ecc::private_key::generate().key_to_wif(), "STM");
+  BOOST_REQUIRE_EQUAL(2u, bk.get_public_keys("legacy_empty").size());
+
+  // ...and the migrated v1 wallet unlocks with the empty password again.
+  bk.close_wallet("legacy_empty");
+  bk.open_wallet(_token, "legacy_empty");
+  BOOST_REQUIRE_THROW(bk.unlock("legacy_empty", "not-empty"), std::exception);
+  bk.unlock("legacy_empty", "");
+  BOOST_REQUIRE_EQUAL(2u, bk.get_public_keys("legacy_empty").size());
+
+} FC_LOG_AND_RETHROW() }
+
+namespace {
+
+/// Storage wrapper whose save() can be switched to fail — simulates a
+/// read-only wallet dir without depending on filesystem permissions
+/// (which do not stop root, e.g. in CI containers).
+struct failing_save_storage final : public beekeeper_minimal::wallet_storage
+{
+  beekeeper_minimal::wallet_storage& inner;
+  bool fail_save = true;
+
+  explicit failing_save_storage(beekeeper_minimal::wallet_storage& s) : inner(s) {}
+
+  void save(const std::string& path, const std::vector<char>& buffer) override
+  {
+    if (fail_save)
+      throw std::runtime_error("storage unavailable");
+    inner.save(path, buffer);
+  }
+  std::vector<char> load(const std::string& path) override { return inner.load(path); }
+  bool scan_dir(const std::string& wallet_name) override { return inner.scan_dir(wallet_name); }
+};
+
+} // anonymous namespace
+
+BOOST_AUTO_TEST_CASE(wallet_legacy_migration_storage_failure)
+{ try {
+  // Migration is opportunistic: when storage cannot be written, unlocking a
+  // legacy wallet must still succeed, leave the file untouched, and retry the
+  // migration on a later unlock once storage works again.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto wif = fc::ecc::private_key::generate().key_to_wif();
+  auto priv = b_mgr.crypto.wif_to_key(wif);
+  BOOST_REQUIRE(priv.has_value());
+  beekeeper_minimal::keys_map keys;
+  keys.emplace(b_mgr.crypto.get_public_key(*priv), beekeeper_minimal::key_data(*priv, "STM"));
+
+  b_mgr.write_wallet_blob("legacy_ro", make_legacy_wallet_blob("pass", keys));
+
+  failing_save_storage storage(*b_mgr.storage);
+  beekeeper_minimal::wallet w(b_mgr.crypto, &storage, "legacy_ro");
+  w.open();
+  w.unlock("pass");
+  BOOST_REQUIRE(!w.is_locked());
+  BOOST_REQUIRE_EQUAL(1u, w.get_keys().size());
+  BOOST_REQUIRE(!blob_has_v1_magic(b_mgr.read_wallet_blob("legacy_ro"))); // untouched
+
+  // Storage recovers: the next unlock performs the migration.
+  storage.fail_save = false;
+  w.lock();
+  w.unlock("pass");
+  BOOST_REQUIRE_EQUAL(1u, w.get_keys().size());
+  BOOST_REQUIRE(blob_has_v1_magic(b_mgr.read_wallet_blob("legacy_ro")));
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_v1_external_fixture)
+{ try {
+  // Fixtures generated by an independent reference implementation (python
+  // hashlib/hmac + openssl CLI); shared with the WASM test suite
+  // (__tests__/detailed/wallet_format.ts). Unlocking them proves the C++
+  // implementation interoperates with the documented format, not just with
+  // itself. Password "fixture-pass", one imported key.
+  const std::string fixture_password = "fixture-pass";
+  const std::string fixture_pub = "STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh";
+  const std::string legacy_hex =
+    "23279e80bad106e06b60ee11322d79f92e2dd72eed60bcba837b05f90e50128ef0cf23d2ed81afcbee559a5c2acccd06"
+    "43e5a21d60ba61c7b2f6ed78a29e98403085382f536bf197c60af92641e71662eaf531e166ce07ba3fb1143d3bed942e"
+    "daaced3e1e6b30e5d5f33521b67cc58874cb617f6d9c7dd56caad67a10ef8940c500d816facf721cb8e610dd986d277e";
+  const std::string v1_hex =
+    "4245454b574c5401010010000010000102030405060708090a0b0c0d0e0f10101112131415161718191a1b1c1d1e1f"
+    "67edcb46992feedbfab1e8849069a75d14e89bca7c154384de797b7b49c51e078100080657f8b5dbe2052911dae498"
+    "db1845bb40f9d9dc4ce80a21756258fc716f2dc2566863028f82b442b43d73301fca2753d806abc28fbb1cad32c167"
+    "ebc467b0696442b2ca669ac534bc17311856";
+  // Same wallet, but with a 32-byte salt — exercises variable-salt-length parsing.
+  const std::string v1_salt32_hex =
+    "4245454b574c5401010010000020202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f10"
+    "404142434445464748494a4b4c4d4e4f216d7ca85bdf59bf8353a3cf6d5602f113a9b5a5e08a2ebecabc3c8430035b"
+    "99bcb9faef160dccc3b55bbbb55807029ad9d7af21841406d1ee542626109537c4c5651c7a7edf98184a4004406cf9"
+    "a364450de7dfbc2405a646065dafcf0dff690fc0d4710e033ddfd6cc50bd03e45882";
+
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+
+  for (const auto& [name, hex] : { std::pair<std::string, std::string>{"fixture_legacy", legacy_hex},
+                                   std::pair<std::string, std::string>{"fixture_v1", v1_hex},
+                                   std::pair<std::string, std::string>{"fixture_v1_salt32", v1_salt32_hex} })
+  {
+    b_mgr.write_wallet_blob(name, beekeeper_minimal::hex_decode(hex));
+    bk.open_wallet(_token, name);
+    bk.unlock(name, fixture_password);
+    auto keys = bk.get_public_keys(name);
+    BOOST_REQUIRE_EQUAL(1u, keys.size());
+    BOOST_REQUIRE_EQUAL(fixture_pub,
+      b_mgr.crypto.public_key_to_string(keys.begin()->first, keys.begin()->second.second));
+  }
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_default_kdf_profile)
+{ try {
+  // One end-to-end pass with the production work factor, so the default
+  // parameters stay exercised even though the rest of the suite lowers them.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  beekeeper_minimal::fc_crypto_provider default_crypto;
+  beekeeper_minimal::beekeeper bk(default_crypto, *b_mgr.storage, 900);
+  auto _token = bk.create_session();
+
+  bk.create_wallet(_token, "prod", "pass", false);
+  auto blob = b_mgr.read_wallet_blob("prod");
+  BOOST_REQUIRE(blob_has_v1_magic(blob));
+  BOOST_REQUIRE_EQUAL(beekeeper_minimal::crypto_provider_impl::default_kdf_iterations,
+                      blob_iterations(blob));
+  bk.lock("prod");
+  bk.unlock("prod", "pass");
+
+  // Wallets are self-describing: one written with a different work factor
+  // (the fast test profile) unlocks fine under the default provider.
+  {
+    auto bk_fast = b_mgr.create_beekeeper();
+    auto _token_fast = bk_fast.create_session();
+    bk_fast.create_wallet(_token_fast, "fast", "pass2", false);
+  }
+  bk.open_wallet(_token, "fast");
+  bk.unlock("fast", "pass2");
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
 #endif
