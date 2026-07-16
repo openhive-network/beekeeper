@@ -12,8 +12,10 @@
 /// JS object must provide:
 ///   sha256(data: Uint8Array): Promise<Uint8Array>         // → 32 bytes
 ///   sha512(data: Uint8Array): Promise<Uint8Array>         // → 64 bytes
+///   hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uint8Array>  // → 32 bytes
 ///   aes256CbcEncrypt(key32, iv16, data): Promise<Uint8Array>
 ///   aes256CbcDecrypt(key32, iv16, data): Promise<Uint8Array>
+///   pbkdf2HmacSha512(password, salt, iterations, dkLen): Promise<Uint8Array>
 
 #include <core_minimal/crypto_provider_impl.hpp>
 #include <core_minimal/crypto_primitives.hpp>
@@ -34,6 +36,13 @@ public:
 
   beekeeper_minimal::digest_type sha256(const uint8_t* data, size_t len) override;
   beekeeper_minimal::sha512_hash sha512(const uint8_t* data, size_t len) override;
+  beekeeper_minimal::digest_type hmac_sha256(const uint8_t* key, size_t key_len,
+                                             const uint8_t* data, size_t data_len) override;
+
+  std::vector<uint8_t> pbkdf2_hmac_sha512(
+      const uint8_t* password, size_t password_len,
+      const uint8_t* salt, size_t salt_len,
+      uint32_t iterations, size_t dk_len) override;
 
   std::vector<uint8_t> aes256_cbc_encrypt(
       const uint8_t* key, const uint8_t* iv,
@@ -96,7 +105,9 @@ class wasm_crypto_provider final
   , public  beekeeper_minimal::crypto_provider_impl
 {
 public:
-  explicit wasm_crypto_provider(emscripten::val crypto_obj);
+  /// @param kdf_iterations  PBKDF2 work factor for newly encrypted wallets;
+  ///                        0 selects the library default.
+  explicit wasm_crypto_provider(emscripten::val crypto_obj, uint32_t kdf_iterations = 0);
 };
 
 } // namespace beekeeper_wasm

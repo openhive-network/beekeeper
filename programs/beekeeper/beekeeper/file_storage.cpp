@@ -21,14 +21,42 @@ boost::filesystem::path file_storage::wallet_path(const std::string& name) const
 
 void file_storage::save(const std::string& name, const std::vector<char>& buffer)
 {
+  // Write to a temp file and rename it over the target, so an interrupted
+  // save (crash, full disk) cannot leave a truncated wallet — the wallet file
+  // is the only copy of the user's keys. No fsync: imports save once per key,
+  // and a per-save fsync makes bulk imports several times slower; rename
+  // atomicity covers process crashes, which is the realistic risk here.
   auto path = wallet_path(name);
-  std::ofstream ofs(path.string(), std::ios::binary | std::ios::trunc);
-  if (!ofs)
-    throw std::runtime_error("Cannot write wallet file: " + path.string());
+  auto tmp_path = path;
+  tmp_path += ".tmp";
 
-  ofs.write(buffer.data(), buffer.size());
-  if (!ofs)
-    throw std::runtime_error("Error writing wallet file: " + path.string());
+  {
+    std::ofstream ofs(tmp_path.string(), std::ios::binary | std::ios::trunc);
+    if (!ofs)
+      throw std::runtime_error("Cannot write wallet file: " + tmp_path.string());
+
+    ofs.write(buffer.data(), buffer.size());
+    ofs.flush();
+    if (!ofs)
+    {
+      ofs.close();
+      boost::system::error_code ec;
+      bfs::remove(tmp_path, ec);
+      throw std::runtime_error("Error writing wallet file: " + tmp_path.string());
+    }
+  }
+
+  // Wallet files hold encrypted keys — keep them owner-only. Set on the tmp
+  // file so the permissions are in place before the file becomes the wallet.
+  boost::system::error_code ec;
+  bfs::permissions(tmp_path, bfs::owner_read | bfs::owner_write, ec);
+
+  bfs::rename(tmp_path, path, ec);
+  if (ec)
+  {
+    bfs::remove(tmp_path, ec);
+    throw std::runtime_error("Cannot replace wallet file: " + path.string());
+  }
 }
 
 std::vector<char> file_storage::load(const std::string& name)

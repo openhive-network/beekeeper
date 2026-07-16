@@ -6,3 +6,4 @@ import "./detailed/beekeeper_api";
 import "./detailed/edge_cases";
 import "./detailed/storage";
 import "./detailed/csp";
+import "./detailed/wallet_format";

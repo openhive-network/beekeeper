@@ -15,9 +15,10 @@ namespace beekeeper_wasm {
 
 // ── wasm_crypto_provider (wires primitives → impl) ────────────
 
-wasm_crypto_provider::wasm_crypto_provider(val crypto_obj)
+wasm_crypto_provider::wasm_crypto_provider(val crypto_obj, uint32_t kdf_iterations)
   : wasm_crypto_provider_prims_holder(std::move(crypto_obj))
-  , crypto_provider_impl(wasm_crypto_provider_prims_holder::prims_)
+  , crypto_provider_impl(wasm_crypto_provider_prims_holder::prims_,
+                         kdf_iterations == 0 ? default_kdf_iterations : kdf_iterations)
 {
 }
 
@@ -27,6 +28,15 @@ wasm_crypto_primitives::wasm_crypto_primitives(val crypto_obj)
   : crypto_(std::move(crypto_obj))
   , secp_ctx_(secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY))
 {
+  // Fail fast at construction (synchronously, outside any Asyncify chain) if
+  // the callback object misses a required method — calling a missing method
+  // later would raise a JS TypeError mid-await and abort the WASM instance.
+  for (const char* method : { "sha256", "sha512", "hmacSha256", "aes256CbcEncrypt",
+                              "aes256CbcDecrypt", "pbkdf2HmacSha512", "getRandomBytes" })
+  {
+    if (crypto_[method].typeOf().as<std::string>() != "function")
+      throw std::runtime_error(std::string("crypto callbacks object is missing method: ") + method);
+  }
 }
 
 wasm_crypto_primitives::~wasm_crypto_primitives()
@@ -76,6 +86,46 @@ beekeeper_minimal::sha512_hash wasm_crypto_primitives::sha512(const uint8_t* dat
   auto promise = crypto_.call<val>("sha512", to_js_array(data, len));
   auto result = promise.await();
   return from_js_fixed<64>(result);
+}
+
+beekeeper_minimal::digest_type wasm_crypto_primitives::hmac_sha256(
+    const uint8_t* key, size_t key_len,
+    const uint8_t* data, size_t data_len)
+{
+  auto promise = crypto_.call<val>("hmacSha256",
+    to_js_array(key, key_len),
+    to_js_array(data, data_len));
+  auto result = promise.await();
+
+  // JS returns null on failure — a rejected Promise would abort the WASM
+  // instance (val::await() has no rejection handler), same as aes decrypt.
+  if (result.isNull())
+    throw std::runtime_error("HMAC computation failed");
+  if (result["length"].as<unsigned>() != 32)
+    throw std::runtime_error("HMAC returned unexpected length");
+
+  return from_js_fixed<32>(result);
+}
+
+std::vector<uint8_t> wasm_crypto_primitives::pbkdf2_hmac_sha512(
+    const uint8_t* password, size_t password_len,
+    const uint8_t* salt, size_t salt_len,
+    uint32_t iterations, size_t dk_len)
+{
+  auto promise = crypto_.call<val>("pbkdf2HmacSha512",
+    to_js_array(password, password_len),
+    to_js_array(salt, salt_len),
+    static_cast<double>(iterations),
+    static_cast<double>(dk_len));
+  auto result = promise.await();
+
+  if (result.isNull())
+    throw std::runtime_error("PBKDF2 key derivation failed");
+
+  auto out = from_js_vector(result);
+  if (out.size() != dk_len)
+    throw std::runtime_error("PBKDF2 returned unexpected length");
+  return out;
 }
 
 std::vector<uint8_t> wasm_crypto_primitives::aes256_cbc_encrypt(

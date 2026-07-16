@@ -16,12 +16,17 @@ const std::string& wallet::get_name() const { return name_; }
 
 void wallet::encrypt_and_save()
 {
-  wallet_data_.cipher_keys = crypto_.encrypt_wallet_keys(password_, keys_);
+  encrypt_and_save(password_, keys_);
+}
+
+void wallet::encrypt_and_save(const std::string& password, const keys_map& keys)
+{
+  auto cipher_keys = crypto_.encrypt_wallet_keys(password, keys);
 
   if (storage_)
   {
     // Serialize cipher_keys as the wallet file format: JSON hex string "abcd..."
-    auto hex = hex_encode(wallet_data_.cipher_keys);
+    auto hex = hex_encode(cipher_keys);
     std::vector<char> buf;
     buf.reserve(hex.size() + 2);
     buf.push_back('"');
@@ -29,6 +34,10 @@ void wallet::encrypt_and_save()
     buf.push_back('"');
     storage_->save(name_, buf);
   }
+
+  // Assign only after a successful save, so the in-memory blob never gets
+  // ahead of the stored one when save throws.
+  wallet_data_.cipher_keys = std::move(cipher_keys);
 }
 
 // ── lifecycle ────────────────────────────────────────────────
@@ -60,8 +69,27 @@ void wallet::unlock(const std::string& password)
     throw std::runtime_error("Wallet is already unlocked: " + name_);
 
   // decrypt_wallet_data throws on bad password
-  keys_ = crypto_.decrypt_wallet_data(password, wallet_data_.cipher_keys);
+  auto keys = crypto_.decrypt_wallet_data(password, wallet_data_.cipher_keys);
 
+  // Transparently re-encrypt legacy (unsalted SHA-512) wallets with the
+  // current format on the first successful unlock. This happens before the
+  // unlocked state is exposed: an error that escapes (in the WASM build a JS
+  // storage exception bypasses C++ catch blocks) then leaves the wallet
+  // consistently locked instead of half-unlocked. Migration stays
+  // opportunistic - with unavailable storage (e.g. read-only wallet dir) the
+  // wallet still unlocks and the file stays legacy; a future unlock retries.
+  if (crypto_.is_legacy_wallet(wallet_data_.cipher_keys))
+  {
+    try
+    {
+      encrypt_and_save(password, keys);
+    }
+    catch (...)
+    {
+    }
+  }
+
+  keys_ = std::move(keys);
   password_ = password;
   unlocked_ = true;
 }
