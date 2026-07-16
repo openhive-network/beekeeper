@@ -50,7 +50,13 @@ bool js_callback_storage::scan_dir(const std::string& wallet_name)
 // ── beekeeper_api ──────────────────────────────────────────
 
 beekeeper_api::beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout)
-  : crypto_(std::move(crypto))
+  : beekeeper_api(std::move(storage), std::move(crypto), unlock_timeout, 0)
+{
+}
+
+beekeeper_api::beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout,
+                             uint32_t kdf_iterations)
+  : crypto_(std::move(crypto), kdf_iterations)
   , storage_(std::move(storage))
   , bk_(crypto_, storage_, unlock_timeout)
 {

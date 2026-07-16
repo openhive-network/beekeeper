@@ -81,6 +81,10 @@ struct crypto_provider
       const std::string& password,
       const std::vector<char>& cipher_keys) = 0;
 
+  /// True if the blob uses the legacy (unsalted SHA-512) format and should be
+  /// re-encrypted with the current scheme on the next successful unlock.
+  virtual bool is_legacy_wallet(const std::vector<char>& cipher_keys) const = 0;
+
   // ── ECDH encrypt / decrypt ─────────────────────────────────
 
   /// Encrypt a message using ECDH shared secret.

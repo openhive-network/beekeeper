@@ -1,8 +1,8 @@
 /**
  * Async cryptographic callbacks for the WASM beekeeper module.
  *
- * Only hash and AES operations remain as JS callbacks — secp256k1, RIPEMD-160,
- * and Base58 are compiled natively into the WASM binary.
+ * Only hash, HMAC, KDF and AES operations remain as JS callbacks — secp256k1,
+ * RIPEMD-160, and Base58 are compiled natively into the WASM binary.
  *
  * All methods return Promises (backed by SubtleCrypto). The C++ side unwraps
  * them via emscripten::val::await() with Asyncify enabled.
@@ -15,8 +15,12 @@
 export interface ICryptoCallbacks {
   sha256(data: Uint8Array): Promise<Uint8Array>;
   sha512(data: Uint8Array): Promise<Uint8Array>;
+  /** HMAC-SHA256 tag (32 bytes). Returns null on failure (never rejects). */
+  hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uint8Array | null>;
   aes256CbcEncrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Promise<Uint8Array>;
   aes256CbcDecrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Promise<Uint8Array | null>;
+  /** PBKDF2-HMAC-SHA512: derive dkLen bytes. Returns null on failure (never rejects). */
+  pbkdf2HmacSha512(password: Uint8Array, salt: Uint8Array, iterations: number, dkLen: number): Promise<Uint8Array | null>;
   /** Fill the provided WASM memory view with cryptographically secure random bytes (in place). */
   getRandomBytes(dest: Uint8Array): void;
 }
@@ -33,6 +37,18 @@ export function createCryptoCallbacks(): ICryptoCallbacks {
 
     async sha512(data: Uint8Array): Promise<Uint8Array> {
       return new Uint8Array(await crypto.subtle.digest('SHA-512', data as Uint8Array<ArrayBuffer>));
+    },
+
+    async hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uint8Array | null> {
+      // Must never reject: Emscripten's Asyncify val::await() has no rejection
+      // handler, so a rejected Promise aborts the WASM instance (see
+      // aes256CbcDecrypt below). Return null and let C++ throw.
+      try {
+        const cryptoKey = await crypto.subtle.importKey('raw', key as Uint8Array<ArrayBuffer>, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        return new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, data as Uint8Array<ArrayBuffer>));
+      } catch {
+        return null;
+      }
     },
 
     async aes256CbcEncrypt(key: Uint8Array, iv: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
@@ -52,6 +68,27 @@ export function createCryptoCallbacks(): ICryptoCallbacks {
       try {
         const cryptoKey = await crypto.subtle.importKey('raw', key as Uint8Array<ArrayBuffer>, 'AES-CBC', false, ['decrypt']);
         return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv as Uint8Array<ArrayBuffer> }, cryptoKey, data as Uint8Array<ArrayBuffer>));
+      } catch {
+        return null;
+      }
+    },
+
+    async pbkdf2HmacSha512(password: Uint8Array, salt: Uint8Array, iterations: number, dkLen: number): Promise<Uint8Array | null> {
+      // Runs only at wallet unlock/save — never on the signing path.
+      // Must never reject (see hmacSha256 above).
+      try {
+        // Some WebCrypto implementations reject zero-length raw keys. HMAC
+        // zero-pads keys to the block size, so an empty PBKDF2 password is by
+        // construction equivalent to a single zero byte — substitute it to
+        // keep historical empty-password wallets working.
+        const passwordKey = password.length === 0 ? new Uint8Array(1) : password;
+        const baseKey = await crypto.subtle.importKey('raw', passwordKey as Uint8Array<ArrayBuffer>, 'PBKDF2', false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits(
+          { name: 'PBKDF2', hash: 'SHA-512', salt: salt as Uint8Array<ArrayBuffer>, iterations },
+          baseKey,
+          dkLen * 8
+        );
+        return new Uint8Array(bits);
       } catch {
         return null;
       }

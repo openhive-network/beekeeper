@@ -37,9 +37,15 @@ class beekeeper_api final
 {
 public:
   /// @param storage         JS object: { save_fn, load_fn, list_dir_fn }
-  /// @param crypto          JS object with async hash/AES methods
+  /// @param crypto          JS object with async hash/AES/KDF methods
   /// @param unlock_timeout  Inactivity timeout in seconds (default 900)
   beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout);
+
+  /// Same, with an explicit PBKDF2 work factor for newly encrypted wallets
+  /// (0 = library default). Lets tests and constrained targets pick a
+  /// lighter profile; decryption always honors the wallet header.
+  beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout,
+                uint32_t kdf_iterations);
 
   // ── session ──────────────────────────────────────────────
 

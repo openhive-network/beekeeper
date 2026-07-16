@@ -12,8 +12,19 @@ namespace beekeeper_minimal {
 class crypto_provider_impl : public crypto_provider
 {
 public:
-  /// @param prims  Low-level crypto primitives (ownership NOT taken).
-  explicit crypto_provider_impl(crypto_primitives& prims);
+  /// PBKDF2-HMAC-SHA512 work factor written into newly encrypted wallets.
+  /// ~0.2-0.5 s on current hardware; stored in the wallet header, so existing
+  /// wallets keep the parameters they were encrypted with.
+  static constexpr uint32_t default_kdf_iterations = 600'000;
+
+  /// Upper bound accepted when parsing a wallet header. Protects against a
+  /// corrupted/hostile file turning unlock into a multi-minute stall.
+  static constexpr uint32_t max_kdf_iterations = 10'000'000;
+
+  /// @param prims           Low-level crypto primitives (ownership NOT taken).
+  /// @param kdf_iterations  PBKDF2 work factor for newly encrypted wallets.
+  explicit crypto_provider_impl(crypto_primitives& prims,
+                                uint32_t kdf_iterations = default_kdf_iterations);
 
   // ── crypto_provider interface (all implemented) ──────────────
 
@@ -40,6 +51,7 @@ public:
       const std::vector<char>& wallet_file_content) override;
   void validate_password(
       const std::string& password, const std::vector<char>& cipher_keys) override;
+  bool is_legacy_wallet(const std::vector<char>& cipher_keys) const override;
 
   std::string ecdh_encrypt(
       const private_key_type& from_key, const public_key_type& to_key,
@@ -61,6 +73,16 @@ private:
 
   /// SHA512(pack(nonce) || shared_secret) — matches FC's generate_encrypted_key
   sha512_hash generate_encrypted_key(uint64_t nonce, const sha512_hash& shared_secret);
+
+  /// Current wallet format: salted PBKDF2-HMAC-SHA512 + AES-256-CBC + HMAC-SHA256 tag.
+  std::vector<char> encrypt_wallet_keys_v1(const std::string& password, const keys_map& keys);
+  keys_map decrypt_wallet_data_v1(const std::string& password, const std::vector<char>& cipher_keys);
+
+  /// Legacy format: unsalted SHA-512 of the password as AES key+IV, no MAC.
+  /// Kept for reading wallets created before the v1 format; never written.
+  keys_map decrypt_wallet_data_legacy(const std::string& password, const std::vector<char>& cipher_keys);
+
+  uint32_t kdf_iterations_;
 };
 
 } // namespace beekeeper_minimal
