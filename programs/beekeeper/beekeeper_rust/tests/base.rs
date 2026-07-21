@@ -32,3 +32,10 @@ fn can_create_beekeeper_api_persistent() {
         tmp.path().to_str().expect("utf8 path"),
     ));
 }
+
+/// Rust-only addition: `new(None)` falls back to `BeekeeperOptions::default()`,
+/// matching the TS factory called without arguments.
+#[test]
+fn can_create_beekeeper_api_with_default_options() {
+    let _bk = BeekeeperApi::new(None);
+}

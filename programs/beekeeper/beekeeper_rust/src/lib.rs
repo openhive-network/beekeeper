@@ -11,18 +11,16 @@
 //! # Quick start
 //!
 //! ```no_run
-//! use beekeeper::{BeekeeperApi, BeekeeperOptions};
+//! use beekeeper::prelude::*;
 //!
-//! let mut bk = BeekeeperApi::new(
+//! let bk = BeekeeperApi::new(
 //!     BeekeeperOptions::new("./storage_root-rust").unlock_timeout(900),
 //! );
-//! let token = bk.create_session().unwrap();
-//! let created = bk.session(&token)
-//!     .create_wallet("my-wallet", Some("password"), None)
-//!     .unwrap();
-//! let mut wallet = created.wallet;
-//! let pubkey = wallet.import_key("5J...wif...").unwrap();
-//! let sig = wallet.sign_digest(&pubkey, "deadbeef...").unwrap();
+//! let session = bk.create_session().unwrap();
+//! let mut created = session.create_wallet("my-wallet", "password").unwrap();
+//! let pubkey = created.import_key("5J...wif...").unwrap();
+//! let sig = created.sign_digest(&pubkey, "deadbeef...").unwrap();
+//! // Dropping `session` locks its wallets and closes the session.
 //! ```
 //!
 //! # Mapping to the TypeScript package
@@ -49,7 +47,11 @@
 //!   because WASM dispatches them on a worker.
 //! - **No `salt` for `create_session`.** TS requires a salt string; the C++
 //!   holder used here derives its own token, so the Rust signature drops the
-//!   parameter.
+//!   parameter. `create_session` also returns the [`session::Session`] value
+//!   itself instead of a token.
+//! - **Sessions close on `Drop`.** TS requires an explicit `session.close()`;
+//!   the Rust [`session::Session`] is a guard that locks its wallets and
+//!   closes itself when it goes out of scope.
 //! - **No injectable storage / crypto callbacks.** TS lets callers supply
 //!   `IStorageCallbacks` / `ICryptoCallbacks`; Rust always uses the bundled
 //!   filesystem-backed [`storage::RustStorageProtocol`] and the FC-backed
@@ -83,6 +85,22 @@ pub use api::BeekeeperApi;
 pub use errors::BeekeeperError;
 pub use options::BeekeeperOptions;
 pub use storage::{RustStorageProtocol, new_rust_storage_protocol};
+
+/// One-line import for everything the README examples use.
+///
+/// ```no_run
+/// use beekeeper::prelude::*;
+/// ```
+pub mod prelude {
+    pub use crate::api::BeekeeperApi;
+    pub use crate::errors::BeekeeperError;
+    pub use crate::options::{BeekeeperOptions, DEFAULT_STORAGE_ROOT};
+    pub use crate::session::{Session, SessionInfo};
+    pub use crate::wallet::{
+        CreatedWallet, DEFAULT_KEY_PREFIX, LockedWallet, UnlockedWallet,
+        WalletInfo,
+    };
+}
 
 /// `cxx`-generated FFI between Rust and the C++ `beekeeper_rs::beekeeper_holder`.
 ///

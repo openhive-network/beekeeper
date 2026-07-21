@@ -10,23 +10,16 @@ use common::{KEYS, new_in_memory, new_persistent};
 // "Should be able to open and unlock a previously created wallet via openWallet"
 #[test]
 fn create_close_then_open_and_unlock() {
-    let mut bk = new_persistent();
-    let token = bk.api.create_session().unwrap();
+    let bk = new_persistent();
+    let session = bk.api.create_session().unwrap();
     // Create + close
     {
-        let mut wallet = bk
-            .api
-            .session(&token)
-            .create_wallet("w0", Some("otherpass"), None)
-            .unwrap()
-            .wallet;
+        let mut wallet = session.create_wallet("w0", "otherpass").unwrap();
         wallet.import_key(KEYS[0].0).unwrap();
         wallet.close().unwrap();
     }
     // Re-open + unlock
-    let mut unlocked = bk
-        .api
-        .session(&token)
+    let mut unlocked = session
         .open_wallet("w0")
         .unwrap()
         .unlock("otherpass")
@@ -38,36 +31,24 @@ fn create_close_then_open_and_unlock() {
 // "Should be able to lock all wallets via session.lockAll"
 #[test]
 fn lock_all_locks_session_wallets() {
-    let mut bk = new_in_memory();
-    let token = bk.api.create_session().unwrap();
+    let bk = new_in_memory();
+    let session = bk.api.create_session().unwrap();
 
-    let mut w0 = bk
-        .api
-        .session(&token)
-        .create_wallet("w0", Some("pass0"), None)
-        .unwrap()
-        .wallet;
+    let mut w0 = session.create_wallet("w0", "pass0").unwrap().wallet;
     w0.import_key(KEYS[0].0).unwrap();
     let _locked0 = w0.lock().unwrap();
 
-    let mut w1 = bk
-        .api
-        .session(&token)
-        .create_wallet("w1", Some("pass1"), None)
-        .unwrap()
-        .wallet;
+    let mut w1 = session.create_wallet("w1", "pass1").unwrap().wallet;
     w1.import_key(KEYS[1].0).unwrap();
     let _locked1 = w1.lock().unwrap();
 
     // Now re-open one, leave unlocked, lock_all and verify
-    let _ = bk
-        .api
-        .session(&token)
+    let _ = session
         .open_wallet("w0")
         .unwrap()
         .unlock("pass0")
         .unwrap();
-    let locked_listing = bk.api.session(&token).lock_all().unwrap();
+    let locked_listing = session.lock_all().unwrap();
     assert!(locked_listing.iter().all(|w| !w.unlocked));
     assert!(locked_listing.iter().any(|w| w.name == "w0"));
 }
@@ -75,14 +56,9 @@ fn lock_all_locks_session_wallets() {
 // "Should be able to lock and unlock a wallet via the high-level API"
 #[test]
 fn lock_then_unlock_recovers_keys() {
-    let mut bk = new_persistent();
-    let token = bk.api.create_session().unwrap();
-    let mut wallet = bk
-        .api
-        .session(&token)
-        .create_wallet("w0", Some("mypassword"), None)
-        .unwrap()
-        .wallet;
+    let bk = new_persistent();
+    let session = bk.api.create_session().unwrap();
+    let mut wallet = session.create_wallet("w0", "mypassword").unwrap().wallet;
     wallet.import_key(KEYS[0].0).unwrap();
     let locked = wallet.lock().unwrap();
     let mut unlocked = locked.unlock("mypassword").unwrap();
@@ -93,12 +69,10 @@ fn lock_then_unlock_recovers_keys() {
 // "Should throw ... when unlocking with wrong password"
 #[test]
 fn unlock_with_wrong_password_errors() {
-    let mut bk = new_persistent();
-    let token = bk.api.create_session().unwrap();
-    let wallet = bk
-        .api
-        .session(&token)
-        .create_wallet("w0", Some("correct_password"), None)
+    let bk = new_persistent();
+    let session = bk.api.create_session().unwrap();
+    let wallet = session
+        .create_wallet("w0", "correct_password")
         .unwrap()
         .wallet;
     let locked = wallet.lock().unwrap();
@@ -109,46 +83,38 @@ fn unlock_with_wrong_password_errors() {
 // "Should throw as the wallet is not found" (importKey to nonexistent wallet)
 #[test]
 fn open_nonexistent_wallet_errors() {
-    let mut bk = new_persistent();
-    let token = bk.api.create_session().unwrap();
-    let res = bk.api.session(&token).open_wallet("never_created");
+    let bk = new_persistent();
+    let session = bk.api.create_session().unwrap();
+    let res = session.open_wallet("never_created");
     assert!(res.is_err());
 }
 
 // "Should throw as the wallet with the same name already exists"
 #[test]
 fn duplicate_wallet_create_errors() {
-    let mut bk = new_in_memory();
-    let token = bk.api.create_session().unwrap();
-    bk.api
-        .session(&token)
-        .create_wallet("w0", Some("pw"), None)
-        .unwrap();
-    let res = bk.api.session(&token).create_wallet("w0", Some("pw"), None);
+    let bk = new_in_memory();
+    let session = bk.api.create_session().unwrap();
+    session.create_wallet("w0", "pw").unwrap();
+    let res = session.create_wallet("w0", "pw");
     assert!(res.is_err(), "creating wallet twice should error");
 }
 
 // "Should throw when querying keys without a wallet"
 #[test]
 fn get_keys_on_nonexistent_wallet_errors() {
-    let mut bk = new_persistent();
-    let token = bk.api.create_session().unwrap();
+    let bk = new_persistent();
+    let session = bk.api.create_session().unwrap();
     // open_wallet for a name that doesn't exist on disk should fail
-    let res = bk.api.session(&token).open_wallet("nonexistent");
+    let res = session.open_wallet("nonexistent");
     assert!(res.is_err());
 }
 
 // "Should throw as the key is invalid"
 #[test]
 fn invalid_wif_errors() {
-    let mut bk = new_in_memory();
-    let token = bk.api.create_session().unwrap();
-    let mut wallet = bk
-        .api
-        .session(&token)
-        .create_wallet("w0", Some("pw"), None)
-        .unwrap()
-        .wallet;
+    let bk = new_in_memory();
+    let session = bk.api.create_session().unwrap();
+    let mut wallet = session.create_wallet("w0", "pw").unwrap();
     let res = wallet.import_key("not-a-real-wif-key");
     assert!(res.is_err());
 }
@@ -156,14 +122,9 @@ fn invalid_wif_errors() {
 // "Should throw as the key is not in the wallet" (removeKey on missing key)
 #[test]
 fn remove_missing_key_errors() {
-    let mut bk = new_in_memory();
-    let token = bk.api.create_session().unwrap();
-    let mut wallet = bk
-        .api
-        .session(&token)
-        .create_wallet("w0", Some("pw"), None)
-        .unwrap()
-        .wallet;
+    let bk = new_in_memory();
+    let session = bk.api.create_session().unwrap();
+    let mut wallet = session.create_wallet("w0", "pw").unwrap();
     let res = wallet.remove_key(KEYS[7].1);
     assert!(res.is_err());
 }

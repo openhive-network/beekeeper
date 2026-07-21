@@ -8,7 +8,7 @@
 //! - isolation between separate dirs
 //! - file persistence with and without explicit `delete()`
 
-use beekeeper::{api::BeekeeperApi, options::BeekeeperOptions};
+use beekeeper::prelude::*;
 use tempfile::TempDir;
 
 mod common;
@@ -23,11 +23,10 @@ fn persists_across_api_instances() {
     let root = tmp.path().to_str().unwrap().to_string();
 
     {
-        let mut bk = BeekeeperApi::new(BeekeeperOptions::new(&root));
-        let token = bk.create_session().unwrap();
-        bk.session(&token)
-            .create_wallet("test_wallet", Some("pass123"), None)
-            .unwrap();
+        let bk = BeekeeperApi::new(BeekeeperOptions::new(&root));
+        let session = bk.create_session().unwrap();
+        session.create_wallet("test_wallet", "pass123").unwrap();
+        drop(session);
         bk.delete().unwrap();
     }
 
@@ -56,24 +55,21 @@ fn keys_persist_across_api_instances() {
 
     // Instance A — create wallet and import a key, then delete the instance.
     {
-        let mut bk = BeekeeperApi::new(BeekeeperOptions::new(&root));
-        let token = bk.create_session().unwrap();
-        let mut wallet = bk
-            .session(&token)
-            .create_wallet("w0", Some("badf00d"), None)
-            .unwrap()
-            .wallet;
+        let bk = BeekeeperApi::new(BeekeeperOptions::new(&root));
+        let session = bk.create_session().unwrap();
+        let mut wallet = session.create_wallet("w0", "badf00d").unwrap().wallet;
         wallet.import_key(KEYS[0].0).unwrap();
+        drop(wallet);
+        drop(session);
         bk.delete().unwrap();
     }
 
     // Instance B — same dir, open the wallet, unlock with the same password,
     // verify the imported key is still there.
     {
-        let mut bk = BeekeeperApi::new(BeekeeperOptions::new(&root));
-        let token = bk.create_session().unwrap();
-        let mut unlocked = bk
-            .session(&token)
+        let bk = BeekeeperApi::new(BeekeeperOptions::new(&root));
+        let session = bk.create_session().unwrap();
+        let mut unlocked = session
             .open_wallet("w0")
             .unwrap()
             .unlock("badf00d")
@@ -91,13 +87,12 @@ fn separate_storage_roots_are_isolated() {
     let tmp_b = TempDir::new().unwrap();
 
     {
-        let mut bk = BeekeeperApi::new(BeekeeperOptions::new(
+        let bk = BeekeeperApi::new(BeekeeperOptions::new(
             tmp_a.path().to_str().unwrap(),
         ));
-        let token = bk.create_session().unwrap();
-        bk.session(&token)
-            .create_wallet("only_in_a", Some("pw"), None)
-            .unwrap();
+        let session = bk.create_session().unwrap();
+        session.create_wallet("only_in_a", "pw").unwrap();
+        drop(session);
         bk.delete().unwrap();
     }
 
@@ -116,12 +111,10 @@ fn persistence_without_explicit_delete() {
     let root = tmp.path().to_str().unwrap().to_string();
 
     {
-        let mut bk = BeekeeperApi::new(BeekeeperOptions::new(&root));
-        let token = bk.create_session().unwrap();
-        bk.session(&token)
-            .create_wallet("w0", Some("pw"), None)
-            .unwrap();
-        // No bk.delete() — let it drop.
+        let bk = BeekeeperApi::new(BeekeeperOptions::new(&root));
+        let session = bk.create_session().unwrap();
+        session.create_wallet("w0", "pw").unwrap();
+        // No bk.delete() — let everything drop.
     }
 
     let bk = BeekeeperApi::new(BeekeeperOptions::new(&root));

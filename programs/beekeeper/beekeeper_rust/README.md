@@ -7,18 +7,16 @@ key import/removal, digest signing and memo encryption/decryption.
 ## Usage
 
 ```rust
-use beekeeper::{BeekeeperApi, BeekeeperOptions};
+use beekeeper::prelude::*;
 
-let mut bk = BeekeeperApi::new(
+let bk = BeekeeperApi::new(
     BeekeeperOptions::new("./storage_root").unlock_timeout(900),
 );
-let token = bk.create_session().unwrap();
-let created = bk.session(&token)
-    .create_wallet("my-wallet", Some("password"), None)
-    .unwrap();
-let mut wallet = created.wallet;
-let pubkey = wallet.import_key("5J...wif...").unwrap();
-let sig = wallet.sign_digest(&pubkey, "deadbeef...").unwrap();
+let session = bk.create_session().unwrap();
+let mut created = session.create_wallet("my-wallet", "password").unwrap();
+let pubkey = created.import_key("5J...wif...").unwrap();
+let sig = created.sign_digest(&pubkey, "deadbeef...").unwrap();
+// Dropping `session` locks its wallets and closes the session.
 ```
 
 ## Platform support
