@@ -43,11 +43,7 @@ fn lock_all_locks_session_wallets() {
     let _locked1 = w1.lock().unwrap();
 
     // Now re-open one, leave unlocked, lock_all and verify
-    let _ = session
-        .open_wallet("w0")
-        .unwrap()
-        .unlock("pass0")
-        .unwrap();
+    let _ = session.open_wallet("w0").unwrap().unlock("pass0").unwrap();
     let locked_listing = session.lock_all().unwrap();
     assert!(locked_listing.iter().all(|w| !w.unlocked));
     assert!(locked_listing.iter().any(|w| w.name == "w0"));

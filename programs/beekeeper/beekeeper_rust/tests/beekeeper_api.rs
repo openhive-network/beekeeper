@@ -168,8 +168,9 @@ fn persist_create_close_reopen_unlock() {
     let bk = new_persistent();
     let session = bk.api.create_session().unwrap();
     {
-        let mut wallet =
-            session.create_wallet("persistent_wallet", "mypass").unwrap();
+        let mut wallet = session
+            .create_wallet("persistent_wallet", "mypass")
+            .unwrap();
         wallet.import_key(KEYS[3].0).unwrap();
         let before = wallet.get_public_keys().unwrap();
         assert_eq!(before, vec![KEYS[3].1.to_string()]);

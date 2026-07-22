@@ -3,13 +3,9 @@
 //! The wallet manager calls into this struct over the `cxx` bridge
 //! whenever it needs to load, persist, probe, sync, or close a wallet file.
 //!
-//! # Difference from TS
-//!
-//! TS exposes a structural `IStorageCallbacks` interface so applications can
-//! plug in IndexedDB, FS Access API, in-memory maps, or anything else. The
-//! Rust facade has no such extension point — the storage backend is always
-//! this filesystem implementation, and in-memory mode is handled by selecting
-//! a different *C++* storage backend
+//! There is no extension point for other backends — the storage is always
+//! this filesystem implementation, and in-memory mode is handled by
+//! selecting a different *C++* storage backend
 //! ([`ffi::new_beekeeper_holder_in_memory`](crate::ffi::new_beekeeper_holder_in_memory))
 //! rather than by swapping this struct.
 
@@ -25,11 +21,9 @@ use crate::{
 
 /// Filesystem storage backend handed to C++ as a `Box<RustStorageProtocol>`.
 ///
-/// Construct via [`new_rust_storage_protocol`]; the struct field is exposed
-/// at `pub(crate)` solely so the higher-level [`api`](crate::api) module can
-/// reuse `wallet_dir` for its own directory scan.
+/// Construct via [`new_rust_storage_protocol`].
 pub struct RustStorageProtocol {
-    pub(crate) wallet_dir: PathBuf,
+    wallet_dir: PathBuf,
 }
 
 /// Build a [`RustStorageProtocol`] rooted at `storage_root`.
@@ -49,25 +43,27 @@ pub fn new_rust_storage_protocol(
 
 impl RustStorageProtocol {
     pub(crate) fn cpp_load(&mut self, name: &str) -> Res<Vec<u8>> {
-        let path = self.wallet_dir.join(format!("{name}{LEGACY_WALLET_EXT}"));
+        let path = self.wallet_path(name);
         fs::read(path)
             .map_err(|_| BeekeeperError::WalletNotFound { name: name.into() })
     }
 
     pub(crate) fn cpp_save(&mut self, name: &str, data: &[u8]) -> Res<()> {
-        let path = self.wallet_dir.join(format!("{name}{LEGACY_WALLET_EXT}"));
+        let path = self.wallet_path(name);
         fs::write(path, data).map_err(|_| BeekeeperError::WalletWriteFailed {
             name: name.into(),
         })
     }
 
     pub(crate) fn cpp_scan_dir(&mut self, name: &str) -> bool {
-        self.wallet_dir
-            .join(format!("{name}{LEGACY_WALLET_EXT}"))
-            .is_file()
+        self.wallet_path(name).is_file()
     }
 
     pub(crate) fn cpp_sync(&mut self) {}
 
     pub(crate) fn cpp_close(&mut self) {}
+
+    fn wallet_path(&self, name: &str) -> PathBuf {
+        self.wallet_dir.join(format!("{name}{LEGACY_WALLET_EXT}"))
+    }
 }

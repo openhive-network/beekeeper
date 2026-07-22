@@ -23,54 +23,23 @@
 //! // Dropping `session` locks its wallets and closes the session.
 //! ```
 //!
-//! # Mapping to the TypeScript package
+//! # Design notes
 //!
-//! Each module mirrors a TypeScript file under
-//! `programs/beekeeper/beekeeper_wasm/src/detailed/`:
+//! The API follows the npm package, but where Rust allows a safer shape
+//! than a 1:1 port, the Rust shape wins:
 //!
-//! | Rust module       | TypeScript file        |
-//! |-------------------|------------------------|
-//! | [`api`]           | `api.ts`               |
-//! | [`session`]       | `session.ts`           |
-//! | [`wallet`]        | `wallet.ts`            |
-//! | [`options`]       | `interfaces.ts`        |
-//! | [`BeekeeperError`] | `errors.ts`            |
-//!
-//! # Cross-language differences
-//!
-//! Behaviour matches the TypeScript binding wherever practical. The notable
-//! divergences are:
-//!
-//! - **Synchronous API.** All Rust calls are blocking; TS marks
-//!   `createWallet`, `unlock`, `importKey`, `removeKey`, `signDigest`,
-//!   `encryptData`, `decryptData`, and `delete` as `async`/`Promise<...>`
-//!   because WASM dispatches them on a worker.
-//! - **No `salt` for `create_session`.** TS requires a salt string; the C++
-//!   holder used here derives its own token, so the Rust signature drops the
-//!   parameter. `create_session` also returns the [`session::Session`] value
-//!   itself instead of a token.
-//! - **Sessions close on `Drop`.** TS requires an explicit `session.close()`;
-//!   the Rust [`session::Session`] is a guard that locks its wallets and
-//!   closes itself when it goes out of scope.
-//! - **No injectable storage / crypto callbacks.** TS lets callers supply
-//!   `IStorageCallbacks` / `ICryptoCallbacks`; Rust always uses the bundled
-//!   filesystem-backed [`storage::RustStorageProtocol`] and the FC-backed
-//!   crypto provider linked from `fc_crypto_bridge`. In-memory mode is
-//!   selected through [`BeekeeperOptions::in_memory`] instead.
-//! - **Key-prefix is hard-coded to `"STM"`** in [`wallet::DEFAULT_KEY_PREFIX`].
-//!   The C++ ABI still accepts a prefix, but the Rust facade doesn't expose
-//!   it (TS doesn't either).
-//! - **`sign_digest` takes a hex string only.** TS additionally accepts
-//!   `Uint8Array`; Rust callers should hex-encode themselves.
-//! - **Move-based wallet state machine.** `unlock`/`lock`/`close` consume
-//!   the wallet handle and return the new state, leaning on Rust's ownership
-//!   to prevent use of stale handles. TS keeps `BeekeeperLockedWallet`
-//!   mutable and tracks the unlocked counterpart on an internal field.
-//! - **`Session::list_wallets`** asks the C++ holder for every wallet in the
-//!   session and recombines it with locally tracked `is_temporary` metadata.
-//!   TS returns only the session's in-memory `wallets` map.
-//! - **`get_version`** returns `CARGO_PKG_VERSION` instead of
-//!   `npm_package_version`.
+//! - **Synchronous API.** All calls are blocking.
+//! - **Sessions close on `Drop`.** A [`session::Session`] is an owned
+//!   guard that locks its wallets and closes itself when it goes out of
+//!   scope; there is no explicit `close`.
+//! - **Lock state lives in the type system.** `unlock`/`lock`/`close`
+//!   consume the wallet handle and return the next state, so stale
+//!   handles are unrepresentable.
+//! - **Fixed backends.** Storage is always the bundled filesystem-backed
+//!   [`storage::RustStorageProtocol`] and crypto is always the FC-backed
+//!   provider; in-memory mode is selected through
+//!   [`BeekeeperOptions::in_memory`]. The key prefix is hard-coded to
+//!   [`wallet::DEFAULT_KEY_PREFIX`] (`"STM"`).
 
 pub mod api;
 pub mod options;
@@ -116,7 +85,6 @@ pub mod prelude {
 pub mod ffi {
     /// Plain-data summary of a wallet returned by C++ `list_wallets`.
     ///
-    /// Equivalent of the per-entry record in `list_wallets` on the C++ side.
     /// The Rust facade widens this to [`wallet::WalletInfo`] with the extra
     /// `is_temporary` flag tracked by [`api::BeekeeperApi`].
     pub struct WalletDetails {

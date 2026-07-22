@@ -1,10 +1,7 @@
 //! Error type returned by the public Rust API.
 //!
-//! Counterpart of `class BeekeeperError extends Error` in
-//! `beekeeper_wasm/src/detailed/errors.ts`. The TS layer collapses every
-//! failure into a single `BeekeeperError` instance with a `message` string;
-//! Rust keeps a small enum so callers can pattern-match on the common
-//! cases without parsing error text.
+//! A small enum rather than a single message string, so callers can
+//! pattern-match on the common cases without parsing error text.
 
 use thiserror::Error;
 
@@ -37,9 +34,6 @@ pub enum BeekeeperError {
     Crypto(String),
 
     /// An operation was attempted after the inactivity timeout elapsed.
-    ///
-    /// Matches the TS behaviour where unlocked-wallet operations call
-    /// `throwIfTimedOutAndRefresh()` and throw with this exact message.
     #[error("Wallet locked due to timeout")]
     TimedOut,
 

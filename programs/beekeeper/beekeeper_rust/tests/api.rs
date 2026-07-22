@@ -81,10 +81,7 @@ fn retrieving_session_information() -> Res {
     let info = session.get_info();
 
     // Should be close to 10 seconds
-    let locks_in = info
-        .timeout_time
-        .duration_since(SystemTime::now())
-        .unwrap();
+    let locks_in = info.timeout_time.duration_since(SystemTime::now()).unwrap();
 
     println!(
         "All wallets will be automatically locked in {} ms if not used.",

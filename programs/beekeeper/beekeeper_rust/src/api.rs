@@ -1,6 +1,5 @@
 //! The top-level [`BeekeeperApi`] handle.
 //!
-//! Equivalent of the TS `BeekeeperApi` class (`beekeeper_wasm/src/detailed/api.ts`).
 //! Owns the C++ wallet manager (via [`ffi::BeekeeperHolder`]), the set of
 //! open session tokens, and the activity clock used for the inactivity
 //! timeout.
@@ -24,6 +23,39 @@ use crate::{
     session::Session,
 };
 
+/// Auto-lock instant reported while the inactivity timeout is disabled:
+/// a far-future sentinel of UNIX epoch + 100 years.
+const NO_TIMEOUT_SENTINEL: Duration =
+    Duration::from_secs(60 * 60 * 24 * 365 * 100);
+
+/// Root handle for the Beekeeper wallet daemon.
+///
+/// A single `BeekeeperApi` owns one C++ wallet manager and zero or more
+/// sessions; each session in turn owns zero or more wallets.
+///
+/// Use [`BeekeeperApi::new`] to construct and
+/// [`create_session`](Self::create_session) to obtain an owned
+/// [`Session`](crate::session::Session) guard for further work.
+pub struct BeekeeperApi {
+    pub(crate) inner: Rc<RefCell<Inner>>,
+}
+
+/// Shared state behind a [`BeekeeperApi`] and every [`Session`] / wallet
+/// handle spawned from it.
+///
+/// Wrapped in `Rc<RefCell<..>>` so that sessions and wallets are owned
+/// values (with the session closing itself on `Drop`) rather than `&mut`
+/// borrows of the api.
+pub(crate) struct Inner {
+    pub(crate) holder: UniquePtr<ffi::BeekeeperHolder>,
+    sessions: HashSet<String>,
+    wallets_meta: HashMap<(String, String), WalletMeta>,
+    pub(crate) is_in_memory: bool,
+    unlock_timeout_ms: u32,
+    last_activity: Instant,
+    wallet_dir: PathBuf,
+}
+
 /// Per-wallet metadata that the C++ layer does not track.
 ///
 /// Currently just the `is_temporary` flag (an in-memory-only wallet inside
@@ -34,24 +66,125 @@ pub(crate) struct WalletMeta {
     pub is_temporary: bool,
 }
 
-/// Shared state behind a [`BeekeeperApi`] and every [`Session`] / wallet
-/// handle spawned from it.
-///
-/// Wrapped in `Rc<RefCell<..>>` so that sessions and wallets are owned
-/// values (with the session closing itself on `Drop`) rather than `&mut`
-/// borrows of the api — mirroring the TS object graph, where sessions and
-/// wallets keep a reference to their parent api.
-pub(crate) struct Inner {
-    pub(crate) holder: UniquePtr<ffi::BeekeeperHolder>,
-    sessions: HashSet<String>,
-    pub(crate) wallets_meta: HashMap<(String, String), WalletMeta>,
-    pub(crate) is_in_memory: bool,
-    unlock_timeout_ms: u32,
-    last_activity: Instant,
-    wallet_dir: PathBuf,
+impl BeekeeperApi {
+    /// Construct a new beekeeper instance.
+    ///
+    /// Accepts anything convertible into `Option<BeekeeperOptions>`:
+    /// pass a [`BeekeeperOptions`] value directly, or `None` to use
+    /// [`BeekeeperOptions::default()`].
+    ///
+    /// When the options are not in-memory this also creates
+    /// `<storage_root>/.beekeeper/` (if missing) for wallet files.
+    pub fn new(options: impl Into<Option<BeekeeperOptions>>) -> Self {
+        let options = options.into().unwrap_or_default();
+        let inner = Inner::new(&options);
+
+        Self {
+            inner: Rc::new(RefCell::new(inner)),
+        }
+    }
+
+    /// Open a new session and return it as an owned
+    /// [`Session`](crate::session::Session) guard.
+    ///
+    /// The session closes itself (locking its wallets first) when dropped;
+    /// there is no explicit `close` call.
+    pub fn create_session(&self) -> Result<Session, BeekeeperError> {
+        let token = {
+            let mut inner = self.inner.borrow_mut();
+            let token = inner.holder.pin_mut().create_session()?;
+            inner.sessions.insert(token.clone());
+            token
+        };
+
+        Ok(Session::new(Rc::clone(&self.inner), token))
+    }
+
+    /// Close every session, flush storage, and shut the C++ holder down.
+    ///
+    /// Named after the TS `delete()` API; there is no Rust destructor work
+    /// behind it. Calling it is useful when you want the storage flushed
+    /// deterministically before the process exits.
+    ///
+    /// Any [`Session`](crate::session::Session) guard still alive is closed
+    /// here; its later `Drop` becomes a no-op. After calling `delete` the
+    /// C++ storage handle has been closed; further operations will fail.
+    pub fn delete(&self) -> Result<(), BeekeeperError> {
+        let mut inner = self.inner.borrow_mut();
+        let tokens: Vec<String> = inner.sessions.drain().collect();
+        for token in tokens {
+            inner.holder.pin_mut().close_session(&token)?;
+        }
+        inner.wallets_meta.clear();
+        inner.holder.pin_mut().sync_storage();
+        inner.holder.pin_mut().close_storage();
+
+        Ok(())
+    }
+
+    /// Reset the inactivity clock to now.
+    ///
+    /// Used internally after every successful unlocked-wallet operation.
+    /// Call manually only if you have some other notion of activity to
+    /// keep the wallet alive.
+    pub fn refresh_timeout(&self) {
+        self.inner.borrow_mut().refresh_timeout();
+    }
+
+    /// If the inactivity timeout has elapsed, return [`BeekeeperError::TimedOut`].
+    /// Otherwise reset the clock.
+    ///
+    /// Every [`UnlockedWallet`](crate::wallet::UnlockedWallet) operation
+    /// calls this as its first step.
+    pub fn throw_if_timed_out_and_refresh(&self) -> Result<(), BeekeeperError> {
+        self.inner.borrow_mut().throw_if_timed_out_and_refresh()
+    }
+
+    /// `true` if the inactivity timeout is enabled and has elapsed.
+    ///
+    /// `unlock_timeout == 0` permanently returns `false`.
+    pub fn is_timed_out(&self) -> bool {
+        self.inner.borrow().is_timed_out()
+    }
+
+    /// Wall-clock instant at which the wallet will auto-lock.
+    ///
+    /// When the timeout is disabled this returns a far-future sentinel:
+    /// the UNIX epoch plus 100 years (≈ year 2069).
+    pub fn get_timeout_time(&self) -> SystemTime {
+        self.inner.borrow().get_timeout_time()
+    }
+
+    /// Names of every wallet found in the storage directory.
+    ///
+    /// Returns `[]` in in-memory mode, since there is nothing to scan. The
+    /// names are derived from filenames by stripping the `.wallet` suffix;
+    /// other files in the directory are ignored.
+    pub fn list_created_wallets(&self) -> Vec<String> {
+        self.inner.borrow().list_created_wallets()
+    }
+
+    /// The crate's SemVer string (compiled-in `CARGO_PKG_VERSION`).
+    pub fn version(&self) -> &'static str {
+        env!("CARGO_PKG_VERSION")
+    }
 }
 
 impl Inner {
+    fn new(options: &BeekeeperOptions) -> Self {
+        let (holder, wallet_dir) = new_holder(options);
+
+        Self {
+            holder,
+            sessions: HashSet::new(),
+            wallets_meta: HashMap::new(),
+            is_in_memory: options.in_memory,
+            unlock_timeout_ms: options.unlock_timeout.saturating_mul(1000),
+            last_activity: Instant::now(),
+            wallet_dir,
+        }
+    }
+
     /// Record a wallet's metadata under `(token, name)`.
     pub(crate) fn register_wallet(
         &mut self,
@@ -107,8 +240,7 @@ impl Inner {
     /// Wall-clock instant at which the wallet will auto-lock.
     pub(crate) fn get_timeout_time(&self) -> SystemTime {
         if self.unlock_timeout_ms == 0 {
-            return SystemTime::UNIX_EPOCH
-                + Duration::from_secs(60 * 60 * 24 * 365 * 100);
+            return SystemTime::UNIX_EPOCH + NO_TIMEOUT_SENTINEL;
         }
         let elapsed = self.last_activity.elapsed();
         let remaining =
@@ -137,6 +269,20 @@ impl Inner {
             .collect()
     }
 
+    /// Lock every unlocked wallet in the session and return the (pre-lock)
+    /// holder-side listing.
+    pub(crate) fn lock_session_wallets(
+        &mut self,
+        token: &str,
+    ) -> Result<Vec<ffi::WalletDetails>, BeekeeperError> {
+        let wallets = self.holder.list_wallets(token)?;
+        for wd in wallets.iter().filter(|w| w.unlocked) {
+            self.holder.pin_mut().lock(&wd.name)?;
+        }
+
+        Ok(wallets)
+    }
+
     /// Close the session identified by `token` on the C++ side and discard
     /// all Rust-side bookkeeping associated with it.
     pub(crate) fn close_session(
@@ -149,190 +295,46 @@ impl Inner {
         Ok(())
     }
 
+    /// Best-effort session teardown used by `Session::drop`: lock the
+    /// session's wallets, then close the session, ignoring errors.
+    ///
+    /// No-op when the session was already closed (e.g. by
+    /// [`BeekeeperApi::delete`]).
+    pub(crate) fn close_session_quietly(&mut self, token: &str) {
+        if !self.session_is_open(token) {
+            return;
+        }
+        let _ = self.lock_session_wallets(token);
+        let _ = self.close_session(token);
+    }
+
     /// Drop the Rust-side bookkeeping for `token` without touching C++.
-    pub(crate) fn forget_session(&mut self, token: &str) {
+    fn forget_session(&mut self, token: &str) {
         self.sessions.remove(token);
         self.wallets_meta.retain(|(t, _), _| t != token);
     }
 
     /// `true` while `token` refers to a session that has not been closed yet.
-    pub(crate) fn session_is_open(&self, token: &str) -> bool {
+    fn session_is_open(&self, token: &str) -> bool {
         self.sessions.contains(token)
     }
 }
 
-/// Root handle for the Beekeeper wallet daemon.
-///
-/// A single `BeekeeperApi` owns one C++ wallet manager and zero or more
-/// sessions; each session in turn owns zero or more wallets.
-///
-/// Use [`BeekeeperApi::new`] to construct and
-/// [`create_session`](Self::create_session) to obtain an owned
-/// [`Session`](crate::session::Session) guard for further work.
-///
-/// # Difference from TS
-///
-/// TS `BeekeeperApi` keeps a `Map<string, BeekeeperSession>` keyed by
-/// session token so callers can re-obtain a session object. Rust hands the
-/// caller the [`Session`](crate::session::Session) value itself; the token
-/// stays internal.
-pub struct BeekeeperApi {
-    pub(crate) inner: Rc<RefCell<Inner>>,
-}
-
-impl BeekeeperApi {
-    /// Construct a new beekeeper instance.
-    ///
-    /// Accepts anything convertible into `Option<BeekeeperOptions>`:
-    /// pass a [`BeekeeperOptions`] value directly, or `None` to use
-    /// [`BeekeeperOptions::default()`] — matching the TS factory, where
-    /// `beekeeperFactory()` can be called without arguments.
-    ///
-    /// When the options are not in-memory this also creates
-    /// `<storage_root>/.beekeeper/` (if missing) for wallet files.
-    ///
-    /// # Difference from TS
-    ///
-    /// The TS constructor is `private` and reached through a factory
-    /// (`createBeekeeper(...)`) that resolves a `wasmLocation`. Here the
-    /// constructor is the entry point; just call it.
-    pub fn new(options: impl Into<Option<BeekeeperOptions>>) -> Self {
-        let options = options.into().unwrap_or_default();
-        let (holder, wallet_dir) = if options.in_memory {
-            (
-                ffi::new_beekeeper_holder_in_memory(options.unlock_timeout),
-                PathBuf::new(),
-            )
-        } else {
-            let wallet_dir =
-                Path::new(&options.storage_root).join(LEGACY_WALLET_DIR);
-            let storage = new_rust_storage_protocol(&options.storage_root);
-            let holder =
-                ffi::new_beekeeper_holder(storage, options.unlock_timeout);
-            (holder, wallet_dir)
-        };
-
-        Self {
-            inner: Rc::new(RefCell::new(Inner {
-                holder,
-                sessions: HashSet::new(),
-                wallets_meta: HashMap::new(),
-                is_in_memory: options.in_memory,
-                unlock_timeout_ms: options.unlock_timeout.saturating_mul(1000),
-                last_activity: Instant::now(),
-                wallet_dir,
-            })),
-        }
+/// Build the C++ holder matching `options`, together with the wallet
+/// directory the persistent backend stores its files in (empty for the
+/// in-memory backend).
+fn new_holder(
+    options: &BeekeeperOptions,
+) -> (UniquePtr<ffi::BeekeeperHolder>, PathBuf) {
+    if options.in_memory {
+        let holder =
+            ffi::new_beekeeper_holder_in_memory(options.unlock_timeout);
+        return (holder, PathBuf::new());
     }
 
-    /// Reset the inactivity clock to now.
-    ///
-    /// Used internally after every successful unlocked-wallet operation.
-    /// Call manually only if you have some other notion of activity to
-    /// keep the wallet alive.
-    pub fn refresh_timeout(&self) {
-        self.inner.borrow_mut().refresh_timeout();
-    }
+    let storage = new_rust_storage_protocol(&options.storage_root);
+    let holder = ffi::new_beekeeper_holder(storage, options.unlock_timeout);
+    let wallet_dir = Path::new(&options.storage_root).join(LEGACY_WALLET_DIR);
 
-    /// If the inactivity timeout has elapsed, return [`BeekeeperError::TimedOut`].
-    /// Otherwise reset the clock.
-    ///
-    /// Every [`UnlockedWallet`](crate::wallet::UnlockedWallet) operation
-    /// calls this as its first step, matching the TS `throwIfTimedOutAndRefresh`.
-    pub fn throw_if_timed_out_and_refresh(
-        &self,
-    ) -> Result<(), BeekeeperError> {
-        self.inner.borrow_mut().throw_if_timed_out_and_refresh()
-    }
-
-    /// `true` if the inactivity timeout is enabled and has elapsed.
-    ///
-    /// `unlock_timeout == 0` permanently returns `false`.
-    pub fn is_timed_out(&self) -> bool {
-        self.inner.borrow().is_timed_out()
-    }
-
-    /// Wall-clock instant at which the wallet will auto-lock.
-    ///
-    /// When the timeout is disabled this returns the UNIX epoch plus 100
-    /// years (≈ year 2069) — matching the TS sentinel `9999-12-31T23:59:59Z`
-    /// in spirit, just clamped to what `SystemTime` can represent on most
-    /// platforms.
-    pub fn get_timeout_time(&self) -> SystemTime {
-        self.inner.borrow().get_timeout_time()
-    }
-
-    /// Names of every wallet found in the storage directory.
-    ///
-    /// Returns `[]` in in-memory mode, since there is nothing to scan. The
-    /// names are derived from filenames by stripping the `.wallet` suffix;
-    /// other files in the directory are ignored.
-    ///
-    /// # Difference from TS
-    ///
-    /// TS delegates to `storage.list_dir_fn()` so a custom storage backend
-    /// can decide what counts as "a wallet". Rust hard-codes a filesystem
-    /// scan against the `.beekeeper/` sub-directory.
-    pub fn list_created_wallets(&self) -> Vec<String> {
-        self.inner.borrow().list_created_wallets()
-    }
-
-    /// The crate's SemVer string (compiled-in `CARGO_PKG_VERSION`).
-    ///
-    /// # Difference from TS
-    ///
-    /// TS reads `process.env.npm_package_version` at runtime; the Rust
-    /// value is baked in at compile time.
-    pub fn version(&self) -> &'static str {
-        env!("CARGO_PKG_VERSION")
-    }
-
-    /// Open a new session and return it as an owned
-    /// [`Session`](crate::session::Session) guard.
-    ///
-    /// The session closes itself (locking its wallets first) when dropped;
-    /// there is no explicit `close` call.
-    ///
-    /// # Difference from TS
-    ///
-    /// - TS `createSession(salt: string)` requires a salt that's mixed into
-    ///   the token. The C++ holder used here derives its own token, so the
-    ///   Rust signature drops the parameter.
-    /// - TS returns the session object *and* tracks it by token; Rust hands
-    ///   over the only handle and keeps just the token internally so
-    ///   [`delete`](Self::delete) can close stragglers.
-    pub fn create_session(&self) -> Result<Session, BeekeeperError> {
-        let token = {
-            let mut inner = self.inner.borrow_mut();
-            let token = inner.holder.pin_mut().create_session()?;
-            inner.sessions.insert(token.clone());
-            token
-        };
-
-        Ok(Session::new(Rc::clone(&self.inner), token))
-    }
-
-    /// Close every session, flush storage, and shut the C++ holder down.
-    ///
-    /// Equivalent to TS `delete()`. Despite the name there is no Rust
-    /// destructor work — the [`UniquePtr<BeekeeperHolder>`](::cxx::UniquePtr)
-    /// is dropped when the last handle over the shared state goes away.
-    /// Calling this is useful when you want the storage flushed
-    /// deterministically before the process exits.
-    ///
-    /// Any [`Session`](crate::session::Session) guard still alive is closed
-    /// here; its later `Drop` becomes a no-op. After calling `delete` the
-    /// C++ storage handle has been closed; further operations will fail.
-    pub fn delete(&self) -> Result<(), BeekeeperError> {
-        let mut inner = self.inner.borrow_mut();
-        let tokens: Vec<String> = inner.sessions.drain().collect();
-        for token in tokens {
-            inner.holder.pin_mut().close_session(&token)?;
-        }
-        inner.wallets_meta.clear();
-        inner.holder.pin_mut().sync_storage();
-        inner.holder.pin_mut().close_storage();
-
-        Ok(())
-    }
+    (holder, wallet_dir)
 }

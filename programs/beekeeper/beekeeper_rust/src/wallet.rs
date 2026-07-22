@@ -1,19 +1,13 @@
 //! Locked / unlocked wallet handles.
 //!
-//! Counterpart of `BeekeeperLockedWallet` / `BeekeeperUnlockedWallet` in
-//! `beekeeper_wasm/src/detailed/wallet.ts`.
-//!
-//! # Difference from TS
-//!
-//! TS represents lock state with a single `BeekeeperLockedWallet` whose
-//! optional `_unlocked` field is set/cleared as the wallet changes state.
-//! Rust models it as two distinct types ([`LockedWallet`] and
-//! [`UnlockedWallet`]) and makes the transition methods consume `self`, so
-//! the type system enforces "you can only call `import_key` on an
-//! unlocked wallet" instead of relying on a runtime check.
+//! Lock state is encoded in the type system: [`LockedWallet`] and
+//! [`UnlockedWallet`] are distinct types, and every transition
+//! (`unlock` / `lock` / `close`) consumes its receiver and returns the next
+//! state. Calling a key operation on a locked wallet is a compile error,
+//! not a runtime check.
 
 use std::{
-    cell::RefCell,
+    cell::{RefCell, RefMut},
     ops::{Deref, DerefMut},
     rc::Rc,
 };
@@ -22,11 +16,6 @@ use crate::{api::Inner, errors::BeekeeperError};
 
 /// Address-format prefix used for every Hive public key serialised by the
 /// C++ side ("STM…").
-///
-/// # Difference from TS
-///
-/// Both bindings hard-code this prefix; the C++ ABI accepts a prefix
-/// parameter for future flexibility but neither facade exposes it.
 pub const DEFAULT_KEY_PREFIX: &str = "STM";
 
 /// Plain summary of a wallet returned from listing operations.
@@ -42,8 +31,7 @@ pub struct WalletInfo {
 /// Result of [`Session::create_wallet`](crate::session::Session::create_wallet).
 ///
 /// `password` is whichever password ended up protecting the wallet — either
-/// the caller-supplied value, or the C++-generated one when `None` was
-/// passed.
+/// the caller-supplied value, or the generated one when `None` was passed.
 ///
 /// Dereferences to the contained [`UnlockedWallet`], so key operations can
 /// be called on it directly:
@@ -60,18 +48,30 @@ pub struct CreatedWallet {
     pub password: String,
 }
 
-impl Deref for CreatedWallet {
-    type Target = UnlockedWallet;
-
-    fn deref(&self) -> &UnlockedWallet {
-        &self.wallet
-    }
+/// A wallet known to the wallet manager but currently locked.
+///
+/// Shares the underlying state with the parent
+/// [`Session`](crate::session::Session) — the handle stays valid for as
+/// long as the session is alive.
+pub struct LockedWallet {
+    handle: WalletHandle,
 }
 
-impl DerefMut for CreatedWallet {
-    fn deref_mut(&mut self) -> &mut UnlockedWallet {
-        &mut self.wallet
-    }
+/// A wallet that is currently unlocked and ready to perform key operations.
+///
+/// Every operation first checks the inactivity timeout, so calls issued
+/// after it elapsed fail with [`BeekeeperError::TimedOut`] instead of
+/// silently succeeding.
+pub struct UnlockedWallet {
+    handle: WalletHandle,
+}
+
+/// State common to both lock states: the wallet's identity plus access to
+/// the beekeeper it belongs to. Transitions move the handle unchanged.
+struct WalletHandle {
+    inner: Rc<RefCell<Inner>>,
+    name: String,
+    is_temporary: bool,
 }
 
 impl CreatedWallet {
@@ -92,42 +92,40 @@ impl CreatedWallet {
     }
 }
 
-/// A wallet known to the C++ holder but currently locked.
-///
-/// Shares the underlying state with the parent
-/// [`Session`](crate::session::Session) — the handle stays valid for as
-/// long as the session is alive.
-pub struct LockedWallet {
-    inner: Rc<RefCell<Inner>>,
-    token: String,
-    name: String,
-    is_temporary: bool,
+impl Deref for CreatedWallet {
+    type Target = UnlockedWallet;
+
+    fn deref(&self) -> &UnlockedWallet {
+        &self.wallet
+    }
+}
+
+impl DerefMut for CreatedWallet {
+    fn deref_mut(&mut self) -> &mut UnlockedWallet {
+        &mut self.wallet
+    }
 }
 
 impl LockedWallet {
     pub(crate) fn new(
         inner: Rc<RefCell<Inner>>,
-        token: String,
         name: String,
         is_temporary: bool,
     ) -> Self {
         Self {
-            inner,
-            token,
-            name,
-            is_temporary,
+            handle: WalletHandle::new(inner, name, is_temporary),
         }
     }
 
     /// The wallet's name, as passed to `create_wallet` / `open_wallet`.
     pub fn name(&self) -> &str {
-        &self.name
+        &self.handle.name
     }
 
     /// `true` when the wallet lives only in process memory and is never
-    /// persisted. Equivalent of the TS `isTemporary` getter.
+    /// persisted.
     pub fn is_temporary(&self) -> bool {
-        self.is_temporary
+        self.handle.is_temporary
     }
 
     /// Unlock with the given password.
@@ -140,16 +138,13 @@ impl LockedWallet {
         password: &str,
     ) -> Result<UnlockedWallet, BeekeeperError> {
         {
-            let mut inner = self.inner.borrow_mut();
-            inner.holder.pin_mut().unlock(&self.name, password)?;
+            let mut inner = self.handle.inner.borrow_mut();
+            inner.holder.pin_mut().unlock(&self.handle.name, password)?;
             inner.refresh_timeout();
         }
 
         Ok(UnlockedWallet {
-            inner: self.inner,
-            token: self.token,
-            name: self.name,
-            is_temporary: self.is_temporary,
+            handle: self.handle,
         })
     }
 
@@ -160,51 +155,33 @@ impl LockedWallet {
     /// [`Session::close_wallet`](crate::session::Session::close_wallet)
     /// instead, which also unregisters the metadata.
     pub fn close(self) -> Result<(), BeekeeperError> {
-        self.inner
-            .borrow_mut()
-            .holder
-            .pin_mut()
-            .close_wallet(&self.name)?;
+        let mut inner = self.handle.inner.borrow_mut();
+        inner.holder.pin_mut().close_wallet(&self.handle.name)?;
+
         Ok(())
     }
-}
-
-/// A wallet that is currently unlocked and ready to perform key operations.
-///
-/// Every method here first calls the shared `throw_if_timed_out_and_refresh`
-/// so that operations issued after the inactivity timeout elapsed fail
-/// with [`BeekeeperError::TimedOut`] instead of silently succeeding.
-pub struct UnlockedWallet {
-    inner: Rc<RefCell<Inner>>,
-    token: String,
-    name: String,
-    is_temporary: bool,
 }
 
 impl UnlockedWallet {
     pub(crate) fn new(
         inner: Rc<RefCell<Inner>>,
-        token: String,
         name: String,
         is_temporary: bool,
     ) -> Self {
         Self {
-            inner,
-            token,
-            name,
-            is_temporary,
+            handle: WalletHandle::new(inner, name, is_temporary),
         }
     }
 
     /// The wallet's name, as passed to `create_wallet` / `open_wallet`.
     pub fn name(&self) -> &str {
-        &self.name
+        &self.handle.name
     }
 
     /// `true` when the wallet lives only in process memory and is never
-    /// persisted. Equivalent of the TS `isTemporary` getter.
+    /// persisted.
     pub fn is_temporary(&self) -> bool {
-        self.is_temporary
+        self.handle.is_temporary
     }
 
     /// Lock the wallet and return its [`LockedWallet`] form.
@@ -213,45 +190,50 @@ impl UnlockedWallet {
     /// allowed, even (especially) if the wallet has already auto-locked
     /// underneath us.
     pub fn lock(self) -> Result<LockedWallet, BeekeeperError> {
-        self.inner.borrow_mut().holder.pin_mut().lock(&self.name)?;
+        {
+            let mut inner = self.handle.inner.borrow_mut();
+            inner.holder.pin_mut().lock(&self.handle.name)?;
+        }
 
         Ok(LockedWallet {
-            inner: self.inner,
-            token: self.token,
-            name: self.name,
-            is_temporary: self.is_temporary,
+            handle: self.handle,
         })
+    }
+
+    /// Lock then close the wallet.
+    pub fn close(self) -> Result<(), BeekeeperError> {
+        let locked = self.lock()?;
+        locked.close()
     }
 
     /// Import a WIF-encoded private key and return its public counterpart.
     ///
-    /// Returned key is base58 with the [`DEFAULT_KEY_PREFIX`] prefix
+    /// The returned key is base58 with the [`DEFAULT_KEY_PREFIX`] prefix
     /// (e.g. `"STM7..."`).
     pub fn import_key(
         &mut self,
         wif_key: &str,
     ) -> Result<String, BeekeeperError> {
-        let mut inner = self.inner.borrow_mut();
-        inner.throw_if_timed_out_and_refresh()?;
-
-        Ok(inner.holder.pin_mut().import_key(
-            &self.name,
+        let mut inner = self.handle.refreshed()?;
+        let public_key = inner.holder.pin_mut().import_key(
+            &self.handle.name,
             wif_key,
             DEFAULT_KEY_PREFIX,
-        )?)
+        )?;
+
+        Ok(public_key)
     }
 
-    /// Remove the private key matching `public_key` (WIF, `STM…`).
+    /// Remove the private key matching `public_key` (`STM…`).
     ///
     /// Errors when no such key exists in the wallet.
     pub fn remove_key(
         &mut self,
         public_key: &str,
     ) -> Result<(), BeekeeperError> {
-        let mut inner = self.inner.borrow_mut();
-        inner.throw_if_timed_out_and_refresh()?;
+        let mut inner = self.handle.refreshed()?;
         inner.holder.pin_mut().remove_key(
-            &self.name,
+            &self.handle.name,
             public_key,
             DEFAULT_KEY_PREFIX,
         )?;
@@ -264,50 +246,46 @@ impl UnlockedWallet {
         &mut self,
         public_key: &str,
     ) -> Result<bool, BeekeeperError> {
-        let mut inner = self.inner.borrow_mut();
-        inner.throw_if_timed_out_and_refresh()?;
-
-        Ok(inner.holder.has_matching_private_key(
-            &self.name,
+        let inner = self.handle.refreshed()?;
+        let has_key = inner.holder.has_matching_private_key(
+            &self.handle.name,
             public_key,
             DEFAULT_KEY_PREFIX,
-        )?)
+        )?;
+
+        Ok(has_key)
     }
 
     /// Sign a pre-computed digest with the private key matching `public_key`.
     ///
     /// `digest_hex` must be the hex encoding of a 32-byte digest. The
-    /// returned signature is the hex encoding of the fc 65-byte compact
+    /// returned signature is the hex encoding of the 65-byte compact
     /// signature.
-    ///
-    /// # Difference from TS
-    ///
-    /// TS accepts `string | Uint8Array` and hex-encodes the byte array
-    /// internally. Rust takes a hex string only; encode upstream if you
-    /// have raw bytes.
     pub fn sign_digest(
         &mut self,
         public_key: &str,
         digest_hex: &str,
     ) -> Result<String, BeekeeperError> {
-        let mut inner = self.inner.borrow_mut();
-        inner.throw_if_timed_out_and_refresh()?;
-
-        Ok(inner.holder.pin_mut().sign_digest(
-            &self.name,
+        let mut inner = self.handle.refreshed()?;
+        let signature = inner.holder.pin_mut().sign_digest(
+            &self.handle.name,
             digest_hex,
             public_key,
             DEFAULT_KEY_PREFIX,
-        )?)
+        )?;
+
+        Ok(signature)
     }
 
     /// Every public key held by the wallet, formatted with
     /// [`DEFAULT_KEY_PREFIX`].
     pub fn get_public_keys(&mut self) -> Result<Vec<String>, BeekeeperError> {
-        let mut inner = self.inner.borrow_mut();
-        inner.throw_if_timed_out_and_refresh()?;
+        let inner = self.handle.refreshed()?;
+        let keys = inner
+            .holder
+            .get_public_keys(&self.handle.name, DEFAULT_KEY_PREFIX)?;
 
-        Ok(inner.holder.get_public_keys(&self.name, DEFAULT_KEY_PREFIX)?)
+        Ok(keys)
     }
 
     /// Encrypt `content` between two keys, returning a base58 buffer.
@@ -315,12 +293,10 @@ impl UnlockedWallet {
     /// `from_key` must be present in the wallet (its private key is used
     /// for the ECDH side). `to_key` accepts anything convertible into
     /// `Option<&str>`; `None` is interpreted as self-encryption
-    /// (`to_key = from_key`), matching TS semantics.
+    /// (`to_key = from_key`).
     ///
     /// `nonce` is mixed into the encryption to make output reproducible;
-    /// pass `0` if you don't care about reproducibility — the C++ side
-    /// will generate a random nonce in that case (this matches the TS
-    /// behaviour where the `?? 0` default is treated as "generate one").
+    /// pass `0` to have the C++ side generate a random nonce instead.
     pub fn encrypt_data<'k>(
         &mut self,
         from_key: &str,
@@ -328,17 +304,18 @@ impl UnlockedWallet {
         content: &str,
         nonce: u64,
     ) -> Result<String, BeekeeperError> {
-        let to_key = to_key.into();
-        let mut inner = self.inner.borrow_mut();
-        inner.throw_if_timed_out_and_refresh()?;
-        Ok(inner.holder.pin_mut().encrypt_data(
-            &self.name,
+        let to_key = to_key.into().unwrap_or(from_key);
+        let mut inner = self.handle.refreshed()?;
+        let encrypted = inner.holder.pin_mut().encrypt_data(
+            &self.handle.name,
             from_key,
-            to_key.unwrap_or(from_key),
+            to_key,
             content,
             DEFAULT_KEY_PREFIX,
             nonce,
-        )?)
+        )?;
+
+        Ok(encrypted)
     }
 
     /// Decrypt a base58 buffer produced by [`encrypt_data`](Self::encrypt_data).
@@ -350,23 +327,39 @@ impl UnlockedWallet {
         to_key: impl Into<Option<&'k str>>,
         encrypted_content: &str,
     ) -> Result<String, BeekeeperError> {
-        let to_key = to_key.into();
-        let mut inner = self.inner.borrow_mut();
-        inner.throw_if_timed_out_and_refresh()?;
-        Ok(inner.holder.pin_mut().decrypt_data(
-            &self.name,
+        let to_key = to_key.into().unwrap_or(from_key);
+        let mut inner = self.handle.refreshed()?;
+        let decrypted = inner.holder.pin_mut().decrypt_data(
+            &self.handle.name,
             from_key,
-            to_key.unwrap_or(from_key),
+            to_key,
             encrypted_content,
             DEFAULT_KEY_PREFIX,
-        )?)
+        )?;
+
+        Ok(decrypted)
+    }
+}
+
+impl WalletHandle {
+    fn new(
+        inner: Rc<RefCell<Inner>>,
+        name: String,
+        is_temporary: bool,
+    ) -> Self {
+        Self {
+            inner,
+            name,
+            is_temporary,
+        }
     }
 
-    /// Lock then close the wallet.
-    ///
-    /// Equivalent of TS `BeekeeperUnlockedWallet.close()`.
-    pub fn close(self) -> Result<(), BeekeeperError> {
-        let locked = self.lock()?;
-        locked.close()
+    /// Borrow the shared state, failing with [`BeekeeperError::TimedOut`]
+    /// if the inactivity timeout has elapsed (and refreshing it otherwise).
+    fn refreshed(&self) -> Result<RefMut<'_, Inner>, BeekeeperError> {
+        let mut inner = self.inner.borrow_mut();
+        inner.throw_if_timed_out_and_refresh()?;
+
+        Ok(inner)
     }
 }

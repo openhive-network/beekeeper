@@ -7,7 +7,8 @@ fn main() {
     // script across crate copies (e.g. `cargo package` verify builds), so a
     // compile-time path would leak from one into the other.
     let manifest_dir = PathBuf::from(
-        env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR set by cargo"),
+        env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR set by cargo"),
     );
 
     // Three modes:
@@ -105,7 +106,8 @@ fn build_from_source(manifest_dir: &Path) {
     build.cargo_metadata(false);
     build.compile("beekeeper_rust_ffi");
 
-    let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR set by cargo"));
+    let out_dir =
+        PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR set by cargo"));
     let ffi_archive = out_dir.join("libbeekeeper_rust_ffi.a");
 
     // Link fc_crypto_bridge and its transitive deps (fc, secp256k1, OpenSSL, …):
@@ -113,7 +115,9 @@ fn build_from_source(manifest_dir: &Path) {
     // (BEEKEEPER_FC_CRYPTO_BRIDGE_LIB_DIR plus a shell-style "-Ldir -llib …"
     // string in BEEKEEPER_FC_LINK_FLAGS); standalone mode drives CMake itself,
     // then prelinks everything into a single localized bundle.
-    println!("cargo:rerun-if-env-changed=BEEKEEPER_FC_CRYPTO_BRIDGE_INCLUDE_DIR");
+    println!(
+        "cargo:rerun-if-env-changed=BEEKEEPER_FC_CRYPTO_BRIDGE_INCLUDE_DIR"
+    );
     println!("cargo:rerun-if-env-changed=BEEKEEPER_FC_LINK_FLAGS");
 
     if let Ok(dir) = env::var("BEEKEEPER_FC_CRYPTO_BRIDGE_LIB_DIR") {
@@ -131,7 +135,7 @@ fn build_from_source(manifest_dir: &Path) {
             }
         }
     } else {
-        prelink_native_bundle(&manifest_dir, &out_dir, &ffi_archive);
+        prelink_native_bundle(manifest_dir, &out_dir, &ffi_archive);
     }
 
     println!("cargo:rerun-if-changed=src/lib.rs");
@@ -151,11 +155,18 @@ fn build_from_source(manifest_dir: &Path) {
 /// localized. This makes the crate's fc copy invisible to the rest of the
 /// process, so it can never cross-bind with another fc build linked into the
 /// same binary (e.g. the one inside the wax crate's native bundle).
-fn prelink_native_bundle(manifest_dir: &Path, out_dir: &Path, ffi_archive: &Path) {
+fn prelink_native_bundle(
+    manifest_dir: &Path,
+    out_dir: &Path,
+    ffi_archive: &Path,
+) {
     // Minimal driver that builds only fc_crypto_bridge + its deps, avoiding the
     // beekeeper daemon's Boost requirements the CI image cannot satisfy.
     let driver_dir = manifest_dir.join("fc_bridge_cmake");
-    println!("cargo:rerun-if-changed={}", driver_dir.join("CMakeLists.txt").display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        driver_dir.join("CMakeLists.txt").display()
+    );
 
     let mut cfg = cmake::Config::new(&driver_dir);
     cfg.build_target("fc_crypto_bridge")
@@ -205,8 +216,17 @@ fn prelink_native_bundle(manifest_dir: &Path, out_dir: &Path, ffi_archive: &Path
             grouped_archives.push(archive);
         }
     }
-    for component in ["chrono", "context", "coroutine", "date_time", "filesystem", "system", "thread"] {
-        grouped_archives.push(find_static_lib(&format!("libboost_{component}.a")));
+    for component in [
+        "chrono",
+        "context",
+        "coroutine",
+        "date_time",
+        "filesystem",
+        "system",
+        "thread",
+    ] {
+        grouped_archives
+            .push(find_static_lib(&format!("libboost_{component}.a")));
     }
     for lib in ["libssl.a", "libcrypto.a", "libz.a", "libbz2.a"] {
         grouped_archives.push(find_static_lib(lib));
@@ -219,20 +239,26 @@ fn prelink_native_bundle(manifest_dir: &Path, out_dir: &Path, ffi_archive: &Path
         .lines()
         .filter_map(|line| {
             let mut cols = line.split_whitespace();
-            let (_addr, kind, name) = (cols.next()?, cols.next()?, cols.next()?);
+            let (_addr, kind, name) =
+                (cols.next()?, cols.next()?, cols.next()?);
             (kind == "T" && name.contains("cxxbridge1$")).then_some(name)
         })
         .collect();
     roots.sort_unstable();
     roots.dedup();
-    assert!(!roots.is_empty(), "no cxxbridge symbols found in {}", ffi_archive.display());
+    assert!(
+        !roots.is_empty(),
+        "no cxxbridge symbols found in {}",
+        ffi_archive.display()
+    );
 
     let prelink_dir = out_dir.join("prelink");
     std::fs::create_dir_all(&prelink_dir).expect("create prelink dir");
 
     let roots_file = prelink_dir.join("gc_roots.txt");
     let exports_file = prelink_dir.join("exported_symbols.txt");
-    let undefined_flags: String = roots.iter().map(|s| format!("--undefined={s}\n")).collect();
+    let undefined_flags: String =
+        roots.iter().map(|s| format!("--undefined={s}\n")).collect();
     std::fs::write(&roots_file, undefined_flags).expect("write gc roots");
     // Trailing newline: prelink_bundle.sh counts these entries with `wc -l`.
     let mut exports = roots.join("\n");
@@ -261,7 +287,10 @@ fn prelink_native_bundle(manifest_dir: &Path, out_dir: &Path, ffi_archive: &Path
     // Strip debug info and unneeded local symbols before localizing — the
     // bundle ships inside the published crate, so size matters.
     let mut strip = Command::new("objcopy");
-    strip.arg("--strip-debug").arg("--strip-unneeded").arg(&bundle);
+    strip
+        .arg("--strip-debug")
+        .arg("--strip-unneeded")
+        .arg(&bundle);
     run(&mut strip);
 
     let mut objcopy = Command::new("objcopy");
@@ -279,7 +308,8 @@ fn prelink_native_bundle(manifest_dir: &Path, out_dir: &Path, ffi_archive: &Path
         .lines()
         .filter_map(|line| {
             let mut cols = line.split_whitespace();
-            let (_addr, kind, name) = (cols.next()?, cols.next()?, cols.next()?);
+            let (_addr, kind, name) =
+                (cols.next()?, cols.next()?, cols.next()?);
             (kind == "u").then(|| format!("{name} beekeeper_native${name}\n"))
         })
         .collect();
@@ -322,7 +352,9 @@ fn find_static_lib(name: &str) -> PathBuf {
         return candidate;
     }
 
-    panic!("static library {name} not found; set BOOST_ROOT/OPENSSL_ROOT_DIR or install its -dev package");
+    panic!(
+        "static library {name} not found; set BOOST_ROOT/OPENSSL_ROOT_DIR or install its -dev package"
+    );
 }
 
 /// Runs a command, panicking with its stderr on failure; returns its stdout.
@@ -349,7 +381,9 @@ fn find_archive(dir: &std::path::Path, name: &str) -> Option<PathBuf> {
             if let Some(found) = find_archive(&path, name) {
                 return Some(found);
             }
-        } else if path.file_name().and_then(|n| n.to_str()) == Some(target.as_str()) {
+        } else if path.file_name().and_then(|n| n.to_str())
+            == Some(target.as_str())
+        {
             return Some(path);
         }
     }
