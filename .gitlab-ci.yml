@@ -43,7 +43,7 @@ variables:
 
 include:
 - project: 'hive/common-ci-configuration'
-  ref: e2825f108f61a949862fb7f4d4793b78ecf712af
+  ref: 7ae84823ee0bcb3163be00e16ebdf8c66002e4b4
   file:
   - '/templates/python_projects.gitlab-ci.yml'
   - '/templates/npm_projects.gitlab-ci.yml'
