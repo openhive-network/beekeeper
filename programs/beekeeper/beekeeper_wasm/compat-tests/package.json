@@ -12,6 +12,6 @@
   "devDependencies": {
     "@playwright/test": "^1.50",
     "http-server": "^14",
-    "vitest": "^3"
+    "vitest": "^5.0.0"
   }
 }
