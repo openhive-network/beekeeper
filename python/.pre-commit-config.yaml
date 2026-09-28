@@ -48,12 +48,12 @@ repos:
         language: system
         types: [python]
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+    rev: v2.4.3
     hooks:
     - id: codespell
       exclude: "programs/|swagger-ui"
   - repo: https://github.com/lk16/detect-missing-init
-    rev: v0.1.6
+    rev: v0.1.9
     hooks:
       - id: detect-missing-init
         args:
