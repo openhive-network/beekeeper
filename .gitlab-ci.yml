@@ -396,10 +396,6 @@ generate_beekeeper_docs:
 push_to_wiki:
   extends: .npm_push_doc_template
   stage: publish
-  # Preview wiki pushes use BEEKEEPER_DOC_WIKI_PUSH_TOKEN; on unprotected MR
-  # branches that token is often unavailable and auth fails. Do not block the
-  # pipeline — default/protected branch publishes remain the source of truth.
-  allow_failure: true
   needs:
   - job: generate_beekeeper_docs
     artifacts: true
