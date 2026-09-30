@@ -11,7 +11,8 @@ authors = [
   "Mateusz Żebrak <mzebrak@syncad.com>",
   "Krzysztof Mochocki <kmochocki@syncad.com>",
 ]
-description = "All in one package for beekeeper interaction via Python interface."
+description = "Python interface for the Hive Beekeeper wallet daemon (key management and signing)."
+readme = "README.md"
 name = "hiveio-beekeepy"
 packages = [
   {include = "beekeepy"},
@@ -19,7 +20,9 @@ packages = [
 include = [
     { path = "beekeepy/beekeeper", format = ["sdist", "wheel"] }
 ]
+homepage = "https://gitlab.syncad.com/hive/beekeeper"
 repository = "https://gitlab.syncad.com/hive/beekeeper"
+documentation = "https://developers.hive.io/quickstart/#quickstart-building-agents"
 source = [
   {name = "PyPI", priority = "primary"},
   {name = "gitlab-hive", url = "https://gitlab.syncad.com/api/v4/groups/136/-/packages/pypi/simple", priority = "primary"},

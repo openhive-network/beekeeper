@@ -1,10 +1,29 @@
 # Beekeeper
 
-Standalone wallet daemon with HTTP/WebSocket API for the Hive blockchain.
+Standalone wallet daemon with HTTP/WebSocket API for the Hive blockchain. Beekeeper provides secure key management and transaction signing without requiring a full blockchain node.
 
-Beekeeper provides secure key management and transaction signing without requiring a full blockchain node.
+## Packages for consumers
 
-## Building
+| Surface | Package / binary | Docs |
+|---------|------------------|------|
+| Native daemon | `beekeeper` (this repo) | Build section below |
+| Python | [`hiveio-beekeepy`](https://pypi.org/project/hiveio-beekeepy/) | [python/README.md](python/README.md) |
+| TypeScript / JavaScript (WASM) | [`@hiveio/beekeeper`](https://www.npmjs.com/package/@hiveio/beekeeper) | [programs/beekeeper/beekeeper_wasm/README.md](programs/beekeeper/beekeeper_wasm/README.md) |
+
+```bash
+pip install hiveio-beekeepy
+npm install @hiveio/beekeeper
+```
+
+## High-level documentation
+
+- Building agents (WAX + Beekeeper + WorkerBee): [developers.hive.io — Building agents](https://developers.hive.io/quickstart/#quickstart-building-agents)
+- Python usage: [python/README.md](python/README.md)
+- TypeScript / WASM usage and examples: [beekeeper_wasm README](programs/beekeeper/beekeeper_wasm/README.md)
+
+---
+
+## Building (contributors)
 
 ```bash
 git clone --recursive https://gitlab.syncad.com/hive/beekeeper.git
