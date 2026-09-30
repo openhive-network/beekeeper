@@ -5,6 +5,10 @@
 
 Hive Beekeeper functionality exposed to TypeScript/JavaScript environments
 
+For building bots and automation on Hive (WAX + Beekeeper + WorkerBee), see [Building agents on developers.hive.io](https://developers.hive.io/quickstart/#quickstart-building-agents).
+
+Python consumers should use [`hiveio-beekeepy`](https://pypi.org/project/hiveio-beekeepy/) — see the [Python README](https://gitlab.syncad.com/hive/beekeeper/-/blob/master/python/README.md).
+
 ## 📥 Installation
 
 This is a [Node.js](https://nodejs.org/en/) (version 20 or higher) module available through the
