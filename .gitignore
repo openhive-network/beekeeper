@@ -35,3 +35,4 @@ storage_root-node
 # AIDEV suite reports (.aidev/run-checks.sh)
 /test-results/
 /beekeeper-storage/
+/.aidev-dir-lease/
