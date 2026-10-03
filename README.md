@@ -20,6 +20,28 @@ ninja beekeeper
 ./programs/beekeeper/beekeeper/beekeeper --webserver-http-endpoint=127.0.0.1:5001
 ```
 
+## Testing
+
+Native unit tests (Boost.Test; configure with `-DBUILD_TESTS=ON`, run from the repository root):
+
+```bash
+./build/tests/unit/beekeeper_test
+```
+
+WASM package (Playwright):
+
+```bash
+cd programs/beekeeper/beekeeper_wasm && pnpm test
+```
+
+beekeepy (pytest):
+
+```bash
+cd python && pytest tests/beekeepy_test
+```
+
+For the containerised checks AIDEV runs, see [`.aidev/README.md`](.aidev/README.md).
+
 ## Dependencies
 
 - [plugins](https://gitlab.syncad.com/hive/plugins) - Shared plugin libraries
