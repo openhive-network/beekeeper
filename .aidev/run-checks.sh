@@ -101,8 +101,34 @@ playwright_tests() {
 # PACKAGES_TO_CHECK.
 py_pkgs=(python/tests/ python/beekeepy/)
 
+# fc's CMakeLists asks git for its HEAD and commit time (get_git_head_revision,
+# get_git_unix_timestamp) and stops when it can't. A workflow's container has no
+# usable git: /work/.git and the submodules' .git files point outside the mount.
+# Then the sources are copied to a scratch tree that is its own one-commit
+# repository, and that is what cmake configures.
+native_sources() {
+    if git -C libraries/plugins/libraries/fc rev-parse -q --verify HEAD > /dev/null 2>&1; then
+        echo "$root"; return
+    fi
+    local src="${TMPDIR:-/tmp}/beekeeper-native-src"
+    rm -rf "$src" && mkdir -p "$src" || return 1
+    tar -C "$root" --exclude=./build --exclude=./test-results --exclude=node_modules \
+        --exclude=.git --exclude=.aidev-artifacts -cf - . | tar -C "$src" -xf - || return 1
+    git -C "$src" init -q \
+        && git -C "$src" -c user.name=aidev -c user.email=aidev@localhost commit -q --allow-empty \
+            -m "snapshot of ${AIDEV_BASE_REF:-the workspace} for the native build" || return 1
+    echo "no usable git in the workspace: configuring a snapshot at $src" >&2
+    echo "$src"
+}
+
 native_build() {
-    cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON && ninja -C build -j"$(nproc)"
+    local src
+    src="$(native_sources)" || return 1
+    # A cache from another source tree (in place vs. snapshot) can't be reused.
+    if [ -f build/CMakeCache.txt ] && ! grep -qx "CMAKE_HOME_DIRECTORY:INTERNAL=$src" build/CMakeCache.txt; then
+        rm -rf build
+    fi
+    cmake -S "$src" -B build -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON && ninja -C build -j"$(nproc)"
 }
 
 native_tests() {
