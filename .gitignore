@@ -31,3 +31,7 @@ results.xml
 .beekeeper
 storage_root-node
 .last-run.json
+
+# AIDEV suite reports (.aidev/run-checks.sh)
+/test-results/
+/beekeeper-storage/

@@ -10,6 +10,14 @@ Two builds exist:
 - **Native C++**: HTTP/WebSocket server daemon
 - **WASM**: TypeScript/JavaScript bindings (`@hiveio/beekeeper` npm package)
 
+## Working in an AIDEV workflow
+When AIDEV runs you on an issue, no one is there to answer questions. GitLab CI doesn't run for AIDEV branches; the checks below are the verification.
+
+- **Check your change:** run `aidev test run --slot quick` once, after your last edit. It builds the WASM module and the TS package, runs the Playwright suite, and runs ruff and mypy on `python/`. `aidev test run --slot full` adds the native build, its Boost.Test suite and the beekeepy pytest suite against the native daemon.
+- **Iterate:** `.aidev/run-checks.sh dev <step>...` runs single steps (`wasm`, `build`, `typecheck`, `test`, `native`, `native-test`, `beekeepy`, `py-format`, `py-lint`, `py-types`); see `.aidev/README.md`. Suites run offline in the test image, so tests that need a live Hive node are not run.
+- **Submodules:** `libraries/plugins` (fc, appbase) and `programs/beekeeper/beekeeper_wasm/npm-common-config` must be checked out; don't change their pinned commits unless the issue asks for it.
+- **Dependencies:** a change to `beekeeper_wasm/pnpm-lock.yaml`, `python/poetry.lock`, `python/pyproject.toml` or `packageManager` needs a new test image. Run `.aidev/runtime/build.sh --push` and put the printed reference in `.aidev/project.yaml` `environment.image` in the same commit (see `.aidev/README.md`).
+
 ## Build Commands
 
 ### Native Build
