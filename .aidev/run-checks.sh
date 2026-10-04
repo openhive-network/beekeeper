@@ -103,11 +103,14 @@ py_pkgs=(python/tests/ python/beekeepy/)
 
 # fc's CMakeLists asks git for its HEAD and commit time (get_git_head_revision,
 # get_git_unix_timestamp) and stops when it can't. A workflow's container has no
-# usable git: /work/.git and the submodules' .git files point outside the mount.
-# Then the sources are copied to a scratch tree that is its own one-commit
-# repository, and that is what cmake configures.
+# usable git: /work/.git and the submodules' .git files point outside the mount,
+# or are mounted links with an absolute gitdir, which fc's cmake appends to the
+# submodule directory instead of resolving. Then the sources are copied to a
+# scratch tree that is its own one-commit repository, and that is what cmake
+# configures.
 native_sources() {
-    if git -C libraries/plugins/libraries/fc rev-parse -q --verify HEAD > /dev/null 2>&1; then
+    if git -C libraries/plugins/libraries/fc rev-parse -q --verify HEAD > /dev/null 2>&1 \
+        && ! grep -qs '^gitdir: /' libraries/plugins/libraries/fc/.git; then
         echo "$root"; return
     fi
     local src="${TMPDIR:-/tmp}/beekeeper-native-src"
