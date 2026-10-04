@@ -323,7 +323,7 @@ packages:
 
   '@hiveio/beekeeper@file:../../beekeeper_wasm':
     resolution: {directory: ../../beekeeper_wasm, type: directory}
-    engines: {node: ^20.11 || >= 21.2}
+    engines: {node: '>=24'}
 
   '@ioredis/commands@1.2.0':
     resolution: {integrity: sha512-Sx1pU8EM64o2BrqNpEO1CNLtKQwyhuXuqyfH7oGKCk+1a33d2r5saW8zNwm3j6BTExtjrv2BxTgzzkMwts6vGg==}

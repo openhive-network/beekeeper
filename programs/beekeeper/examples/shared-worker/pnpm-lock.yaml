@@ -44,7 +44,7 @@ packages:
 
   '@hiveio/beekeeper@file:../../beekeeper_wasm':
     resolution: {directory: ../../beekeeper_wasm, type: directory}
-    engines: {node: ^20.11 || >= 21.2}
+    engines: {node: '>=24'}
 
   '@jridgewell/sourcemap-codec@1.5.0':
     resolution: {integrity: sha512-gv3ZRaISU3fjPAgNsriBRqGWQL6quFx04YMPW/zD8XMLsU32mhCCbfbO6KZFLjvYpCZ8zyDEgqsgf+PwPaM7GQ==}

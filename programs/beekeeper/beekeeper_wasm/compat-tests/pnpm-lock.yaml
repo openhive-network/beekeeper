@@ -189,7 +189,7 @@ packages:
 
   '@hiveio/beekeeper@file:..':
     resolution: {directory: .., type: directory}
-    engines: {node: ^20.11 || >= 21.2}
+    engines: {node: '>=24'}
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}

@@ -43,8 +43,8 @@ pre-commit hooks other than ruff/mypy, and packaging/publishing.
 ## The test runtime image (`runtime/`)
 
 The suites run in a container with `--network none` and your uid. The image is CI's
-`emsdk:5.0.2-3` (the npm_projects template's `EMSCRIPTEN_IMAGE_TAG`: emscripten, Node
-22.21.1, pnpm 10.0.0) plus the chromium build the lockfile's Playwright wants, a pnpm
+`emsdk:5.0.2-4` (the npm_projects template's `EMSCRIPTEN_IMAGE_TAG`: emscripten, Node
+24.21.0, pnpm 10.0.0) plus the chromium build the lockfile's Playwright wants, a pnpm
 store filled from `beekeeper_wasm/pnpm-lock.yaml`, Ubuntu's g++/Boost/OpenSSL for the
 native build, and Python 3.12 with `python/poetry.lock` (dev and static-analysis
 groups) in `/opt/py`.

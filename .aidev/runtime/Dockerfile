@@ -3,7 +3,7 @@
 # everything they need is in the image:
 #
 # * the CI emsdk image the project's npm_projects template pins (EMSCRIPTEN_IMAGE_TAG
-#   5.0.2-3): emscripten, cmake, ninja, Node 22.21.1 and pnpm 10.0.0 under nvm (as
+#   5.0.2-4): emscripten, cmake, ninja, Node 24.21.0 and pnpm 10.0.0 under nvm (as
 #   CI's `nvm use "${NODEJS_VERSION}"`);
 # * the chromium build the lockfile's Playwright wants, in /opt/pw-browsers (CI's
 #   beekeeper_wasm_test runs `playwright install chromium`; the emsdk image's own
@@ -19,12 +19,12 @@
 #   the subprocesses its tests start need.
 #
 # Build and pin it with .aidev/runtime/build.sh; see .aidev/README.md.
-FROM registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-3@sha256:77d9f1994382bae6fdd01f44e8b1af3b0396651b1c4dbc8a50ed60d596bc73b3
+FROM registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-4@sha256:966dd9e9da494d184fcc7f622bb24d93c41b8d58c814156aa79cd1d70f31d9ab
 
 USER root
 
 ENV HOME=/tmp \
-    PATH=/opt/py/bin:/home/emscripten/.nvm/versions/node/v22.21.1/bin:$PATH \
+    PATH=/opt/py/bin:/home/emscripten/.nvm/versions/node/v24.21.0/bin:$PATH \
     VIRTUAL_ENV=/opt/py \
     npm_config_store_dir=/opt/pnpm-store \
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
@@ -44,7 +44,7 @@ RUN apt-get update \
 
 COPY js/ /tmp/pnpm-fetch/
 RUN cd /tmp/pnpm-fetch \
-    && test "$(node --version)" = v22.21.1 && test "$(pnpm --version)" = 10.0.0 \
+    && test "$(node --version)" = v24.21.0 && test "$(pnpm --version)" = 10.0.0 \
     && pnpm fetch \
     && pnpm install --offline --frozen-lockfile --ignore-scripts \
     && pnpm exec playwright install chromium \
