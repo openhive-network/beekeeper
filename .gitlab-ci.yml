@@ -29,7 +29,7 @@ variables:
   GIT_CONFIG_KEY_0: "protocol.file.allow"
   GIT_CONFIG_VALUE_0: "always"
   # Common CI configuration reference
-  COMMON_CI_REF: "c9cb02ea67f9f381f52280be4ca1f708243373a0"
+  COMMON_CI_REF: "7dffa23eb3612b0e2f049e98260028c0134c0156"
 
   # Python/beekeepy configuration
   PYTHON_DIR: ${CI_PROJECT_DIR}/python
@@ -51,7 +51,7 @@ variables:
 
 include:
 - project: 'hive/common-ci-configuration'
-  ref: 1c0dc43e07ed44a5f87fe5d0b6a39ca0795f9ea6
+  ref: 7dffa23eb3612b0e2f049e98260028c0134c0156
   file:
   - '/templates/python_projects.gitlab-ci.yml'
   - '/templates/npm_projects.gitlab-ci.yml'
@@ -498,7 +498,6 @@ deploy_beekeeper_wasm_production_public_npm:
   variables:
     GIT_STRATEGY: clone
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
-    NPM_PUBLISH_TOKEN: "$INTERNAL_HIDDEN_PUBLISH_TOKEN"
     NPM_PACKAGE_NAME: "beekeeper"
     PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
   before_script:
