@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from beekeepy._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
+from hiveio_api._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
 
 __all__ = [
     "AnyUrl",
@@ -30,7 +30,8 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from beekeepy._communication.url import AnyUrl, HttpUrl, P2PUrl, Url, WsUrl
+    from hiveio_api._communication.url import AnyUrl, HttpUrl, P2PUrl, Url, WsUrl
+
     from beekeepy._utilities.context import ContextAsync, ContextSync, SelfContextAsync, SelfContextSync
     from beekeepy._utilities.context_settings_updater import ContextSettingsUpdater
     from beekeepy._utilities.delay_guard import AsyncDelayGuard, DelayGuardBase, SyncDelayGuard
@@ -50,7 +51,7 @@ __getattr__ = lazy_module_factory(
         "P2PUrl",
         "Url",
         "WsUrl",
-        module="beekeepy._communication.url",
+        module="hiveio_api._communication.url",
     ),
     *aggregate_same_import(
         "ContextAsync",

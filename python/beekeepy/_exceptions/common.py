@@ -13,7 +13,7 @@ from beekeepy.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from beekeepy._communication.url import Url
+    from hiveio_api._communication.url import Url
 
 
 class BatchRequestError(BeekeepyError):

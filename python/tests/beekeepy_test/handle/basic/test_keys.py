@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final
 
 import pytest
+from hiveio_api.beekeeper_api.beekeeper_api_description import BeekeeperImportKeyResponse as ImportKey
+from hiveio_api.beekeeper_api.beekeeper_api_description import Key as PublicKeyItem
 
-from schemas.apis.beekeeper_api import ImportKey
-from schemas.apis.beekeeper_api.fundaments_of_responses import PublicKeyItem
 from schemas.fields.basic import PrivateKey, PublicKey
 
 if TYPE_CHECKING:

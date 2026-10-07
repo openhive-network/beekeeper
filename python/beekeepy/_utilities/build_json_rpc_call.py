@@ -1,14 +1,14 @@
+"""Moved to `hiveio_api._utilities.build_json_rpc_call` (hiveio-api).
+
+Re-exported here for backward compatibility.
+"""
+
 from __future__ import annotations
 
+from hiveio_api._utilities.build_json_rpc_call import (
+    build_json_rpc_call,
+)
 
-def build_json_rpc_call(*, method: str, params: str, id_: int = 0) -> str:
-    """Builds params for jsonrpc call."""
-    return (
-        """{"id":"""
-        + str(id_)
-        + ""","jsonrpc":"2.0","method":\""""
-        + method
-        + '"'
-        + (""","params":""" + params if params else "")
-        + "}"
-    )
+__all__ = [
+    "build_json_rpc_call",
+]

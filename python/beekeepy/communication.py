@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from beekeepy._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
+from hiveio_api._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
 
 __all__ = [
     "AbstractCommunicator",
@@ -31,9 +31,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from beekeepy._communication import rules
-    from beekeepy._communication.abc.communicator import AbstractCommunicator
-    from beekeepy._communication.abc.communicator_models import (
+    from hiveio_api._communication.abc.communicator_models import (
         AsyncCallback,
         AsyncCallbacks,
         AsyncErrorCallback,
@@ -47,6 +45,9 @@ if TYPE_CHECKING:
         ResponseCallback,
         SyncCallback,
     )
+
+    from beekeepy._communication import rules
+    from beekeepy._communication.abc.communicator import AbstractCommunicator
     from beekeepy._communication.abc.overseer import AbstractOverseer
     from beekeepy._communication.aiohttp_communicator import AioHttpCommunicator
     from beekeepy._communication.communicator_getter import get_communicator_cls
@@ -77,7 +78,7 @@ __getattr__ = lazy_module_factory(
         "Response",
         "ResponseCallback",
         "SyncCallback",
-        module="beekeepy._communication.abc.communicator_models",
+        module="hiveio_api._communication.abc.communicator_models",
     ),
     *aggregate_same_import(
         "CommonOverseer",

@@ -37,9 +37,10 @@ psutil = "^7.0.0"
 python-dateutil = "^2.8.2"
 requests = "^2.32.3"
 
-# Range admits only development builds - final and .post releases of this version predate the related merge
-# request (they lack schemas.validation).
+# Ranges admit only development builds - final and .post releases of these versions predate the related merge
+# requests (they lack schemas.validation and the API base classes).
 hiveio-schemas = {version = ">=1.28.2.dev20261007135615,<1.28.2.dev99999999999999", source = "gitlab-hive", allow-prereleases = true}  # development builds of the related merge request
+hiveio-api = {version = ">=1.28.8rc3.dev20261007140455,<1.28.8rc3.dev99999999999999", source = "gitlab-hive", allow-prereleases = true}  # API base classes, models of beekeeper_api/app_status_api
 
 [tool.poetry.group.static-analysis.dependencies]
 mypy = "^2.0.0"

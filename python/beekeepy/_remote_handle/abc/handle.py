@@ -4,15 +4,15 @@ import json
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 
-from loguru import logger as loguru_logger
-
-from beekeepy._apis.abc.api_collection import (
+from hiveio_api._apis.abc.api_collection import (
     AbstractAsyncApiCollection,
     AbstractSyncApiCollection,
 )
-from beekeepy._apis.abc.sendable import AsyncSendable, SyncSendable
+from hiveio_api._apis.abc.sendable import AsyncSendable, SyncSendable
+from hiveio_api._communication.url import HttpUrl
+from loguru import logger as loguru_logger
+
 from beekeepy._communication.communicator_getter import get_communicator_cls
-from beekeepy._communication.url import HttpUrl
 from beekeepy._remote_handle.settings import RemoteHandleSettings
 from beekeepy._utilities.context import SelfContextAsync, SelfContextSync
 from beekeepy._utilities.settings_holder import UniqueSettingsHolder
@@ -21,10 +21,10 @@ from beekeepy.exceptions import CommunicationError
 from schemas.jsonrpc import ExpectResultT, JSONRPCResult, get_response_model
 
 if TYPE_CHECKING:
+    from hiveio_api._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
     from loguru import Logger
 
     from beekeepy._communication.abc.communicator import AbstractCommunicator
-    from beekeepy._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
     from beekeepy._communication.abc.overseer import AbstractOverseer
     from beekeepy._remote_handle.abc.batch_handle import AsyncBatchHandle, SyncBatchHandle
     from beekeepy.exceptions import Json

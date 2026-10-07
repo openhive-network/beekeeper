@@ -10,7 +10,8 @@ from beekeepy._communication.abc.communicator import (
 from beekeepy.exceptions import CommunicationError
 
 if TYPE_CHECKING:
-    from beekeepy._communication.abc.communicator_models import Request, Response
+    from hiveio_api._communication.abc.communicator_models import Request, Response
+
     from beekeepy._communication.settings import CommunicationSettings
 
 

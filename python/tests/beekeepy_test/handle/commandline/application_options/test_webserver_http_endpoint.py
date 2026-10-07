@@ -3,14 +3,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+import hiveio_api.beekeeper_api.beekeeper_api_description as beekeeper_api
 import pytest
 import requests
 from beekeepy.handle.runnable import BeekeeperArguments
 from beekeepy.interfaces import HttpUrl
 from local_tools.beekeepy.network import get_port
-
-from schemas.apis import beekeeper_api
-from schemas.jsonrpc import get_response_model
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper
@@ -28,7 +26,7 @@ def check_webserver_http_endpoint(*, webserver_http_endpoint: HttpUrl) -> None:
     resp = requests.post(webserver_http_endpoint.as_string(), data=json.dumps(data), timeout=10.0)
     assert resp.ok
     resp_json = resp.json()
-    get_response_model(beekeeper_api.CreateSession, json.dumps(resp_json), "hf26")
+    assert beekeeper_api.BeekeeperCreateSessionResponse.from_builtins(resp_json["result"]).token
 
 
 @pytest.mark.parametrize(

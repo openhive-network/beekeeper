@@ -6,8 +6,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 
+from hiveio_api._apis.abc.sendable import AsyncSendable, SyncSendable
+
 from beekeepy import exceptions
-from beekeepy._apis.abc.sendable import AsyncSendable, SyncSendable
 from beekeepy._utilities.context import ContextAsync, ContextSync, EnterReturnT
 from schemas.jsonrpc import ExpectResultT, JSONRPCResult, get_response_model
 
@@ -15,9 +16,10 @@ if TYPE_CHECKING:
     from types import TracebackType
     from typing import Self
 
-    from beekeepy._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
+    from hiveio_api._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy._communication.abc.overseer import AbstractOverseer
-    from beekeepy._communication.url import HttpUrl
 
 
 class _DelayedResponseWrapper:

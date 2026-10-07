@@ -22,6 +22,7 @@ from beekeepy.exceptions import (
     NotExistingKeyError,
     UnknownDecisionPathError,
 )
+from schemas.fields.hive_datetime import HiveDateTime
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -122,7 +123,7 @@ class UnlockedWallet(UnlockedWalletInterface, Wallet):
 
     @property
     def lock_time(self) -> datetime:
-        return self._beekeeper.api.get_info(token=self.session_token).timeout_time
+        return HiveDateTime(self._beekeeper.api.get_info(token=self.session_token).timeout_time)
 
     @wallet_unlocked
     def encrypt_data(self, *, from_key: PublicKey, to_key: PublicKey, content: str, nonce: int = 0) -> str:

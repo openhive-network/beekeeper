@@ -7,10 +7,11 @@ from beekeepy._communication.overseers import CommonOverseer
 from beekeepy._communication.settings import CommunicationSettings
 
 if TYPE_CHECKING:
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy._communication.abc.communicator import (
         AbstractCommunicator,
     )
-    from beekeepy._communication.url import HttpUrl
 
 
 class RemoteHandleSettings(CommunicationSettings):
