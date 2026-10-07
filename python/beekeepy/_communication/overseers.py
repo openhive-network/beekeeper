@@ -9,6 +9,7 @@ from beekeepy._communication.rules import (
     InvalidPassword,
     JussiResponse,
     NullResult,
+    SchemaValidation,
     UnableToAcquireDatabaseLock,
     UnableToAcquireForkdbLock,
     UnableToOpenWallet,
@@ -47,7 +48,7 @@ class CommonOverseer(AbstractOverseer):
 
 
 class StrictOverseer(AbstractOverseer):
-    """Dedicated for test usage."""
+    """Dedicated for test usage. Also validates responses against schemas of called endpoints (SchemaValidation)."""
 
     def _rules(self) -> RulesClassifier:
         return RulesClassifier(
@@ -61,6 +62,7 @@ class StrictOverseer(AbstractOverseer):
                 WalletIsAlreadyUnlocked,
                 UnableToOpenWallet,
                 InvalidPassword,
+                SchemaValidation,
                 ErrorInResponse,
             ],
             infinitely_repeatable=[

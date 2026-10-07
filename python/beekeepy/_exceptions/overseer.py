@@ -109,6 +109,35 @@ class ErrorInResponseError(OverseerError):
         return self.response
 
 
+class SchemaValidationError(OverseerError):
+    """Result of the response does not match the validation model of the called endpoint."""
+
+    def __init__(  # noqa: PLR0913
+        self,
+        url: str | Url[Any],
+        request: CommunicationResponseT | bytes,
+        response: CommunicationResponseT | None = None,
+        whole_response: CommunicationResponseT | None = None,
+        *,
+        message: str = "",
+        request_id: int | None,
+        schema_errors: Sequence[Any] = (),
+    ) -> None:
+        super().__init__(
+            url=url,
+            request=request,
+            response=response,
+            message=message,
+            request_id=request_id,
+            whole_response=whole_response,
+        )
+        self.schema_errors = list(schema_errors)
+        """Problems found by `schemas.validation.validate_schema` (`SchemaError` instances)."""
+
+    def retry(self) -> bool:
+        return False
+
+
 class GroupedErrorsError(BeekeepyError):
     def __init__(self, exceptions: Sequence[BaseException]) -> None:
         self.exceptions = list(exceptions)

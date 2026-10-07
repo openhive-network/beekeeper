@@ -37,7 +37,9 @@ psutil = "^7.0.0"
 python-dateutil = "^2.8.2"
 requests = "^2.32.3"
 
-hiveio-schemas = "^1.28.2-post.0"
+# Range admits only development builds - final and .post releases of this version predate the related merge
+# request (they lack schemas.validation).
+hiveio-schemas = {version = ">=1.28.2.dev20261007135615,<1.28.2.dev99999999999999", source = "gitlab-hive", allow-prereleases = true}  # development builds of the related merge request
 
 [tool.poetry.group.static-analysis.dependencies]
 mypy = "^2.0.0"

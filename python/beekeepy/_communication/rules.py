@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, ClassVar, Final
+from functools import cache
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final
 
 from beekeepy._communication.abc.rules import OverseerRule
 from beekeepy.exceptions import (
@@ -14,6 +15,7 @@ from beekeepy.exceptions import (
     NullResultError,
     OverseerError,
     OverseerInvalidPasswordError,
+    SchemaValidationError,
     UnableToAcquireDatabaseLockError,
     UnableToAcquireForkdbLockError,
     UnableToOpenWalletError,
@@ -147,9 +149,7 @@ class UnparsableResponse(OverseerRule):
         if isinstance(parsed_response, json.JSONDecodeError):
             return [
                 self._construct_exception(
-                    message=(
-                        "Received response is not parsable, " f"probably plaintext or invalid json: {response_raw}"
-                    ),
+                    message=(f"Received response is not parsable, probably plaintext or invalid json: {response_raw}"),
                     response=parsed_response,
                     whole_response=response_raw,  # type: ignore[arg-type]
                     request_id=None,
@@ -325,3 +325,68 @@ class InvalidPassword(OverseerRule):
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return OverseerInvalidPasswordError
+
+
+_MAX_SCHEMA_ERRORS_IN_MESSAGE: Final[int] = 10
+
+
+class SchemaValidation(OverseerRule):
+    """
+    Validates `result` of a JSON-RPC response against the validation model of the called endpoint.
+
+    Uses `schemas.validation.validate_schema` with the endpoint taken from `method` of the matching request
+    (e.g. `condenser_api.get_accounts`). Responses with an error, without (or with null) `result`, REST requests and
+    endpoints without registered validation models are skipped.
+
+    Note: Validation is opt-in, API calls do not validate responses by default - use an overseer containing this rule.
+    """
+
+    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
+        result = parsed_response.get("result")
+        if result is None or parsed_response.get("error") is not None or not self.request:
+            return []
+
+        request_id = parsed_response.get("id")
+        method = self._get_matching_request(request_id=request_id).get("method")  # type: ignore[arg-type]
+        validation = _load_validate_schema()
+        if not isinstance(method, str) or "." not in method or validation is None:
+            return []
+
+        validate_schema, unknown_endpoint_error = validation
+        try:
+            schema_errors = validate_schema(result, method)
+        except unknown_endpoint_error:
+            return []
+        if not schema_errors:
+            return []
+
+        described = "\n".join(
+            f"  {error.path}: {error.message}" for error in schema_errors[:_MAX_SCHEMA_ERRORS_IN_MESSAGE]
+        )
+        more = len(schema_errors) - _MAX_SCHEMA_ERRORS_IN_MESSAGE
+        return [
+            SchemaValidationError(
+                url=self.url,
+                request=self.request,
+                response=parsed_response,
+                whole_response=whole_response,
+                message=f"Response of `{method}` does not match its schema:\n{described}"
+                + (f"\n  ... and {more} more" if more > 0 else ""),
+                request_id=request_id,
+                schema_errors=schema_errors,
+            )
+        ]
+
+    @classmethod
+    def expected_exception(cls) -> type[OverseerError]:
+        return SchemaValidationError
+
+
+@cache
+def _load_validate_schema() -> tuple[Callable[..., list[Any]], type[Exception]] | None:
+    """Imported lazily - validation machinery is loaded only when validation is used."""
+    try:
+        from schemas.validation import UnknownEndpointError, validate_schema
+    except ImportError:  # hiveio-schemas without validation support
+        return None
+    return validate_schema, UnknownEndpointError
