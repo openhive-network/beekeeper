@@ -1,4 +1,8 @@
+# shellcheck shell=bash
 # Sourced, not executed, by the .aidev/run-*.sh scripts that write junit.
+# The node -e programs are single-quoted on purpose: their ${...} are JS template
+# literals, not shell expansions.
+# shellcheck disable=SC2016
 #
 # run_with_junit_fallback JUNIT SUITE CMD...
 #   Runs CMD, showing its output as usual. If CMD fails without leaving a
