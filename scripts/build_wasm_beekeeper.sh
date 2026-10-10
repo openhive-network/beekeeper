@@ -54,6 +54,12 @@ build() {
   # Handle process at start of line
   sed -i 's#^process\.argv#globalThis.process.argv#g' "${GLUE}"
   sed -i 's#^process\.exitCode#globalThis.process.exitCode#g' "${GLUE}"
+
+  # The glue must run under a Content-Security-Policy without 'unsafe-eval' (see -sNO_DYNAMIC_EXECUTION).
+  if grep -nE 'new Function[[:space:]]*\(|(^|[^[:alnum:]_$.])eval[[:space:]]*\(' "${BUILD_DIR}"/*.js; then
+    echo "Emitted JS glue uses dynamic code execution (new Function/eval)" >&2
+    exit 1
+  fi
 }
 
 if [ "${DIRECT_EXECUTION}" -eq 0 ]; then

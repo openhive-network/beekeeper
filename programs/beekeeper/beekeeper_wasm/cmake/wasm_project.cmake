@@ -79,6 +79,8 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     -sMODULARIZE=1 -sSINGLE_FILE=0 -sUSE_ES6_IMPORT_META=1
     -sEXPORT_ES6=1 -sINITIAL_MEMORY=67108864 -sWASM_ASYNC_COMPILATION=1
     -sNO_FILESYSTEM=1
+    # Keep embind/Asyncify on their non-eval code paths, so the glue runs under a CSP without 'unsafe-eval'
+    -sNO_DYNAMIC_EXECUTION=1
     -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=65536
     "-sASYNCIFY_ONLY=['${ASYNCIFY_FUNCS_STR}']"
     --minify=0 --emit-symbol-map -sENVIRONMENT=web,worker,node
