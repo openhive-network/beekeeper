@@ -27,8 +27,10 @@
 #   py-format  ruff format --check (CI's beekeepy_formatting_with_ruff_check)
 #   py-lint    ruff check (the ruff hook of CI's beekeepy_pre_commit_checks)
 #   py-types   mypy (CI's beekeepy_type_check_with_mypy)
+# The step functions below are only called through step(), which shellcheck can't see.
+# shellcheck disable=SC2317
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 root="$PWD"
 pkg="$root/programs/beekeeper/beekeeper_wasm"
 
@@ -36,6 +38,9 @@ suite="${1:?usage: $0 <suite> <step>...}"; shift
 out="$root/test-results/$suite"
 rm -rf "$out"; mkdir -p "$out"
 cases="$out/cases.tsv"; : > "$cases"
+# The sourced helpers are checked on their own; pre-commit may lint them in another
+# batch than this file, and then they cannot be followed.
+# shellcheck source=.aidev/junit-helpers.sh disable=SC1091
 source .aidev/junit-helpers.sh
 
 # The TS package's workspace file and .npmrc are symlinks into the
@@ -49,7 +54,7 @@ fi
 needs_node=0
 for s in "$@"; do case "$s" in build|typecheck|test) needs_node=1 ;; esac; done
 if [ "$needs_node" -eq 1 ]; then
-    # shellcheck source=pnpm-deps.sh
+    # shellcheck source=.aidev/pnpm-deps.sh disable=SC1091
     if ! (cd "$pkg" && source "$root/.aidev/pnpm-deps.sh"); then
         printf 'case\tinstall\tfail\t0\tpnpm install --offline failed\n' >> "$cases"
         junit_write_cases "$out/junit.xml" "$suite" "$cases"
@@ -134,7 +139,10 @@ for s in "$@"; do
     case "$s" in
         wasm) step wasm wasm_build ;;
         build) step build ts_build ;;
-        typecheck) step typecheck bash -c 'cd "$1" && [ -f src/build/beekeeper_wasm.common.js ] && pnpm exec tsc --noEmit' _ "$pkg" ;;
+        typecheck)
+            # $1 is the inner bash's argument.
+            # shellcheck disable=SC2016
+            step typecheck bash -c 'cd "$1" && [ -f src/build/beekeeper_wasm.common.js ] && pnpm exec tsc --noEmit' _ "$pkg" ;;
         test) step test playwright_tests ;;
         native) step native native_build ;;
         native-test) step native-test native_tests ;;
