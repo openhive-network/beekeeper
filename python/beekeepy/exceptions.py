@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from beekeepy._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
+from hiveio_api._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
 
 __all__ = [
     "ApiNotFoundError",
@@ -52,6 +52,7 @@ __all__ = [
     "ProcessSearchError",
     "ResponseNotReadyError",
     "SchemaDetectableError",
+    "SchemaValidationError",
     "TimeoutExceededError",
     "TimeoutReachWhileCloseError",
     "TimeTooBigError",
@@ -135,6 +136,7 @@ if TYPE_CHECKING:
         JussiResponseError,
         NullResultError,
         OverseerInvalidPasswordError,
+        SchemaValidationError,
         UnableToAcquireDatabaseLockError,
         UnableToAcquireForkdbLockError,
         UnableToOpenWalletError,
@@ -215,6 +217,7 @@ __getattr__ = lazy_module_factory(
         "JussiResponseError",
         "NullResultError",
         "OverseerInvalidPasswordError",
+        "SchemaValidationError",
         "UnableToAcquireDatabaseLockError",
         "UnableToAcquireForkdbLockError",
         "UnableToOpenWalletError",
