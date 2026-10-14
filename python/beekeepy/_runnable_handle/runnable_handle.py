@@ -8,9 +8,9 @@ from pathlib import Path
 from subprocess import SubprocessError
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
+from hiveio_api._communication.url import HttpUrl, P2PUrl, WsUrl
 from loguru import logger as default_logger
 
-from beekeepy._communication.url import HttpUrl, P2PUrl, WsUrl
 from beekeepy._executable.abc.executable import ArgumentT, ConfigT, Executable
 from beekeepy._remote_handle.app_status_probe import AppStatusProbe
 from beekeepy._runnable_handle.match_ports import PortMatchingResult, match_ports
@@ -24,9 +24,8 @@ from beekeepy.exceptions import (
 from beekeepy.interfaces import Stopwatch
 
 if TYPE_CHECKING:
+    from hiveio_api.app_status_api.app_status_api_description import AppStatusGetAppStatusResponse
     from loguru import Logger
-
-    from schemas.apis.app_status_api import GetAppStatus
 
 
 ExecutableT = TypeVar("ExecutableT", bound=Executable[Any, Any])
@@ -262,7 +261,7 @@ class RunnableHandle(ABC, Generic[ExecutableT, ConfigT, ArgumentT, SettingsT]):
                 period_between_retries=settings.period_between_retries,
             )
         )
-        status: None | GetAppStatus = None
+        status: None | AppStatusGetAppStatusResponse = None
         try:
             status = handle.api.get_app_status()
         except ApiNotFoundError:

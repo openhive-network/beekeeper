@@ -21,8 +21,9 @@ from beekeepy._utilities.sanitize import sanitize
 if TYPE_CHECKING:
     from typing import Self
 
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy._communication.abc.overseer import AbstractOverseer
-    from beekeepy._communication.url import HttpUrl
     from beekeepy.exceptions import Json
 
 

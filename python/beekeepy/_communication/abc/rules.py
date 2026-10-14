@@ -6,7 +6,8 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Iterator, Sequence
 
 if TYPE_CHECKING:
-    from beekeepy._communication.url import HttpUrl
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy.exceptions import Json, OverseerError
 
 

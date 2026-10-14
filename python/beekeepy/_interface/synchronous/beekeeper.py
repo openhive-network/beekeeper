@@ -17,8 +17,9 @@ from beekeepy.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy._communication.settings import CommunicationSettings
-    from beekeepy._communication.url import HttpUrl
     from beekeepy._interface.abc.synchronous.session import (
         Session as SessionInterface,
     )

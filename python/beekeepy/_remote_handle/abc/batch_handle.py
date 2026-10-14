@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-import json
 from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
+
+from hiveio_api._apis.abc.sendable import AsyncSendable, SyncSendable
+from hiveio_api._communication.jsonrpc import ExpectResultT, JSONRPCResult, build_response
 
 from beekeepy import exceptions
-from beekeepy._apis.abc.sendable import AsyncSendable, SyncSendable
 from beekeepy._utilities.context import ContextAsync, ContextSync, EnterReturnT
-from schemas.jsonrpc import ExpectResultT, JSONRPCResult, get_response_model
 
 if TYPE_CHECKING:
     from types import TracebackType
     from typing import Self
 
-    from beekeepy._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
+    from hiveio_api._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy._communication.abc.overseer import AbstractOverseer
-    from beekeepy._communication.url import HttpUrl
 
 
 class _DelayedResponseWrapper:
@@ -53,7 +54,7 @@ class _DelayedResponseWrapper:
 
     def _set_response(self, **kwargs: Any) -> None:
         expected_type = super().__getattribute__("_expected_type")
-        response = get_response_model(expected_type, json.dumps(kwargs), "hf26")
+        response = build_response(expected_type, kwargs)
         assert isinstance(response, JSONRPCResult), "Expected JSONRPCResult, model cannot be found."
         super().__setattr__("_response", response.result)
 
@@ -233,12 +234,11 @@ class SyncBatchHandle(_BatchHandle["SyncBatchHandle"], SyncSendable, Generic[Api
         )
         self.api: ApiT = api(self)
 
-    def _send(  # noqa: PLR0913
+    def _send(
         self,
         *,
         method: Methods,  # noqa: ARG002
         expected_type: type[ExpectResultT],
-        serialization_type: Literal["hf26", "legacy"],  # noqa: ARG002
         data: str | None = None,
         url: HttpUrl | None = None,  # noqa: ARG002
         callbacks: Callbacks | None = None,  # noqa: ARG002
@@ -265,12 +265,11 @@ class AsyncBatchHandle(_BatchHandle["AsyncBatchHandle"], AsyncSendable, Generic[
         )
         self.api: ApiT = api(self)
 
-    async def _async_send(  # noqa: PLR0913
+    async def _async_send(
         self,
         *,
         method: Methods,  # noqa: ARG002
         expected_type: type[ExpectResultT],
-        serialization_type: Literal["hf26", "legacy"],  # noqa: ARG002
         data: str | None = None,
         url: HttpUrl | None = None,  # noqa: ARG002
         callbacks: AsyncCallbacks | None = None,  # noqa: ARG002

@@ -13,10 +13,11 @@ from beekeepy.exceptions import GroupedErrorsError, Json, UnknownDecisionPathErr
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from hiveio_api._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy._communication.abc.communicator import AbstractCommunicator
-    from beekeepy._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
     from beekeepy._communication.abc.rules import Rules, RulesClassifier
-    from beekeepy._communication.url import HttpUrl
     from beekeepy.exceptions import OverseerError
 
 

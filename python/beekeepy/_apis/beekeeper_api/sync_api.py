@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from beekeepy._apis.abc.api import AbstractSyncApi, ApiArgumentsToSerialize
-from beekeepy._apis.abc.sendable import SyncSendable
+import hiveio_api.beekeeper_api.beekeeper_api_description as beekeeper_api  # noqa: TCH002  # resolved at runtime by get_type_hints
+from hiveio_api._apis.abc.api import AbstractSyncApi, ApiArgumentsToSerialize
+from hiveio_api._apis.abc.sendable import SyncSendable
+
 from beekeepy._apis.abc.session_holder import SyncSessionHolder
 from beekeepy._apis.apply_session_token import sync_apply_session_token
 from beekeepy._apis.beekeeper_api.beekeeper_api_commons import BeekeeperApiCommons
-from schemas.apis import beekeeper_api  # noqa: TCH001
 
 
 class BeekeeperApi(AbstractSyncApi, BeekeeperApiCommons[SyncSendable]):
@@ -30,81 +31,89 @@ class BeekeeperApi(AbstractSyncApi, BeekeeperApiCommons[SyncSendable]):
     @api
     def create(
         self, *, wallet_name: str, password: str | None = None, token: str | None = None
-    ) -> beekeeper_api.Create:
+    ) -> beekeeper_api.BeekeeperCreateResponse:
         raise NotImplementedError
 
     @api
-    def open(self, *, wallet_name: str, token: str | None = None) -> beekeeper_api.EmptyResponse:
+    def open(self, *, wallet_name: str, token: str | None = None) -> beekeeper_api.BeekeeperOpenResponse:
         raise NotImplementedError
 
     @api
-    def set_timeout(self, *, seconds: int, token: str | None = None) -> beekeeper_api.EmptyResponse:
+    def set_timeout(self, *, seconds: int, token: str | None = None) -> beekeeper_api.BeekeeperSetTimeoutResponse:
         raise NotImplementedError
 
     @api
-    def lock_all(self, token: str | None = None) -> beekeeper_api.EmptyResponse:
+    def lock_all(self, token: str | None = None) -> beekeeper_api.BeekeeperLockAllResponse:
         raise NotImplementedError
 
     @api
-    def lock(self, *, wallet_name: str, token: str | None = None) -> beekeeper_api.EmptyResponse:
+    def lock(self, *, wallet_name: str, token: str | None = None) -> beekeeper_api.BeekeeperLockResponse:
         raise NotImplementedError
 
     @api
-    def unlock(self, *, wallet_name: str, password: str, token: str | None = None) -> beekeeper_api.EmptyResponse:
+    def unlock(
+        self, *, wallet_name: str, password: str, token: str | None = None
+    ) -> beekeeper_api.BeekeeperUnlockResponse:
         raise NotImplementedError
 
     @api
-    def import_key(self, *, wallet_name: str, wif_key: str, token: str | None = None) -> beekeeper_api.ImportKey:
+    def import_key(
+        self, *, wallet_name: str, wif_key: str, token: str | None = None
+    ) -> beekeeper_api.BeekeeperImportKeyResponse:
         raise NotImplementedError
 
     @api
     def import_keys(
         self, *, wallet_name: str, wif_keys: list[str], token: str | None = None
-    ) -> beekeeper_api.ImportKeys:
+    ) -> beekeeper_api.BeekeeperImportKeysResponse:
         raise NotImplementedError
 
     @api
-    def remove_key(self, *, wallet_name: str, public_key: str, token: str | None = None) -> beekeeper_api.EmptyResponse:
+    def remove_key(
+        self, *, wallet_name: str, public_key: str, token: str | None = None
+    ) -> beekeeper_api.BeekeeperRemoveKeyResponse:
         raise NotImplementedError
 
     @api
-    def list_wallets(self, token: str | None = None) -> beekeeper_api.ListWallets:
+    def list_wallets(self, token: str | None = None) -> beekeeper_api.BeekeeperListWalletsResponse:
         raise NotImplementedError
 
     @api
-    def list_created_wallets(self, token: str | None = None) -> beekeeper_api.ListWallets:
+    def list_created_wallets(self, token: str | None = None) -> beekeeper_api.BeekeeperListCreatedWalletsResponse:
         raise NotImplementedError
 
     @api
-    def get_public_keys(self, wallet_name: str | None = None, token: str | None = None) -> beekeeper_api.GetPublicKeys:
+    def get_public_keys(
+        self, wallet_name: str | None = None, token: str | None = None
+    ) -> beekeeper_api.BeekeeperGetPublicKeysResponse:
         raise NotImplementedError
 
     @api
     def sign_digest(
         self, *, sig_digest: str, public_key: str, wallet_name: str | None = None, token: str | None = None
-    ) -> beekeeper_api.SignDigest:
+    ) -> beekeeper_api.BeekeeperSignDigestResponse:
         raise NotImplementedError
 
     @api
-    def get_info(self, token: str | None = None) -> beekeeper_api.GetInfo:
+    def get_info(self, token: str | None = None) -> beekeeper_api.BeekeeperGetInfoResponse:
         raise NotImplementedError
 
     @api
-    def create_session(self, *, salt: str = "") -> beekeeper_api.CreateSession:
+    def create_session(self, *, salt: str = "") -> beekeeper_api.BeekeeperCreateSessionResponse:
         raise NotImplementedError
 
     @api
-    def close_session(self, token: str | None = None) -> beekeeper_api.EmptyResponse:
+    def close_session(self, token: str | None = None) -> beekeeper_api.BeekeeperCloseSessionResponse:
         raise NotImplementedError
 
     @api
-    def close(self, wallet_name: str, token: str | None = None) -> beekeeper_api.EmptyResponse:
+    def close(self, wallet_name: str, token: str | None = None) -> beekeeper_api.BeekeeperCloseResponse:
         raise NotImplementedError
 
     @api
     def has_matching_private_key(
         self, wallet_name: str, public_key: str, token: str | None = None
-    ) -> beekeeper_api.HasMatchingPrivateKey:
+    ) -> beekeeper_api.BeekeeperHasMatchingPrivateKeyResponse:
         raise NotImplementedError
 
     @api
@@ -117,7 +126,7 @@ class BeekeeperApi(AbstractSyncApi, BeekeeperApiCommons[SyncSendable]):
         content: str,
         nonce: int | None = None,
         token: str | None = None,
-    ) -> beekeeper_api.EncryptData:
+    ) -> beekeeper_api.BeekeeperEncryptDataResponse:
         raise NotImplementedError
 
     @api
@@ -129,5 +138,5 @@ class BeekeeperApi(AbstractSyncApi, BeekeeperApiCommons[SyncSendable]):
         to_public_key: str,
         encrypted_content: str,
         token: str | None = None,
-    ) -> beekeeper_api.DecryptData:
+    ) -> beekeeper_api.BeekeeperDecryptDataResponse:
         raise NotImplementedError

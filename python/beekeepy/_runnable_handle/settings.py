@@ -4,7 +4,8 @@ from datetime import timedelta
 from pathlib import Path
 from typing import ClassVar
 
-from beekeepy._communication.url import HttpUrl  # noqa: TCH001
+from hiveio_api._communication.url import HttpUrl  # noqa: TCH002
+
 from beekeepy._remote_handle.settings import RemoteHandleSettings
 from beekeepy.exceptions import UnknownValueForBooleanConversionError
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from beekeepy._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
+from hiveio_api._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
 
 __all__ = [
     "AbstractAsyncApi",
@@ -32,15 +32,16 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from beekeepy._apis.abc.api import AbstractAsyncApi, AbstractSyncApi, ApiArgumentSerialization, RegisteredApisT
-    from beekeepy._apis.abc.api_collection import (
+    from hiveio_api._apis.abc.api import AbstractAsyncApi, AbstractSyncApi, ApiArgumentSerialization, RegisteredApisT
+    from hiveio_api._apis.abc.api_collection import (
         AbstractAsyncApiCollection,
         AbstractSyncApiCollection,
     )
-    from beekeepy._apis.abc.sendable import (
+    from hiveio_api._apis.abc.sendable import (
         AsyncSendable,
         SyncSendable,
     )
+
     from beekeepy._apis.app_status_api import (
         AppStatusProbeAsyncApiCollection,
         AppStatusProbeSyncApiCollection,
@@ -75,7 +76,7 @@ __getattr__ = lazy_module_factory(
         "AbstractSyncApi",
         "ApiArgumentSerialization",
         "RegisteredApisT",
-        module="beekeepy._apis.abc.api",
+        module="hiveio_api._apis.abc.api",
     ),
     *aggregate_same_import(
         "AbstractSyncHandle",
@@ -86,10 +87,10 @@ __getattr__ = lazy_module_factory(
     *aggregate_same_import(
         "AsyncSendable",
         "SyncSendable",
-        module="beekeepy._apis.abc.sendable",
+        module="hiveio_api._apis.abc.sendable",
     ),
-    ("beekeepy._apis.abc.api_collection", "AbstractAsyncApiCollection"),
-    ("beekeepy._apis.abc.api_collection", "AbstractSyncApiCollection"),
+    ("hiveio_api._apis.abc.api_collection", "AbstractAsyncApiCollection"),
+    ("hiveio_api._apis.abc.api_collection", "AbstractSyncApiCollection"),
     ("beekeepy._apis.app_status_api", "AppStatusProbeAsyncApiCollection"),
     ("beekeepy._apis.app_status_api", "AppStatusProbeSyncApiCollection"),
     ("beekeepy._remote_handle.abc.batch_handle", "AsyncBatchHandle"),

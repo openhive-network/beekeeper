@@ -9,7 +9,8 @@ from beekeepy._utilities.context import ContextAsync
 from beekeepy._utilities.context_settings_updater import ContextSettingsUpdater
 
 if TYPE_CHECKING:
-    from beekeepy._communication.url import HttpUrl
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy._interface.abc.asynchronous.session import Session
     from beekeepy._interface.abc.packed_object import PackedAsyncBeekeeper
 

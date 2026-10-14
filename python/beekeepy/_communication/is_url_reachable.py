@@ -9,8 +9,9 @@ from beekeepy.exceptions import CommunicationError
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from hiveio_api._communication.url import HttpUrl
+
     from beekeepy._communication.settings import CommunicationSettings
-    from beekeepy._communication.url import HttpUrl
 
 __all__ = [
     "sync_is_url_reachable",

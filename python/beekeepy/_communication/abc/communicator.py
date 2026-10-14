@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from threading import Thread
 from typing import TYPE_CHECKING, Any, Awaitable, TypeGuard, TypeVar, cast
 
-from beekeepy._communication.abc.communicator_models import (
+from hiveio_api._communication.abc.communicator_models import (
     AsyncCallback,
     AsyncCallbacks,
     AsyncErrorCallback,
@@ -16,12 +16,13 @@ from beekeepy._communication.abc.communicator_models import (
     Response,
     SyncCallback,
 )
+
 from beekeepy._communication.settings import CommunicationSettings
 from beekeepy._utilities.settings_holder import SharedSettingsHolder
 from beekeepy.exceptions import TimeoutExceededError
 
 if TYPE_CHECKING:
-    from beekeepy._communication.url import HttpUrl
+    from hiveio_api._communication.url import HttpUrl
 
 
 T = TypeVar("T")

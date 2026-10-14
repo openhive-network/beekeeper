@@ -3,16 +3,16 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from beekeepy._apis.abc.sendable import AsyncSendable, SyncSendable
-from schemas.apis.beekeeper_api import CreateSession
+from hiveio_api._apis.abc.sendable import AsyncSendable, SyncSendable
+from hiveio_api.beekeeper_api.beekeeper_api_description import BeekeeperCreateSessionResponse
 
 __all__ = ["SyncSessionHolder", "AsyncSessionHolder"]
 
 
 class Session:
-    def __init__(self, token_or_create_session_return: str | CreateSession | Session) -> None:
+    def __init__(self, token_or_create_session_return: str | BeekeeperCreateSessionResponse | Session) -> None:
         incoming = token_or_create_session_return
-        self.__token = incoming.token if isinstance(incoming, CreateSession | Session) else incoming
+        self.__token = incoming.token if isinstance(incoming, BeekeeperCreateSessionResponse | Session) else incoming
 
     @property
     def token(self) -> str:
@@ -27,7 +27,7 @@ class SessionHolder:
     def is_session_token_set(self) -> bool:
         return self.__session is not None
 
-    def set_session_token(self, value: Session | CreateSession | str) -> None:
+    def set_session_token(self, value: Session | BeekeeperCreateSessionResponse | str) -> None:
         self.__session = Session(value)
 
     def _clear_session(self) -> None:

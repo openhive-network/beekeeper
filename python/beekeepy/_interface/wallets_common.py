@@ -17,7 +17,7 @@ from beekeepy.exceptions import UnlockIsNotAccessibleError, WalletIsLockedError
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from schemas.apis.beekeeper_api.fundaments_of_responses import WalletDetails
+    from hiveio_api.beekeeper_api.beekeeper_api_description import Wallet as WalletDetails
 
 P = ParamSpec("P")
 ResultT = TypeVar("ResultT")

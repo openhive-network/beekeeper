@@ -1,30 +1,29 @@
 from __future__ import annotations
 
-import json
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from loguru import logger as loguru_logger
-
-from beekeepy._apis.abc.api_collection import (
+from hiveio_api._apis.abc.api_collection import (
     AbstractAsyncApiCollection,
     AbstractSyncApiCollection,
 )
-from beekeepy._apis.abc.sendable import AsyncSendable, SyncSendable
+from hiveio_api._apis.abc.sendable import AsyncSendable, SyncSendable
+from hiveio_api._communication.jsonrpc import ExpectResultT, JSONRPCResult, build_response
+from hiveio_api._communication.url import HttpUrl
+from loguru import logger as loguru_logger
+
 from beekeepy._communication.communicator_getter import get_communicator_cls
-from beekeepy._communication.url import HttpUrl
 from beekeepy._remote_handle.settings import RemoteHandleSettings
 from beekeepy._utilities.context import SelfContextAsync, SelfContextSync
 from beekeepy._utilities.settings_holder import UniqueSettingsHolder
 from beekeepy._utilities.stopwatch import Stopwatch
 from beekeepy.exceptions import CommunicationError
-from schemas.jsonrpc import ExpectResultT, JSONRPCResult, get_response_model
 
 if TYPE_CHECKING:
+    from hiveio_api._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
     from loguru import Logger
 
     from beekeepy._communication.abc.communicator import AbstractCommunicator
-    from beekeepy._communication.abc.communicator_models import AsyncCallbacks, Callbacks, Methods
     from beekeepy._communication.abc.overseer import AbstractOverseer
     from beekeepy._remote_handle.abc.batch_handle import AsyncBatchHandle, SyncBatchHandle
     from beekeepy.exceptions import Json
@@ -120,18 +119,17 @@ class AbstractHandle(UniqueSettingsHolder[RemoteSettingsT], ABC, Generic[RemoteS
         cls,
         response: Json | list[Json],
         expected_type: type[ExpectResultT],
-        serialization_type: Literal["hf26", "legacy"],
         *,
         is_jsonrpc: bool,
     ) -> JSONRPCResult[ExpectResultT]:
-        """Validates and builds response."""
+        """Builds response (without validation)."""
         if is_jsonrpc:
             assert isinstance(response, dict), f"Expected dict as response, got: {response=}"
         else:
             response = {"result": response, "jsonrpc": "2.0", "id": 0}
-        serialized_data = get_response_model(expected_type, json.dumps(response), serialization_type)
-        assert isinstance(serialized_data, JSONRPCResult)
-        return serialized_data
+        built = build_response(expected_type, response)
+        assert isinstance(built, JSONRPCResult)
+        return built
 
     def __configure_logger(self, logger: Logger | None) -> Logger:
         # credit for lazy=True: https://github.com/Delgan/loguru/issues/402#issuecomment-2028011786
@@ -185,12 +183,11 @@ class AbstractHandle(UniqueSettingsHolder[RemoteSettingsT], ABC, Generic[RemoteS
 class AbstractAsyncHandle(AbstractHandle[RemoteSettingsT, ApiT], SelfContextAsync, AsyncSendable, ABC):
     """Base class for service handlers that uses asynchronous communication."""
 
-    async def _async_send(  # noqa: PLR0913
+    async def _async_send(
         self,
         *,
         method: Methods,
         expected_type: type[ExpectResultT],
-        serialization_type: Literal["hf26", "legacy"],
         data: str | None = None,
         url: HttpUrl | None = None,
         callbacks: AsyncCallbacks | None = None,
@@ -211,7 +208,6 @@ class AbstractAsyncHandle(AbstractHandle[RemoteSettingsT, ApiT], SelfContextAsyn
         return self._response_handle(
             response=response,
             expected_type=expected_type,
-            serialization_type=serialization_type,
             is_jsonrpc=self._is_jsonrpc(data),
         )
 
@@ -232,12 +228,11 @@ class AbstractAsyncHandle(AbstractHandle[RemoteSettingsT, ApiT], SelfContextAsyn
 class AbstractSyncHandle(AbstractHandle[RemoteSettingsT, ApiT], SelfContextSync, SyncSendable, ABC):
     """Base class for service handlers that uses synchronous communication."""
 
-    def _send(  # noqa: PLR0913
+    def _send(
         self,
         *,
         method: Methods,
         expected_type: type[ExpectResultT],
-        serialization_type: Literal["hf26", "legacy"],
         data: str | None = None,
         url: HttpUrl | None = None,
         callbacks: Callbacks | None = None,
@@ -258,7 +253,6 @@ class AbstractSyncHandle(AbstractHandle[RemoteSettingsT, ApiT], SelfContextSync,
         return self._response_handle(
             response=response,
             expected_type=expected_type,
-            serialization_type=serialization_type,
             is_jsonrpc=self._is_jsonrpc(data),
         )
 
