@@ -47,6 +47,8 @@ repos:
         args: ["--config-file", "./python/pyproject.toml"]
         language: system
         types: [python]
+        # parallel mypy processes sharing a cold .mypy_cache crash with INTERNAL ERROR (mypy 2.0)
+        require_serial: true
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
@@ -67,4 +69,5 @@ repos:
     rev: v0.9.0.6
     hooks:
       - id: shellcheck
-        exclude: "programs/"
+        # .aidev/ holds scripts maintained by the aidev tooling (sourced helpers without shebangs)
+        exclude: "programs/|^\\.aidev/"
