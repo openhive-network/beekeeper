@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from beekeepy.handle.remote import (
@@ -9,16 +10,17 @@ from beekeepy.handle.remote import (
     RemoteHandleSettings,
     SyncSendable,
 )
+from hiveio_api import HiveModel
 
-from schemas._preconfigured_base_model import PreconfiguredBaseModel
 
-
-class InputTypeSchema(PreconfiguredBaseModel):
+@dataclass(frozen=True, kw_only=True)
+class InputTypeSchema(HiveModel):
     input_type: str
     input_value: list[str]
 
 
-class VoterSchema(PreconfiguredBaseModel):
+@dataclass(frozen=True, kw_only=True)
+class VoterSchema(HiveModel):
     voter_name: str
     vests: str
     account_vests: str
@@ -26,7 +28,8 @@ class VoterSchema(PreconfiguredBaseModel):
     timestamp: str
 
 
-class WitnessesVotersResponseSchema(PreconfiguredBaseModel):
+@dataclass(frozen=True, kw_only=True)
+class WitnessesVotersResponseSchema(HiveModel):
     total_votes: int
     total_pages: int
     voters: list[VoterSchema]

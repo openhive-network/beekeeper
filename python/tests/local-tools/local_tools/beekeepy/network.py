@@ -9,8 +9,7 @@ from beekeepy.settings import RemoteHandleSettings
 
 if TYPE_CHECKING:
     from beekeepy.interfaces import HttpUrl
-
-    from schemas.jsonrpc import JSONRPCRequest
+    from hiveio_api._communication.jsonrpc import JSONRPCRequest
 
 
 async def async_raw_http_call(*, http_endpoint: HttpUrl, data: JSONRPCRequest) -> dict[str, Any]:

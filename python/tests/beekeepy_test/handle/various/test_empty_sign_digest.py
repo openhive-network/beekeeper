@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from hiveio_api._communication.jsonrpc import JSONRPCRequest
 from local_tools.beekeepy.network import raw_http_call
-
-from schemas.jsonrpc import JSONRPCRequest
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper
