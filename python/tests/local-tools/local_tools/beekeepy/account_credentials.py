@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from dataclasses import dataclass
 from typing import Final
 
 from beekeepy.interfaces import KeyPair
@@ -516,6 +517,7 @@ ACCOUNTS_DATA: Final[list[dict[str, str]]] = [
 MAX_ACCOUNT_DATA_RANGE: Final[int] = 100
 
 
+@dataclass(eq=False)
 class AccountCredentials(KeyPair):
     name: str
 

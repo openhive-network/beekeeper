@@ -6,7 +6,7 @@ import pytest
 from beekeepy.communication import Callbacks, CommunicationSettings, get_communicator_cls
 
 if TYPE_CHECKING:
-    from beekeepy.communication import Request, Response
+    from beekeepy.communication import RequestContext
     from beekeepy.interfaces import HttpUrl
 
 SIMPLE_DATA: Final[str] = """{"id": 0, "jsonrpc": "2.0", "method": "database_api.get_config"}"""
@@ -42,8 +42,9 @@ def test_jsonrpc_with_error_and_callback_reraise(hived_http_endpoint: HttpUrl) -
     error_message: Final[str] = "Invalid response received"
     communicator = get_communicator_cls("sync")(settings=CommunicationSettings())
 
-    def raise_if_error_in_respone(*, request: Request, response: Response) -> None:  # noqa: ARG001
-        if "error" in response.body:
+    def raise_if_error_in_respone(context: RequestContext, /) -> None:
+        assert context.response is not None
+        if "error" in context.response.body:
             raise ValueError(error_message)
 
     # ACT & ASSERT
@@ -51,5 +52,5 @@ def test_jsonrpc_with_error_and_callback_reraise(hived_http_endpoint: HttpUrl) -
         communicator.post(
             url=hived_http_endpoint,
             data=INVALID_DATA,
-            callbacks=Callbacks(process_response=raise_if_error_in_respone),
+            callbacks=Callbacks(process_response=[raise_if_error_in_respone]),
         )
