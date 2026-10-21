@@ -17,12 +17,14 @@ def test_api_get_info(beekeeper: Beekeeper) -> None:
 
     # ACT
     get_info = beekeeper.api.get_info()
+    now = get_info.now
+    timeout_time = get_info.timeout_time
 
     # ASSERT
-    upper_bound = get_info.now + timedelta(seconds=(unlock_timeout + tolerance_secs))
-    lower_bound = get_info.now + timedelta(seconds=(unlock_timeout - tolerance_secs))
+    upper_bound = now + timedelta(seconds=(unlock_timeout + tolerance_secs))
+    lower_bound = now + timedelta(seconds=(unlock_timeout - tolerance_secs))
     message = (
         f"Difference between get_info.now and get_info.timeout_time should be equal {unlock_timeout} (+/-"
         f" {tolerance_secs}s)"
     )
-    assert lower_bound <= get_info.timeout_time <= upper_bound, message
+    assert lower_bound <= timeout_time <= upper_bound, message
