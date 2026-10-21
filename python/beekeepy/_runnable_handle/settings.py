@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
-from beekeepy._communication.url import HttpUrl  # noqa: TC001
+from beekeepy._communication.settings import seconds
 from beekeepy._remote_handle.settings import RemoteHandleSettings
 from beekeepy.exceptions import UnknownValueForBooleanConversionError
+
+if TYPE_CHECKING:
+    from hiveio_api.client import HttpUrl
 
 
 def strtobool(value: str) -> bool:
@@ -25,11 +29,18 @@ def strtobool(value: str) -> bool:
     raise UnknownValueForBooleanConversionError(value)
 
 
+@dataclass
 class RunnableHandleSettings(RemoteHandleSettings):
     """Defines parameters for runnable handles how to start and behave."""
 
     class EnvironNames(RemoteHandleSettings.EnvironNames):
-        WORKING_DIRECTORY: ClassVar[str] = "BEEKEEPY_WORKING_DIRECTORY"
+        PROPAGATE_SIGINT: ClassVar[str] = "HIVEIO_PROPAGATE_SIGINT"
+        CLOSE_TIMEOUT: ClassVar[str] = "HIVEIO_CLOSE_TIMEOUT"
+        INITIALIZATION_TIMEOUT: ClassVar[str] = "HIVEIO_INITIALIZATION_TIMEOUT"
+
+    class FormerEnvironNames(RemoteHandleSettings.FormerEnvironNames):
+        """Former names of environment variables - deprecated, read when variables of `EnvironNames` are not set."""
+
         PROPAGATE_SIGINT: ClassVar[str] = "BEEKEEPY_PROPAGATE_SIGINT"
         CLOSE_TIMEOUT: ClassVar[str] = "BEEKEEPY_CLOSE_TIMEOUT"
         INITIALIZATION_TIMEOUT: ClassVar[str] = "BEEKEEPY_INITIALIZATION_TIMEOUT"
@@ -52,24 +63,33 @@ class RunnableHandleSettings(RemoteHandleSettings):
     binary_path: Path | None = None
     """Alternative path to beekeeper binary."""
 
-    propagate_sigint: bool = Defaults.default_factory(
-        EnvironNames.PROPAGATE_SIGINT,
-        lambda x: RunnableHandleSettings.Defaults.PROPAGATE_SIGINT if x is None else strtobool(x),
+    propagate_sigint: bool = field(
+        default_factory=Defaults.default_factory(
+            EnvironNames.PROPAGATE_SIGINT,
+            lambda x: RunnableHandleSettings.Defaults.PROPAGATE_SIGINT if x is None else strtobool(x),
+            former_env_name=FormerEnvironNames.PROPAGATE_SIGINT,
+        )
     )
     """If set to True (default), sigint will be sent to beekeeper without control of this library."""
 
     use_existing_session: str | None = None
     """If set, beekeeper will use given session while connecting to beeekeeper."""
 
-    close_timeout: timedelta = Defaults.default_factory(
-        EnvironNames.CLOSE_TIMEOUT,
-        lambda x: RunnableHandleSettings.Defaults.CLOSE_TIMEOUT if x is None else timedelta(seconds=int(x)),
+    close_timeout: timedelta = field(
+        default_factory=Defaults.default_factory(
+            EnvironNames.CLOSE_TIMEOUT,
+            lambda x: RunnableHandleSettings.Defaults.CLOSE_TIMEOUT if x is None else seconds(x),
+            former_env_name=FormerEnvironNames.CLOSE_TIMEOUT,
+        )
     )
     """Affects time handle waits before beekeepy closes."""
 
-    initialization_timeout: timedelta = Defaults.default_factory(
-        EnvironNames.INITIALIZATION_TIMEOUT,
-        lambda x: RunnableHandleSettings.Defaults.INITIALIZATION_TIMEOUT if x is None else timedelta(seconds=int(x)),
+    initialization_timeout: timedelta = field(
+        default_factory=Defaults.default_factory(
+            EnvironNames.INITIALIZATION_TIMEOUT,
+            lambda x: RunnableHandleSettings.Defaults.INITIALIZATION_TIMEOUT if x is None else seconds(x),
+            former_env_name=FormerEnvironNames.INITIALIZATION_TIMEOUT,
+        )
     )
     """Affects time handle waits for beekeeper to start."""
 

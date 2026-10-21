@@ -12,6 +12,7 @@ A high-level Python interface for interacting with a Beekeeper instance.
 4. [Error Handling](#error-handling)
 5. [Beekeeper Instance Management](#beekeeper-instance-management)
 6. [Notes on Configuration](#notes-on-configuration)
+7. [Environment Variables](#environment-variables)
 
 ## Introduction
 
@@ -101,3 +102,18 @@ client.teardown()
 Beekeepy comes with an embedded Beekeeper binary, so no additional configuration or setup is required to run the Beekeeper instance. Simply install the package, and you're ready to go!
 
 > :warning: **Note**: The Beekeeper binary is compiled for Linux systems. There are no plans to support Windows.
+
+## Environment Variables
+
+Defaults of settings (`beekeepy.settings`) can be given by environment variables - they are read when settings are created. Times are given in seconds (also fractional, e.g. `0.5`).
+
+| Variable                                           | Setting                  | Former name (deprecated)                          |
+|----------------------------------------------------|--------------------------|---------------------------------------------------|
+| `HIVEIO_COMMUNICATION_MAX_RETRIES`                 | `max_retries`            | `HELPY_COMMUNICATION_MAX_RETRIES`                 |
+| `HIVEIO_COMMUNICATION_TIMEOUT_SECS`                | `timeout`                | `HELPY_COMMUNICATION_TIMEOUT_SECS`                |
+| `HIVEIO_COMMUNICATION_PERIOD_BETWEEN_RETRIES_SECS` | `period_between_retries` | `HELPY_COMMUNICATION_PERIOD_BETWEEN_RETRIES_SECS` |
+| `HIVEIO_PROPAGATE_SIGINT`                          | `propagate_sigint`       | `BEEKEEPY_PROPAGATE_SIGINT`                       |
+| `HIVEIO_CLOSE_TIMEOUT`                             | `close_timeout`          | `BEEKEEPY_CLOSE_TIMEOUT`                          |
+| `HIVEIO_INITIALIZATION_TIMEOUT`                    | `initialization_timeout` | `BEEKEEPY_INITIALIZATION_TIMEOUT`                 |
+
+Former names are still read, with `DeprecationWarning`, when the variable of the new name is not set. Each of them now sets the setting of its name - formerly the `HELPY_COMMUNICATION_*` variables set wrong settings (e.g. `HELPY_COMMUNICATION_MAX_RETRIES` set the timeout).
