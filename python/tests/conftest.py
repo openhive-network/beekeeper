@@ -7,6 +7,11 @@ from pathlib import Path
 import pytest
 from beekeepy.handle.remote import AbstractSyncApi, RegisteredApisT
 from beekeepy.interfaces import HttpUrl
+from hiveio_api import register_validation_models
+
+# validation models of beekeeper_api are generated for the tests only (msgspec is a dependency of the tests) - responses
+# of beekeepers created by fixtures are validated against them (`SchemaValidationRules`)
+register_validation_models("beekeeper_api", "local_tools.beekeepy.beekeeper_api_validation")
 
 
 def _convert_test_name_to_directory_name(test_name: str) -> str:

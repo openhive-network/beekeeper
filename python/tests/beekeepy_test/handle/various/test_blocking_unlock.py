@@ -6,11 +6,10 @@ from typing import TYPE_CHECKING, AsyncIterator, Final, Iterator
 import pytest
 from beekeepy.handle.runnable import AsyncBeekeeper
 from beekeepy.interfaces import DelayGuardBase
+from hiveio_api.client import JSONRPCRequest
 from local_tools.beekeepy.generators import default_wallet_credentials
 from local_tools.beekeepy.models import SettingsLoggerFactory, WalletInfo
 from local_tools.beekeepy.network import async_raw_http_call
-
-from schemas.jsonrpc import JSONRPCRequest
 
 if TYPE_CHECKING:
     from beekeepy.interfaces import HttpUrl as Url

@@ -7,7 +7,7 @@ from beekeepy.settings import RemoteHandleSettings
 from local_tools.beekeepy.simple_api import InputTypeSchema, TestCaller, WitnessesVotersResponseSchema
 
 if TYPE_CHECKING:
-    from beekeepy._communication.url import HttpUrl
+    from hiveio_api.client import HttpUrl
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def test_pos_args(caller: TestCaller) -> None:
 
     # ASSERT
     validate_type(result, InputTypeSchema)
-    assert result.input_type != "invalid_input"
+    assert (result.input_type, result.input_value) == ("account_name", ["gtg"])
 
 
 def test_pos_and_keyword_args(caller: TestCaller) -> None:

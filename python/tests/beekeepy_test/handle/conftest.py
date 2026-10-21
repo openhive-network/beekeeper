@@ -4,6 +4,7 @@ from functools import wraps
 from typing import Iterator
 
 import pytest
+from beekeepy.communication import SchemaValidationRules
 from beekeepy.handle.runnable import Beekeeper
 from local_tools.beekeepy.account_credentials import AccountCredentials
 from local_tools.beekeepy.generators import (
@@ -23,6 +24,8 @@ from local_tools.beekeepy.models import (
 def beekeeper_not_started(settings_with_logger: SettingsLoggerFactory) -> Iterator[Beekeeper]:
     incoming_settings, logger = settings_with_logger()
     bk = Beekeeper(settings=incoming_settings, logger=logger)
+    # responses (also of batches) must match their schemas - every endpoint of beekeeper_api has a validation model
+    bk.apis.callbacks.process_response.append(SchemaValidationRules(strict=True))
 
     yield bk
 

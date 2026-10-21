@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from dataclasses import replace
 from typing import TYPE_CHECKING, Final
 
 import pytest
@@ -8,7 +10,7 @@ from beekeepy.interfaces import HttpUrl
 from requests.status_codes import codes
 
 if TYPE_CHECKING:
-    from beekeepy.communication import Request, Response
+    from beekeepy.communication import Request, RequestContext
 
 
 @pytest.fixture
@@ -60,15 +62,16 @@ def test_restapi_with_error_and_callback_reraise(invalid_get: HttpUrl) -> None:
     error_message: Final[str] = "Invalid status code received"
     communicator = get_communicator_cls("sync")(settings=CommunicationSettings())
 
-    def raise_if_invalid_status_code(*, request: Request, response: Response) -> None:  # noqa: ARG001
-        if response.status_code != codes.ok:
+    def raise_if_invalid_status_code(context: RequestContext, /) -> None:
+        assert context.response is not None
+        if context.response.status_code != codes.ok:
             raise ValueError(error_message)
 
     # ACT & ASSERT
     with pytest.raises(ValueError, match=error_message):
         communicator.get(
             url=invalid_get,
-            callbacks=Callbacks(process_response=raise_if_invalid_status_code),
+            callbacks=Callbacks(process_response=[raise_if_invalid_status_code]),
         )
 
 
@@ -76,16 +79,21 @@ def test_restapi_with_request_correction(simple_get: HttpUrl, invalid_get: HttpU
     # ARRANGE
     communicator = get_communicator_cls("sync")(settings=CommunicationSettings())
 
-    def fix_url(*, request: Request) -> Request:
-        request.url = simple_get
-        return request
+    statuses: list[int] = []
+
+    def fix_url(request: Request, /) -> Request:
+        return replace(request, url=simple_get)
+
+    def record_status(context: RequestContext, /) -> None:
+        assert context.response is not None
+        statuses.append(context.response.status_code)
 
     # ACT
     result = communicator.get(
         url=invalid_get,
-        callbacks=Callbacks(prepare_request=fix_url),
+        callbacks=Callbacks(prepare_request=[fix_url], process_response=[record_status]),
     )
 
     # ASSERT
-    assert isinstance(result, str)
-    assert len(result) > 0
+    assert statuses == [codes.ok], "the corrected request is sent"
+    assert json.loads(result)["name"] == "gtg"

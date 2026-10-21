@@ -6,7 +6,7 @@ import pytest
 from beekeepy.exceptions import ErrorInResponseError
 from local_tools.beekeepy.account_credentials import AccountCredentials
 
-from schemas.fields.basic import PublicKey
+from schemas.fields.user_friendly import PublicKey
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper
