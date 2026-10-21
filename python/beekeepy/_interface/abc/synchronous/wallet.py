@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 
 from beekeepy._interface.wallets_common import ContainsWalletName
 from beekeepy._utilities.context import ContextSync
-from schemas.fields.basic import PublicKey
+from schemas.fields import user_friendly
 
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from schemas.fields.hex import Signature
+    from schemas.fields.public import PublicKey, Signature
 
 
 class Wallet(ContainsWalletName, ABC):
@@ -64,5 +64,5 @@ class UnlockedWallet(Wallet, ContextSync["UnlockedWallet"], ABC):
 
     def __contains__(self, obj: object) -> bool:
         if isinstance(obj, str):
-            return self.has_matching_private_key(key=PublicKey(obj))
+            return self.has_matching_private_key(key=user_friendly.PublicKey(obj))
         raise TypeError(f"Object `{obj}` is not str which can't be check for matching private key in wallet.")

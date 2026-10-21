@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
-from beekeepy.interfaces import HttpUrl  # noqa: TC001
-from schemas._preconfigured_base_model import PreconfiguredBaseModel
+if TYPE_CHECKING:
+    from beekeepy.interfaces import HttpUrl
 
 
 @dataclass
@@ -14,7 +14,7 @@ class ExportKeysWalletParams:
     wallet_password: str
 
 
-class BeekeeperDefaults(PreconfiguredBaseModel):
+class BeekeeperDefaults:
     DEFAULT_BACKTRACE: ClassVar[str] = "yes"
     DEFAULT_DATA_DIR: ClassVar[Path] = Path.cwd()
     DEFAULT_EXPORT_KEYS_WALLET: ClassVar[ExportKeysWalletParams | None] = None

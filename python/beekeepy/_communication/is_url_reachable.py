@@ -9,8 +9,9 @@ from beekeepy.exceptions import CommunicationError
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from hiveio_api.client import HttpUrl
+
     from beekeepy._communication.settings import CommunicationSettings
-    from beekeepy._communication.url import HttpUrl
 
 __all__ = [
     "async_get_first_reachable_url",

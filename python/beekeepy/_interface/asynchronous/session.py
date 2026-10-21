@@ -23,6 +23,7 @@ from beekeepy.exceptions import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from beekeepy._generated.beekeeper_api_description import GetInfoResponse
     from beekeepy._interface.abc.asynchronous.wallet import (
         UnlockedWallet as UnlockedWalletInterface,
     )
@@ -32,9 +33,7 @@ if TYPE_CHECKING:
     from beekeepy._interface.settings import InterfaceSettings
     from beekeepy._remote_handle.async_beekeeper import AsyncBeekeeper as AsynchronousRemoteBeekeeperHandle
     from beekeepy._utilities.delay_guard import AsyncDelayGuard
-    from schemas.apis.beekeeper_api import GetInfo
-    from schemas.fields.basic import PublicKey
-    from schemas.fields.hex import Signature
+    from schemas.fields.public import PublicKey, Signature
 
 
 class Session(SessionInterface, StateInvalidator):
@@ -53,7 +52,7 @@ class Session(SessionInterface, StateInvalidator):
         self.__guard = guard
         self.__default_session_close_callback = default_session_close_callback
 
-    async def get_info(self) -> GetInfo:
+    async def get_info(self) -> GetInfoResponse:
         return await self.__beekeeper.api.get_info(token=await self.token)
 
     async def create_wallet(  # type: ignore[override]
