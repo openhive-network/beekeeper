@@ -9,7 +9,7 @@ from beekeepy._interface.abc.synchronous.wallet import (
     Wallet as WalletInterface,
 )
 from beekeepy._interface.settings import InterfaceSettings
-from beekeepy._interface.validators import validate_private_keys, validate_public_keys
+from beekeepy._interface.validators import validate_digest, validate_private_keys, validate_public_keys
 from beekeepy._interface.wallets_common import WalletCommons
 from beekeepy._remote_handle.sync_beekeeper import Beekeeper as SyncRemoteBeekeeper
 from beekeepy._runnable_handle.callbacks_protocol import SyncWalletLocked
@@ -26,8 +26,7 @@ from beekeepy.exceptions import (
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from schemas.fields.basic import PublicKey
-    from schemas.fields.hex import Signature
+    from schemas.fields.public import PublicKey, Signature
 
 
 class Wallet(WalletCommons[SyncRemoteBeekeeper[InterfaceSettings], SyncWalletLocked, SyncDelayGuard], WalletInterface):
@@ -105,6 +104,7 @@ class UnlockedWallet(UnlockedWalletInterface, Wallet):
     @wallet_unlocked
     def sign_digest(self, *, sig_digest: str, key: str) -> Signature:
         validate_public_keys(key=key)
+        validate_digest(sig_digest=sig_digest)
         with MissingSTMPrefixError(public_key=key), InvalidPublicKeyError(public_keys=key), NotExistingKeyError(
             public_key=key
         ):

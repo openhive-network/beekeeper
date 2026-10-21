@@ -14,8 +14,7 @@ from beekeepy.exceptions import (
     TimeTooBigError,
 )
 from schemas.errors import ValidationError
-from schemas.fields.basic import AccountName, PrivateKey, PublicKey
-from schemas.fields.hex import Hex
+from schemas.fields.user_friendly import AccountName, Hex, PrivateKey, PublicKey
 
 __all__ = [
     "validate_account_names",

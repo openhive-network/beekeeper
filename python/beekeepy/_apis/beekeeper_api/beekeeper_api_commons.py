@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Generic, Protocol
+from typing import TYPE_CHECKING, Any, Generic
 
-from beekeepy._apis.abc.api import HandleT
+from hiveio_api.client import HandleT
 
 if TYPE_CHECKING:
     from beekeepy._apis.abc.session_holder import AsyncSessionHolder, SyncSessionHolder
-
-
-class CreateSessionActionProtocol(Protocol):
-    def __call__(self, endpoint_name: str, *args: Any, **kwargs: Any) -> tuple[list[Any], dict[str, Any]]: ...
 
 
 class BeekeeperApiCommons(Generic[HandleT]):
@@ -18,7 +14,7 @@ class BeekeeperApiCommons(Generic[HandleT]):
         super().__init__(*args, **kwargs)
 
     def _token_required(self, endpoint_name: str) -> bool:
-        return endpoint_name != "beekeeper_api.create_session"
+        return endpoint_name not in {"beekeeper_api.create_session", "beekeeper_api.get_version"}
 
     def _verify_is_owner_can_hold_session_token(self, owner: HandleT) -> None:
         assert isinstance(

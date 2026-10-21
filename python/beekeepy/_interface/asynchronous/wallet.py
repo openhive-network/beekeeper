@@ -26,8 +26,7 @@ from beekeepy.exceptions import (
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from schemas.fields.basic import PublicKey
-    from schemas.fields.hex import Signature
+    from schemas.fields.public import PublicKey, Signature
 
 
 class Wallet(
