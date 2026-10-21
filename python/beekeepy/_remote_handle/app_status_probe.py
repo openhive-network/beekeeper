@@ -17,7 +17,7 @@ class AppStatusProbe(AbstractSyncHandle[RemoteHandleSettings, "AppStatusProbeSyn
     def _construct_api(self) -> AppStatusProbeSyncApiCollection:
         from beekeepy._apis.app_status_api import AppStatusProbeSyncApiCollection
 
-        return AppStatusProbeSyncApiCollection(owner=self)
+        return self._with_rules(AppStatusProbeSyncApiCollection(owner=self))
 
     @property
     def api(self) -> SyncAppStatusApi:  # type: ignore[override]
