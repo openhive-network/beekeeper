@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from contextlib import contextmanager
+from dataclasses import fields
 from typing import TYPE_CHECKING, Generic, TypeVar
-
-from schemas._preconfigured_base_model import PreconfiguredBaseModel
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-SettingsT = TypeVar("SettingsT", bound=PreconfiguredBaseModel)
+    from beekeepy._communication.settings import CommunicationSettings
+
+SettingsT = TypeVar("SettingsT", bound="CommunicationSettings")
 
 
 class ContextSettingsUpdater(Generic[SettingsT]):
@@ -58,5 +59,5 @@ class ContextSettingsUpdater(Generic[SettingsT]):
         # Simple override is not possible here because
         # SharedSettingsHolder won't work, as reference
         # to original settings will be lost
-        for key, value in settings_to_update.dict().items():
-            setattr(self._settings, key, value)
+        for member in fields(settings_to_update):
+            setattr(self._settings, member.name, getattr(settings_to_update, member.name))

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from beekeepy._apis.abc.api_collection import AbstractAsyncApiCollection, AbstractSyncApiCollection
+from hiveio_api.client import AbstractAsyncApiCollection, AbstractSyncApiCollection
 
 if TYPE_CHECKING:
-    from beekeepy._apis.abc.sendable import AsyncSendable, SyncSendable
+    from hiveio_api.client import AsyncSendable, SyncSendable
 
 
 class AppStatusProbeSyncApiCollection(AbstractSyncApiCollection):
@@ -28,7 +28,7 @@ class AppStatusProbeAsyncApiCollection(AbstractAsyncApiCollection):
 
     def __init__(self, owner: AsyncSendable) -> None:
         super().__init__(owner)
-        from beekeepy._apis.app_status_api.async_api import AppStatusApi as AsyncAppStatusApi
+        from hiveio_api.app_status_api import AppStatusApi as AsyncAppStatusApi
 
         self.app_status = AsyncAppStatusApi(owner=self._owner)
         self.app_status_api = self.app_status

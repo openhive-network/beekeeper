@@ -6,17 +6,16 @@ from typing import TYPE_CHECKING, TypeAlias, overload
 from beekeepy._utilities.context import ContextAsync
 
 if TYPE_CHECKING:
+    from beekeepy._generated.beekeeper_api_description import GetInfoResponse
     from beekeepy._interface.abc.asynchronous.wallet import UnlockedWallet, Wallet
-    from schemas.apis.beekeeper_api import GetInfo
-    from schemas.fields.basic import PublicKey
-    from schemas.fields.hex import Signature
+    from schemas.fields.public import PublicKey, Signature
 
 Password: TypeAlias = str
 
 
 class Session(ContextAsync["Session"], ABC):
     @abstractmethod
-    async def get_info(self) -> GetInfo: ...
+    async def get_info(self) -> GetInfoResponse: ...
 
     @overload
     @abstractmethod
