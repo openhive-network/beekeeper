@@ -8,7 +8,7 @@ from beekeepy._utilities.context import ContextSync
 if TYPE_CHECKING:
     from types import TracebackType
 
-    from beekeepy._communication.url import Url
+    from hiveio_api.client import Url
 
 Json = dict[str, Any]
 CommunicationResponseT = str | Json | list[Json]
@@ -173,7 +173,13 @@ class CommunicationError(BeekeepyError):
 
 
 class OverseerError(CommunicationError, ABC):
-    """Base class for exceptions dedicated to be raised on invalid content in response."""
+    """
+    Base class for exceptions dedicated to be raised on invalid content in response.
+
+    Raised by rules checking responses (`beekeepy.communication`, e.g. `JsonRpcRules`). The `Overseer` prefix (after
+    the former mechanism of checking responses) tells them apart from errors of the interface with similar names, e.g.
+    `OverseerInvalidPasswordError` (response of beekeeper) and `InvalidPasswordError` (raised by wallets).
+    """
 
     def __init__(  # noqa: PLR0913
         self,
@@ -188,10 +194,6 @@ class OverseerError(CommunicationError, ABC):
         super().__init__(url, request, response, message=message)
         self.request_id = request_id
         self.whole_response = whole_response
-
-    @abstractmethod
-    def retry(self) -> bool:
-        """Used by overseer to determine if retry should be performed if such error occurs."""
 
 
 class ExecutableError(BeekeepyError, ABC):
