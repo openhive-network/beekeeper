@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from beekeepy._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
+from hiveio_api._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
 
 __all__ = [
+    "Abort",
     "AbstractCommunicator",
-    "AbstractOverseer",
     "AioHttpCommunicator",
     "async_is_url_reachable",
     "AsyncCallback",
@@ -14,26 +14,35 @@ __all__ = [
     "AsyncErrorCallback",
     "AsyncRequestCallback",
     "AsyncResponseCallback",
+    "BeekeeperRules",
     "Callbacks",
-    "CommonOverseer",
     "CommunicationSettings",
     "ErrorCallback",
+    "ErrorInResponseRules",
     "get_communicator_cls",
+    "HiveRules",
+    "JsonRpcRules",
+    "Reaction",
     "Request",
     "RequestCallback",
     "RequestCommunicator",
+    "RequestContext",
+    "RequestTimings",
     "Response",
     "ResponseCallback",
+    "response_id",
+    "ResponsesRule",
+    "Retry",
+    "Rule",
     "rules",
-    "StrictOverseer",
+    "RuleSet",
+    "SchemaValidationRules",
     "sync_is_url_reachable",
     "SyncCallback",
 ]
 
 if TYPE_CHECKING:
-    from beekeepy._communication import rules
-    from beekeepy._communication.abc.communicator import AbstractCommunicator
-    from beekeepy._communication.abc.communicator_models import (
+    from hiveio_api.client import (
         AsyncCallback,
         AsyncCallbacks,
         AsyncErrorCallback,
@@ -43,17 +52,29 @@ if TYPE_CHECKING:
         ErrorCallback,
         Request,
         RequestCallback,
+        RequestContext,
+        RequestTimings,
         Response,
         ResponseCallback,
         SyncCallback,
     )
-    from beekeepy._communication.abc.overseer import AbstractOverseer
+
+    from beekeepy._communication import rules
+    from beekeepy._communication.abc.communicator import AbstractCommunicator
+    from beekeepy._communication.abc.rules import Reaction, ResponsesRule, Rule, RuleSet, response_id
     from beekeepy._communication.aiohttp_communicator import AioHttpCommunicator
     from beekeepy._communication.communicator_getter import get_communicator_cls
     from beekeepy._communication.is_url_reachable import async_is_url_reachable, sync_is_url_reachable
-    from beekeepy._communication.overseers import CommonOverseer, StrictOverseer
     from beekeepy._communication.request_communicator import RequestCommunicator
+    from beekeepy._communication.rules import (
+        BeekeeperRules,
+        ErrorInResponseRules,
+        HiveRules,
+        JsonRpcRules,
+        SchemaValidationRules,
+    )
     from beekeepy._communication.settings import CommunicationSettings
+    from beekeepy._communication.signals import Abort, Retry
 
 
 __getattr__ = lazy_module_factory(
@@ -74,18 +95,26 @@ __getattr__ = lazy_module_factory(
         "ErrorCallback",
         "Request",
         "RequestCallback",
+        "RequestContext",
+        "RequestTimings",
         "Response",
         "ResponseCallback",
         "SyncCallback",
-        module="beekeepy._communication.abc.communicator_models",
+        module="hiveio_api._communication.abc.communicator_models",
     ),
     *aggregate_same_import(
-        "CommonOverseer",
-        "StrictOverseer",
-        module="beekeepy._communication.overseers",
+        "BeekeeperRules",
+        "ErrorInResponseRules",
+        "HiveRules",
+        "JsonRpcRules",
+        "SchemaValidationRules",
+        module="beekeepy._communication.rules",
     ),
+    *aggregate_same_import(
+        "Reaction", "ResponsesRule", "Rule", "RuleSet", "response_id", module="beekeepy._communication.abc.rules"
+    ),
+    *aggregate_same_import("Abort", "Retry", module="beekeepy._communication.signals"),
     ("beekeepy._communication", "rules"),
-    ("beekeepy._communication.abc.overseer", "AbstractOverseer"),
     ("beekeepy._communication.abc.communicator", "AbstractCommunicator"),
     ("beekeepy._communication.settings", "CommunicationSettings"),
     ("beekeepy._communication.communicator_getter", "get_communicator_cls"),

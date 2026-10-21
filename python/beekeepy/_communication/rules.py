@@ -2,273 +2,246 @@ from __future__ import annotations
 
 import json
 import re
+import warnings
+from abc import abstractmethod
 from typing import TYPE_CHECKING, ClassVar, Final
 
-from beekeepy._communication.abc.rules import OverseerRule
+from hiveio_api import UnknownEndpointError, validate_json
+
+from beekeepy._communication.abc.rules import (
+    Reaction,
+    ResponsesRule,
+    Rule,
+    RuleSet,
+    matching_request,
+    received,
+    request_payload,
+    response_id,
+    whole_response,
+)
 from beekeepy.exceptions import (
     ApiNotFoundError,
     DifferenceBetweenAmountOfRequestsAndResponsesError,
     ErrorInResponseError,
-    Json,
     JussiResponseError,
+    MissingValidationModelWarning,
     NullResultError,
-    OverseerError,
     OverseerInvalidPasswordError,
+    SchemaValidationError,
     UnableToAcquireDatabaseLockError,
     UnableToAcquireForkdbLockError,
     UnableToOpenWalletError,
-    UnknownDecisionPathError,
     UnlockIsNotAccessibleError,
     UnparsableResponseError,
     WalletIsAlreadyUnlockedError,
 )
 
 if TYPE_CHECKING:
-    from beekeepy.exceptions import OverseerError
+    from collections.abc import Sequence
+
+    from hiveio_api.client import RequestContext
+
+    from beekeepy.exceptions import Json, OverseerError
 
 
 REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME: Final[str] = r"\/(?:(?:[^\/]+\/)+)([^\/]+)\.wallet"
 
 
-class UnableToAcquireDatabaseLock(OverseerRule):
-    LOOKUP_MESSAGE: ClassVar[str] = "Unable to acquire database lock"
+class ErrorMessageRule(ResponsesRule):
+    """
+    Detects an error by its message - only the `error` member of a JSON-RPC response is searched.
 
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        if self.LOOKUP_MESSAGE in str(parsed_response):
-            return [
-                self._construct_exception(
-                    request_id=parsed_response.get("id"),
-                    response=parsed_response,
-                    message=f"Found `{self.LOOKUP_MESSAGE}` in response",
-                    whole_response=whole_response,
+    Messages of errors of hived and beekeeper are always in `error` (`message`, `data`). `result` holds data of users
+    (posts, memos, custom_json), so searching the whole response detected errors in correct responses, and turned
+    every response into a string once per pattern.
+    """
+
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]]
+    """Patterns of the message, searched in their order - the first match decides."""
+
+    def _check_response(self, context: RequestContext, response: Json) -> OverseerError | None:
+        error = response.get("error")
+        if error is None:
+            return None
+        error_text = self._error_text(error)
+        for pattern in self.PATTERNS:
+            if (match := pattern.search(error_text)) is not None:
+                return self._error(
+                    context, response=response, request_id=response_id(response), message=self._message(match)
                 )
-            ]
-        return []
+        return None
+
+    def _error_text(self, error: object) -> str:
+        """Text of the error searched by the patterns - the whole `error` member (message and data)."""
+        return str(error)
+
+    @abstractmethod
+    def _message(self, match: re.Match[str]) -> str:
+        """Message of the exception raised when a pattern matches."""
+
+
+class UnableToAcquireDatabaseLock(ErrorMessageRule):
+    LOOKUP_MESSAGE: ClassVar[str] = "Unable to acquire database lock"
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]] = [re.compile(re.escape(LOOKUP_MESSAGE))]
+
+    def _message(self, match: re.Match[str]) -> str:  # noqa: ARG002
+        return f"Found `{self.LOOKUP_MESSAGE}` in response"
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return UnableToAcquireDatabaseLockError
 
 
-class UnableToAcquireForkdbLock(OverseerRule):
+class UnableToAcquireForkdbLock(ErrorMessageRule):
     LOOKUP_MESSAGE: ClassVar[str] = "Unable to acquire forkdb lock"
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]] = [re.compile(re.escape(LOOKUP_MESSAGE))]
 
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        if self.LOOKUP_MESSAGE in str(parsed_response):
-            return [
-                self._construct_exception(
-                    message=f"Found `{self.LOOKUP_MESSAGE}` in response",
-                    response=parsed_response,
-                    request_id=parsed_response.get("id"),
-                    whole_response=whole_response,
-                )
-            ]
-        return []
+    def _message(self, match: re.Match[str]) -> str:  # noqa: ARG002
+        return f"Found `{self.LOOKUP_MESSAGE}` in response"
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return UnableToAcquireForkdbLockError
 
 
-class NullResult(OverseerRule):
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        if parsed_response.get("result", {}) is None:
-            request_id = int(parsed_response["id"])
-            if self.is_excluded_request(request_id=request_id):
-                return []
+class NullResult(ResponsesRule):
+    EXCLUDED_METHODS: ClassVar[Sequence[str]] = [
+        "wallet_bridge_api.get_account",
+        "wallet_bridge_api.get_witness",
+        "condenser_api.get_escrow",
+    ]
+    """Endpoints returning null as a correct result."""
 
-            return [
-                self._construct_exception(
-                    message="`result` field in response is null",
-                    response=parsed_response,
-                    request_id=request_id,
-                    whole_response=whole_response,
-                )
-            ]
-
-        return []
-
-    def is_excluded_request(self, request_id: int) -> bool:
-        request = self._get_matching_request(request_id=request_id)
-        return request["method"] in [
-            "wallet_bridge_api.get_account",
-            "wallet_bridge_api.get_witness",
-            "condenser_api.get_escrow",
-        ]
+    def _check_response(self, context: RequestContext, response: Json) -> OverseerError | None:
+        if "result" not in response or response["result"] is not None:
+            return None
+        request = matching_request(context, response_id(response))
+        if request is not None and request.method in self.EXCLUDED_METHODS:
+            return None
+        return self._error(
+            context, response=response, request_id=response_id(response), message="`result` field in response is null"
+        )
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return NullResultError
 
 
-class ApiNotFound(OverseerRule):
-    _API_NOT_FOUND_REGEX: ClassVar[re.Pattern[str]] = re.compile(
-        pattern=r"Assert Exception:api_itr != data\._registered_apis\.end\(\): Could not find API (\w+_api)"
-    )
+class ApiNotFound(ErrorMessageRule):
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]] = [
+        re.compile(r"Assert Exception:api_itr != data\._registered_apis\.end\(\): Could not find API (\w+_api)")
+    ]
 
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        search_result = self._API_NOT_FOUND_REGEX.search(str(parsed_response))
-        if search_result is not None:
-            return [
-                self._construct_exception(
-                    message=f"Requested api not found: {search_result.group(1)}",
-                    response=parsed_response,
-                    request_id=parsed_response.get("id"),
-                    whole_response=whole_response,
-                )
-            ]
-        return []
+    def _message(self, match: re.Match[str]) -> str:
+        return f"Requested api not found: {match.group(1)}"
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return ApiNotFoundError
 
 
-class JussiResponse(OverseerRule):
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        if "jussi_request_id" in str(parsed_response):
-            return [
-                self._construct_exception(
-                    message="Jussi responded instead of target service",
-                    response=parsed_response,
-                    request_id=parsed_response.get("id"),
-                    whole_response=whole_response,
-                )
-            ]
-        return []
+class JussiResponse(ErrorMessageRule):
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]] = [re.compile("jussi_request_id")]
+
+    def _message(self, match: re.Match[str]) -> str:  # noqa: ARG002
+        return "Jussi responded instead of target service"
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return JussiResponseError
 
 
-class UnparsableResponse(OverseerRule):
-    def _check_non_json_response(self, parsed_response: Exception, response_raw: str) -> list[OverseerError]:
-        if isinstance(parsed_response, json.JSONDecodeError):
-            return [
-                self._construct_exception(
-                    message=(
-                        "Received response is not parsable, " f"probably plaintext or invalid json: {response_raw}"
-                    ),
-                    response=parsed_response,
-                    whole_response=response_raw,  # type: ignore[arg-type]
-                    request_id=None,
-                )
-            ]
-        return []
+class UnparsableResponse(Rule):
+    """Response is not a JSON-RPC response - neither an object nor an array of objects (batch)."""
 
-    def _check_single(
-        self,
-        parsed_response: Json,  # noqa: ARG002
-        whole_response: Json | list[Json],  # noqa: ARG002
-    ) -> list[OverseerError]:
-        return []
+    def check(self, context: RequestContext) -> list[OverseerError]:
+        response = received(context)
+        try:
+            payload = response.json
+        except json.JSONDecodeError as error:
+            message = f"Received response is not parsable, probably plaintext or invalid json: {response.body}"
+            return [self._error(context, response=str(error), request_id=None, message=message)]
+        items = payload if isinstance(payload, list) else [payload]
+        if all(isinstance(item, dict) for item in items):
+            return []
+        message = f"Received response is neither a JSON-RPC object nor an array of them: {response.body}"
+        return [self._error(context, response=response.body, request_id=None, message=message)]
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return UnparsableResponseError
 
 
-class DifferenceBetweenAmountOfRequestsAndResponses(OverseerRule):
-    def _check_batch(self, parsed_response: list[Json]) -> list[OverseerError]:
-        def exception_factory(msg: str) -> OverseerError:
-            return self._construct_exception(
-                message=msg,
-                response=parsed_response,
-                whole_response=parsed_response,
-                request_id=None,
-            )
+class DifferenceBetweenAmountOfRequestsAndResponses(Rule):
+    """Responses of a batch do not answer its requests one to one."""
 
-        if not isinstance(self.request, list):
-            return [exception_factory("Received list of responses (batch), while requesting singular response")]
+    def check(self, context: RequestContext) -> list[OverseerError]:
+        try:
+            payload = received(context).json
+        except json.JSONDecodeError:
+            return []  # detected by UnparsableResponse
+        if not isinstance(payload, list):
+            return []
 
-        if (request_len := len(self.request)) != (response_len := len(parsed_response)):
-            message_pattern: Final[str] = "Received {} responses than requested"
-
-            if response_len == 0:
-                return [exception_factory("Received no responses (empty array)")]
-
-            if request_len < response_len:
-                return [exception_factory(message_pattern % "more")]
-
-            if request_len > response_len:
-                return [exception_factory(message_pattern % "less")]
-
-            raise UnknownDecisionPathError
-
-        return []
-
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:  # noqa: ARG002
-        return []
+        requests = request_payload(context)
+        if not isinstance(requests, list):
+            message = "Received list of responses (batch), while requesting singular response"
+        elif not payload and requests:
+            message = "Received no responses (empty array)"
+        elif len(requests) < len(payload):
+            message = "Received more responses than requested"
+        elif len(requests) > len(payload):
+            message = "Received less responses than requested"
+        else:
+            return []
+        return [self._error(context, response=whole_response(context), request_id=None, message=message)]
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return DifferenceBetweenAmountOfRequestsAndResponsesError
 
 
-class ErrorInResponse(OverseerRule):
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        if (error := parsed_response.get("error")) is not None:
-            return [
-                self._construct_exception(
-                    message=f"Error found in response: {error=}",
-                    response=parsed_response,
-                    request_id=parsed_response.get("id"),
-                    whole_response=whole_response,
-                )
-            ]
-        return []
+class ErrorInResponse(ResponsesRule):
+    def _check_response(self, context: RequestContext, response: Json) -> OverseerError | None:
+        if (error := response.get("error")) is None:
+            return None
+        return self._error(
+            context, response=response, request_id=response_id(response), message=f"Error found in response: {error=}"
+        )
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return ErrorInResponseError
 
 
-class UnlockIsNotAccessible(OverseerRule):
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        if "unlock is not accessible" in str(parsed_response):
-            return [
-                self._construct_exception(
-                    message="You tried to unlock wallet too fast",
-                    response=parsed_response,
-                    request_id=parsed_response.get("id"),
-                    whole_response=whole_response,
-                )
-            ]
-        return []
+class UnlockIsNotAccessible(ErrorMessageRule):
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]] = [re.compile("unlock is not accessible")]
+
+    def _message(self, match: re.Match[str]) -> str:  # noqa: ARG002
+        return "You tried to unlock wallet too fast"
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return UnlockIsNotAccessibleError
 
 
-class WalletIsAlreadyUnlocked(OverseerRule):
-    _WALLET_IS_ALREADY_UNLOCKED_REGEXES: ClassVar[list[re.Pattern[str]]] = [
+class WalletIsAlreadyUnlocked(ErrorMessageRule):
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]] = [
         re.compile(r"_itr->is_locked\(\): Wallet with name: '([\w-]+)' is already unlocked"),
         re.compile(r"_itr->is_locked\(\): Wallet is already unlocked: ([\w-]+)rethrow"),
         re.compile(r"Wallet is already unlocked: ([\w-]+)"),
     ]
 
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        for regex in self._WALLET_IS_ALREADY_UNLOCKED_REGEXES:
-            if (match := regex.search(str(parsed_response))) is not None:
-                return [
-                    self._construct_exception(
-                        message=f"You tried to unlock already unlocked wallet: `{match.group(1)}`",
-                        response=parsed_response,
-                        request_id=parsed_response.get("id"),
-                        whole_response=whole_response,
-                    )
-                ]
-        return []
+    def _message(self, match: re.Match[str]) -> str:
+        return f"You tried to unlock already unlocked wallet: `{match.group(1)}`"
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return WalletIsAlreadyUnlockedError
 
 
-class UnableToOpenWallet(OverseerRule):
-    _UNABLE_TO_OPEN_WALLET_REGEXES: ClassVar[list[re.Pattern[str]]] = [
+class UnableToOpenWallet(ErrorMessageRule):
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]] = [
         re.compile(
             r"_new_item->load_wallet_file\(\): "
             r"Unable to open file: " + REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME + r"(?:rethrow)?"
@@ -278,28 +251,16 @@ class UnableToOpenWallet(OverseerRule):
         re.compile(r"Wallet file not found"),
     ]
 
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        response_str = str(parsed_response)
-        for regex in self._UNABLE_TO_OPEN_WALLET_REGEXES:
-            if (match := regex.search(response_str)) is not None:
-                wallet_name = match.group(1) if match.lastindex else "unknown"
-                return [
-                    self._construct_exception(
-                        message=f"No such wallet: {wallet_name}",
-                        response=parsed_response,
-                        request_id=parsed_response.get("id"),
-                        whole_response=whole_response,
-                    )
-                ]
-        return []
+    def _message(self, match: re.Match[str]) -> str:
+        return f"No such wallet: {match.group(1) if match.lastindex else 'unknown'}"
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return UnableToOpenWalletError
 
 
-class InvalidPassword(OverseerRule):
-    _INVALID_PASSWORD_REGEXES: ClassVar[list[re.Pattern[str]]] = [
+class InvalidPassword(ErrorMessageRule):
+    PATTERNS: ClassVar[Sequence[re.Pattern[str]]] = [
         re.compile(
             r"false: Invalid password for wallet: '"
             + REGEX_FOR_PATH_WITH_CAPTURE_GROUP_ON_WALLET_NAME
@@ -308,20 +269,145 @@ class InvalidPassword(OverseerRule):
         re.compile(r"Invalid password for wallet: ([\w-]+)"),
     ]
 
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        error_message = parsed_response.get("error", {}).get("message", "")
-        for regex in self._INVALID_PASSWORD_REGEXES:
-            if (match := regex.search(error_message)) is not None:
-                return [
-                    self._construct_exception(
-                        message=f"Invalid password for wallet: {match.group(1)}",
-                        response=parsed_response,
-                        request_id=parsed_response.get("id"),
-                        whole_response=whole_response,
-                    )
-                ]
-        return []
+    def _error_text(self, error: object) -> str:
+        """Only the message of the error (data of the error repeats it with paths of the wallet)."""
+        message = error.get("message", "") if isinstance(error, dict) else ""
+        return message if isinstance(message, str) else ""
+
+    def _message(self, match: re.Match[str]) -> str:
+        return f"Invalid password for wallet: {match.group(1)}"
 
     @classmethod
     def expected_exception(cls) -> type[OverseerError]:
         return OverseerInvalidPasswordError
+
+
+_MAX_SCHEMA_ERRORS_IN_MESSAGE: Final[int] = 10
+
+
+class SchemaValidation(ResponsesRule):
+    """
+    Validates `result` of a JSON-RPC response against the validation model of the called endpoint.
+
+    Uses `hiveio_api.validate_json` (`result` is already JSON builtins, validated without a copy) with the endpoint
+    taken from `method` of the matching request (e.g. `condenser_api.get_accounts`). Responses with an error, without
+    (or with null) `result` and REST requests are skipped.
+
+    Endpoints without validation models (`hiveio_api.UnknownEndpointError`) are skipped with a warning
+    (`MissingValidationModelWarning`, once for each API), in the strict mode the error is raised.
+
+    Note: Validation is opt-in, API calls do not validate responses by default - use `SchemaValidationRules`.
+    """
+
+    def __init__(self, *, strict: bool = False) -> None:
+        self.__strict = strict
+        self.__apis_without_models: set[str] = set()
+        """APIs reported as having no validation models - each one is reported once."""
+
+    def _check_response(self, context: RequestContext, response: Json) -> OverseerError | None:
+        result = response.get("result")
+        if result is None or response.get("error") is not None:
+            return None
+        request = matching_request(context, response_id(response))
+        if request is None:
+            return None
+
+        try:
+            schema_errors = validate_json(result, request.method)
+        except UnknownEndpointError as error:
+            if self.__strict:
+                raise
+            self.__warn_once(request.method, error)
+            return None
+        if not schema_errors:
+            return None
+
+        described = "\n".join(
+            f"  {error.path}: {error.message}" for error in schema_errors[:_MAX_SCHEMA_ERRORS_IN_MESSAGE]
+        )
+        more = len(schema_errors) - _MAX_SCHEMA_ERRORS_IN_MESSAGE
+        message = f"Response of `{request.method}` does not match its schema:\n{described}" + (
+            f"\n  ... and {more} more" if more > 0 else ""
+        )
+        return SchemaValidationError(
+            **self._error_arguments(context, response=response, request_id=response_id(response), message=message),
+            schema_errors=schema_errors,
+        )
+
+    def __warn_once(self, method: str, error: UnknownEndpointError) -> None:
+        api = method.rpartition(".")[0] or method
+        if api in self.__apis_without_models:
+            return
+        self.__apis_without_models.add(api)
+        warnings.warn(f"Responses of `{api}` are not validated: {error}", MissingValidationModelWarning, stacklevel=2)
+
+    @classmethod
+    def expected_exception(cls) -> type[OverseerError]:
+        return SchemaValidationError
+
+
+class JsonRpcRules(RuleSet):
+    """
+    Responses of JSON-RPC servers of appbase (hived, beekeeper) - structure of responses and not found APIs.
+
+    The first rules of handles; errors of the services are checked by the next rule sets.
+    """
+
+    RULES = (
+        (UnparsableResponse(), Reaction.RETRY),
+        (DifferenceBetweenAmountOfRequestsAndResponses(), Reaction.RETRY),
+        (ApiNotFound(), Reaction.ABORT),
+    )
+
+
+class HiveRules(RuleSet):
+    """Errors of hived (and jussi in front of it)."""
+
+    RULES = (
+        (UnableToAcquireDatabaseLock(), Reaction.RETRY_UNLIMITED),
+        (UnableToAcquireForkdbLock(), Reaction.RETRY_UNLIMITED),
+        (JussiResponse(), Reaction.RETRY),
+        (NullResult(), Reaction.RETRY),
+    )
+
+
+class BeekeeperRules(RuleSet):
+    """Errors of beekeeper."""
+
+    RULES = (
+        (UnlockIsNotAccessible(), Reaction.ABORT),
+        (WalletIsAlreadyUnlocked(), Reaction.ABORT),
+        (UnableToOpenWallet(), Reaction.ABORT),
+        (InvalidPassword(), Reaction.ABORT),
+    )
+
+
+class ErrorInResponseRules(RuleSet):
+    """Any other error in a response - the last rules of handles."""
+
+    RULES = ((ErrorInResponse(), Reaction.ABORT),)
+
+
+class SchemaValidationRules(RuleSet):
+    """
+    Results of responses match validation models of called endpoints (`hiveio_api.validate_schema`).
+
+    Opt-in - add after rules of the handle (e.g. `handle.apis.callbacks.process_response.append(...)`).
+
+    Validation models of APIs of hived are registered by `hiveio_api`. Models of `beekeeper_api` are not a part of
+    beekeepy - they are generated for its tests only, so responses of beekeeper are validated only after their
+    registration (`hiveio_api.register_validation_models`).
+    """
+
+    def __init__(self, *, strict: bool = False) -> None:
+        """
+        Rules validating results of responses.
+
+        Args:
+            strict: Raise `hiveio_api.UnknownEndpointError` when a called endpoint has no validation model - otherwise
+                its responses are not validated and `MissingValidationModelWarning` is issued once for each API.
+        """
+        self.__rules = ((SchemaValidation(strict=strict), Reaction.ABORT),)
+
+    def _rules(self) -> tuple[tuple[Rule, Reaction], ...]:
+        return self.__rules

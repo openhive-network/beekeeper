@@ -1,27 +1,26 @@
 from __future__ import annotations
 
-import asyncio
+import inspect
+import time
 from abc import ABC, abstractmethod
-from threading import Thread
-from typing import TYPE_CHECKING, Any, Awaitable, TypeGuard, TypeVar, cast
+from typing import TYPE_CHECKING, Awaitable, TypeVar, cast
 
-from beekeepy._communication.abc.communicator_models import (
-    AsyncCallback,
+from hiveio_api.client import (
     AsyncCallbacks,
-    AsyncErrorCallback,
     Callbacks,
-    ErrorCallback,
     Methods,
     Request,
+    RequestContext,
+    RequestTimings,
     Response,
-    SyncCallback,
 )
+
 from beekeepy._communication.settings import CommunicationSettings
 from beekeepy._utilities.settings_holder import SharedSettingsHolder
 from beekeepy.exceptions import TimeoutExceededError
 
 if TYPE_CHECKING:
-    from beekeepy._communication.url import HttpUrl
+    from hiveio_api.client import HttpUrl
 
 
 T = TypeVar("T")
@@ -42,37 +41,62 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
 
     def get(self, url: HttpUrl, callbacks: Callbacks | None = None) -> str:
         """Sends to given url given data synchronously as GET."""
-        return self.__send(url, "GET", callbacks or default_callback())
+        return self.__send(url, "GET", callbacks or default_callback()).body
 
     def post(self, url: HttpUrl, data: str | None = None, callbacks: Callbacks | None = None) -> str:
         """Sends to given url given data synchronously as POST."""
-        return self.__send(url, "POST", callbacks or default_callback(), data)
+        return self.__send(url, "POST", callbacks or default_callback(), data).body
 
     def put(self, url: HttpUrl, data: str | None = None, callbacks: Callbacks | None = None) -> str:
         """Sends to given url given data synchronously as PUT."""
-        return self.__send(url, "PUT", callbacks or default_callback(), data)
+        return self.__send(url, "PUT", callbacks or default_callback(), data).body
 
-    def send(self, url: HttpUrl, method: Methods, data: str | None = None, callbacks: Callbacks | None = None) -> str:
-        """Sends to given url given data synchronously."""
-        return self.__send(url, method, callbacks or default_callback(), data)
+    def send(
+        self,
+        url: HttpUrl,
+        method: Methods,
+        data: str | None = None,
+        callbacks: Callbacks | None = None,
+        timings: RequestTimings | None = None,
+    ) -> Response:
+        """
+        Sends to given url given data synchronously.
+
+        When preparing, sending or processing the request raises, callbacks of errors are called in their order and the
+        exception is raised afterwards. A callback of errors may raise another exception instead (e.g. to translate
+        the error) - it replaces the exception and the next callbacks of errors are not called.
+
+        Args:
+            url: Target of the request.
+            method: HTTP method.
+            data: Body of the request.
+            callbacks: Callbacks of the request.
+            timings: Timings of previous attempts of the request - duration of this attempt is appended to them.
+        """
+        return self.__send(url, method, callbacks or default_callback(), data, timings)
 
     async def async_get(self, url: HttpUrl, callbacks: AsyncCallbacks | None = None) -> str:
         """Sends to given url given data asynchronously as GET."""
-        return await self.__async_send(url, "GET", callbacks or default_async_callback())
+        return (await self.__async_send(url, "GET", callbacks or default_async_callback())).body
 
     async def async_post(self, url: HttpUrl, data: str | None = None, callbacks: AsyncCallbacks | None = None) -> str:
         """Sends to given url given data asynchronously as POST."""
-        return await self.__async_send(url, "POST", callbacks or default_async_callback(), data)
+        return (await self.__async_send(url, "POST", callbacks or default_async_callback(), data)).body
 
     async def async_put(self, url: HttpUrl, data: str | None = None, callbacks: AsyncCallbacks | None = None) -> str:
         """Sends to given url given data asynchronously as PUT."""
-        return await self.__async_send(url, "PUT", callbacks or default_async_callback(), data)
+        return (await self.__async_send(url, "PUT", callbacks or default_async_callback(), data)).body
 
     async def async_send(
-        self, url: HttpUrl, method: Methods, data: str | None = None, callbacks: AsyncCallbacks | None = None
-    ) -> str:
-        """Sends to given url given data asynchronously."""
-        return await self.__async_send(url, method, callbacks or default_async_callback(), data)
+        self,
+        url: HttpUrl,
+        method: Methods,
+        data: str | None = None,
+        callbacks: AsyncCallbacks | None = None,
+        timings: RequestTimings | None = None,
+    ) -> Response:
+        """Sends to given url given data asynchronously - as `send`."""
+        return await self.__async_send(url, method, callbacks or default_async_callback(), data, timings)
 
     # ABSTRACT
 
@@ -110,11 +134,6 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
     def _construct_timeout_exception(self, request: Request) -> TimeoutExceededError:
         return TimeoutExceededError(url=request.url, request=request.body or "", timeout_secs=request.get_timeout())
 
-    def _asyncio_run(self, coro: Awaitable[Any]) -> None:
-        thread = Thread(target=asyncio.run, args=(coro,))
-        thread.start()
-        thread.join()
-
     def _prepare_request(self, url: HttpUrl, method: Methods, data: str | None = None) -> Request:
         """Default prepare request callback."""
         return Request(
@@ -137,31 +156,31 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
         method: Methods,
         callbacks: Callbacks,
         data: str | None = None,
-    ) -> str:
+        timings: RequestTimings | None = None,
+    ) -> Response:
+        timings = RequestTimings() if timings is None else timings
         request = self._prepare_request(url, method, data)
-        if self.__is_available(callbacks.prepare_request):
-            request = self.__call_callback(callbacks.prepare_request, Request, callbacks.request_error, request=request)
-
+        response: Response | None = None
         try:
-            response = self._send(request)
+            for prepare_request in callbacks.prepare_request:
+                request = prepare_request(request)
+
+            started = time.perf_counter()
+            try:
+                response = self._send(request)
+            finally:
+                timings.attempts.append(time.perf_counter() - started)
+
+            context = RequestContext(request=request, response=response, timings=timings)
+            for process_response in callbacks.process_response:
+                process_response(context)
         except Exception as error:
-            if self.__is_available(callbacks.communicator_error):
-                self.__call_callback(
-                    callbacks.communicator_error, type(None), None, request=request, response=None, exception=error
-                )
-            else:
-                raise
+            context = RequestContext(request=request, response=response, exception=error, timings=timings)
+            for error_callback in callbacks.error:
+                error_callback(context)
+            raise
 
-        if self.__is_available(callbacks.process_response):
-            response = self.__call_callback(
-                callbacks.process_response,
-                Response,
-                callbacks.response_error,
-                request=request,
-                response=response,
-            )
-
-        return response.body
+        return response
 
     async def __async_send(
         self,
@@ -169,76 +188,35 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
         method: Methods,
         callbacks: AsyncCallbacks,
         data: str | None = None,
-    ) -> str:
+        timings: RequestTimings | None = None,
+    ) -> Response:
+        timings = RequestTimings() if timings is None else timings
         request = self._prepare_request(url, method, data)
-        if self.__is_available(callbacks.prepare_request):
-            request = await self.__call_async_callback(
-                cast(AsyncCallback, callbacks.prepare_request),
-                Request,
-                cast(AsyncErrorCallback | ErrorCallback, callbacks.request_error),
-                request=request,
-            )
-
+        response: Response | None = None
         try:
-            response = await self._async_send(request)
+            for prepare_request in callbacks.prepare_request:
+                request = await _resolve(prepare_request(request))
+
+            started = time.perf_counter()
+            try:
+                response = await self._async_send(request)
+            finally:
+                timings.attempts.append(time.perf_counter() - started)
+
+            context = RequestContext(request=request, response=response, timings=timings)
+            for process_response in callbacks.process_response:
+                await _resolve(process_response(context))
         except Exception as error:
-            if self.__is_available(callbacks.communicator_error):
-                await self.__call_async_callback(
-                    cast(AsyncCallback, callbacks.communicator_error),
-                    type(None),
-                    None,
-                    request=request,
-                    response=None,
-                    exception=error,
-                )
-            else:
-                raise
-
-        if self.__is_available(callbacks.process_response):
-            response = await self.__call_async_callback(
-                cast(AsyncCallback, callbacks.process_response),
-                Response,
-                cast(AsyncErrorCallback | ErrorCallback, callbacks.response_error),
-                request=request,
-                response=response,
-            )
-
-        return response.body
-
-    def __call_callback(
-        self,
-        callback: SyncCallback,
-        _: type[T],
-        error_callback: ErrorCallback | None = None,
-        **kwargs: Any,
-    ) -> T:
-        """Calls given callback with given arguments."""
-        try:
-            return cast(T, callback(**kwargs))
-        except Exception as error:
-            if self.__is_available(error_callback):
-                error_callback(**kwargs, exception=error)
+            context = RequestContext(request=request, response=response, exception=error, timings=timings)
+            for error_callback in callbacks.error:
+                await _resolve(error_callback(context))
             raise
 
-    async def __call_async_callback(
-        self,
-        callback: AsyncCallback,
-        _: type[T],
-        error_callback: ErrorCallback | AsyncErrorCallback | None = None,
-        **kwargs: Any,
-    ) -> T:
-        """Calls given callback with given arguments."""
-        try:
-            if asyncio.iscoroutinefunction(callback):
-                return cast(T, await callback(**kwargs))
-            return cast(T, callback(**kwargs))
-        except Exception as error:
-            if self.__is_available(error_callback):
-                await self.__call_async_callback(
-                    cast(AsyncCallback, error_callback), type(None), None, **kwargs, exception=error
-                )
-            raise
+        return response
 
-    def __is_available(self, callback: T | None) -> TypeGuard[T]:
-        """Checks if callback is available."""
-        return callback is not None
+
+async def _resolve(result: T | Awaitable[T]) -> T:
+    """Result of a callback - awaited when the callback is asynchronous (also an object with async `__call__`)."""
+    if inspect.isawaitable(result):
+        return cast(T, await result)
+    return result
