@@ -8,12 +8,21 @@ const nodeStorageCreator: TStorageCreator = async (storageRoot: string): Promise
   const walletDir = join(storageRoot, LEGACY_WALLET_DIR);
   mkdirSync(walletDir, { recursive: true });
 
+  // Wallet names are file names in walletDir. A name with '/' or '\' (a separator on Windows)
+  // would make save and load use another directory, e.g. '../x', so it is refused.
+  const walletFile = (name: string): string => {
+    if (name.includes('/') || name.includes('\\'))
+      throw new Error("Invalid wallet name: " + name);
+
+    return join(walletDir, name + LEGACY_WALLET_EXT);
+  };
+
   return {
     save_fn: (name: string, data: Uint8Array): void => {
       // Write a new owner-only temp file, flush it and rename it over the wallet, so an
       // interrupted save cannot truncate the only copy of the keys (unlocking a legacy
       // wallet rewrites it). 'wx' never follows a file or symlink left at the temp path.
-      const target = join(walletDir, name + LEGACY_WALLET_EXT);
+      const target = walletFile(name);
       const tmp = target + '.tmp';
       rmSync(tmp, { force: true });
 
@@ -33,8 +42,9 @@ const nodeStorageCreator: TStorageCreator = async (storageRoot: string): Promise
     },
 
     load_fn: (name: string): Uint8Array => {
+      const file = walletFile(name);
       try {
-        const buf = readFileSync(join(walletDir, name + LEGACY_WALLET_EXT));
+        const buf = readFileSync(file);
         return new Uint8Array(buf);
       } catch {
         throw new Error("Wallet not found: " + name);
