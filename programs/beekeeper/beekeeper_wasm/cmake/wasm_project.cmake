@@ -42,6 +42,12 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*wasm_crypto_primitives::aes256_cbc_decrypt*"
     "*wasm_crypto_primitives::ecdh_shared_secret*"
     # crypto_provider_impl — calls async primitives (some inlined by -Oz)
+    # aes_encrypt/aes_decrypt/generate_encrypted_key are private helpers that
+    # sit on the await stack; today -Oz inlines them (patterns may warn as
+    # non-matching), these entries take over if inlining ever stops.
+    "*crypto_provider_impl::aes_encrypt*"
+    "*crypto_provider_impl::aes_decrypt*"
+    "*crypto_provider_impl::generate_encrypted_key*"
     "*crypto_provider_impl::encrypt_wallet_keys*"
     "*crypto_provider_impl::encrypt_wallet_data*"
     "*crypto_provider_impl::decrypt_wallet_data*"
@@ -52,6 +58,23 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*crypto_provider_impl::key_to_wif*"
     # wallet — encrypt_and_save calls async crypto, but lock() is now sync (no longer saves)
     "*wallet::encrypt_and_save*"
+    # The wallet / beekeeper methods between the embind entry points and the
+    # crypto calls (unlock of a wallet another session unlocked checks the
+    # password with async crypto). -Oz currently inlines most of them into the
+    # beekeeper_api entry points, so the linker may warn these patterns match
+    # nothing; they are a safety net that activates exactly when inlining stops.
+    "*wallet::unlock*"
+    "*wallet::create*"
+    "*wallet::import_key*"
+    "*wallet::remove_key*"
+    "*wallet::check_password*"
+    "*beekeeper::unlock*"
+    "*beekeeper::create_wallet*"
+    "*beekeeper::gen_password*"
+    "*beekeeper::import_key*"
+    "*beekeeper::remove_key*"
+    "*beekeeper::encrypt_data*"
+    "*beekeeper::decrypt_data*"
     # beekeeper_api — embind entry points (only those that transitively call async crypto)
     "*beekeeper_api::create*"
     "*beekeeper_api::unlock*"

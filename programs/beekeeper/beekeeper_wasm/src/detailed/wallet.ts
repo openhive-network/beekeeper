@@ -111,7 +111,7 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
 
   get unlocked(): BeekeeperUnlockedWallet | undefined {
     if (this._unlocked && this.api.isTimedOut()) {
-      this._unlocked.lock();
+      this.api.lockAllSessions();
     }
     return this._unlocked;
   }
@@ -130,6 +130,9 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
 
   public async unlock(password: string): Promise<IBeekeeperUnlockedWallet> {
     this.ensureOpened();
+    // Restarting the timer must not revive the wallets that timed out: lock them first.
+    if (this.api.isTimedOut())
+      this.api.lockAllSessions();
     this.api.refreshTimeout();
     await safeAsyncWasmCall(
       () => this.api.api.unlock(this.session.token, this.name, password),

@@ -61,6 +61,16 @@ export class BeekeeperApi implements IBeekeeperInstance {
       && (Date.now() - this.#lastActivity) >= this.unlockTimeoutMs;
   }
 
+  /**
+   * The inactivity timeout covers the whole instance, while each session holds
+   * its own unlock of a wallet: once it expires, lock the wallets of every session.
+   */
+  public lockAllSessions(): void {
+    for (const session of this.sessions.values())
+      for (const wallet of session.wallets.values())
+        wallet._unlocked?.lock();
+  }
+
   /** Returns the timeout deadline as a Date (for getInfo). */
   public getTimeoutTime(): Date {
     if (this.unlockTimeoutMs === 0)

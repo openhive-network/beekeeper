@@ -77,6 +77,9 @@ uint32_t beekeeper_app::save_keys( const std::string& wallet_name, const std::st
 
   ilog( "*****Saving keys into `${_filename}` file*****", (_filename) );
 
+  // The auto-lock timer is already running and walks the sessions under this mutex.
+  std::unique_lock guard( mtx_handler->get_mutex() );
+
   ilog( "Create a session" );
   std::string _token = bk_->create_session();
 
@@ -86,10 +89,10 @@ uint32_t beekeeper_app::save_keys( const std::string& wallet_name, const std::st
     bk_->open_wallet( _token, wallet_name );
 
     ilog( "Unlock the wallet" );
-    bk_->unlock( wallet_name, wallet_password );
+    bk_->unlock( _token, wallet_name, wallet_password );
 
     ilog( "Get keys" );
-    auto _keys = bk_->get_public_keys( wallet_name );
+    auto _keys = bk_->get_public_keys( _token, wallet_name );
 
     std::vector<keys_container> _v;
     std::transform( _keys.begin(), _keys.end(), std::back_inserter( _v ),
@@ -109,7 +112,7 @@ uint32_t beekeeper_app::save_keys( const std::string& wallet_name, const std::st
   auto _finish = [this, &_token, &wallet_name]()
   {
     ilog( "Lock the wallet" );
-    bk_->lock( wallet_name );
+    bk_->lock( _token, wallet_name );
 
     ilog( "Close a session" );
     bk_->close_session( _token );
@@ -185,10 +188,11 @@ uint32_t beekeeper_app::initialize_program_options()
       storage_ = std::make_unique<beekeeper::file_storage>( _dir );
       bk_ = std::make_unique<beekeeper_minimal::beekeeper>( *crypto_, *storage_, static_cast<uint32_t>(_timeout) );
 
-      // Start timeout thread
+      // Start timeout thread. Auto-locking changes the sessions' wallet state,
+      // so it takes the API mutex exclusively.
       timer_ = std::make_unique<beekeeper::time_manager>( [this]()
       {
-        std::shared_lock guard( mtx_handler->get_mutex() );
+        std::unique_lock guard( mtx_handler->get_mutex() );
         bk_->check_timeout();
       });
 
