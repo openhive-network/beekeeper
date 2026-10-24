@@ -20,6 +20,8 @@
 #include <beekeeper/extended_api.hpp>
 
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <thread>
 #include <condition_variable>
 
@@ -2108,6 +2110,35 @@ BOOST_AUTO_TEST_CASE(wallet_legacy_conversion_skipped_when_stored_wallet_changed
   fresh.unlock("pass");
   BOOST_REQUIRE_EQUAL(2u, fresh.get_keys().size());
   BOOST_REQUIRE(blob_has_v1_magic(b_mgr.read_wallet_blob("shared")));
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(file_storage_save_replaces_planted_temp_file)
+{ try {
+  // A file planted at the temp path (here a symlink to another file) is
+  // replaced, never written through, and the wallet is owner-only.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto victim = b_mgr.dir / "victim.txt";
+  {
+    std::ofstream out(victim.string());
+    out << "keep";
+  }
+  boost::filesystem::create_symlink(victim, b_mgr.dir / "planted.wallet.tmp");
+
+  const std::vector<char> content{ '"', 'a', 'b', '"' };
+  b_mgr.storage->save("planted", content);
+
+  std::ifstream in(victim.string());
+  std::string victim_content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  BOOST_REQUIRE_EQUAL("keep", victim_content);
+  BOOST_REQUIRE(b_mgr.storage->load("planted") == content);
+  BOOST_REQUIRE(boost::filesystem::symlink_status(b_mgr.dir / "planted.wallet.tmp").type() == boost::filesystem::file_not_found);
+
+  auto perms = boost::filesystem::status(b_mgr.dir / "planted.wallet").permissions();
+  BOOST_REQUIRE_EQUAL(static_cast<int>(perms & boost::filesystem::all_all),
+                      static_cast<int>(boost::filesystem::owner_read | boost::filesystem::owner_write));
 
 } FC_LOG_AND_RETHROW() }
 
