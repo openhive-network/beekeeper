@@ -603,6 +603,61 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     expect(retVal.keys).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
   });
 
+  test('Should refuse wallet names with a path separator in the Node.js storage', async ({ beekeeperTest }) => {
+    await beekeeperTest.dynamic(async ({ provider, env }) => {
+      if (env !== 'node')
+        return;
+
+      // Module names in variables keep the browser run from resolving them.
+      const fsName = 'fs', pathName = 'path', osName = 'os';
+      const fs = await import(fsName) as typeof import('fs');
+      const path = await import(pathName) as typeof import('path');
+      const os = await import(osName) as typeof import('os');
+
+      const base = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-node-names-'));
+      const otherDir = path.join(base, 'other', '.beekeeper');
+      const walletDir = path.join(base, 'root', '.beekeeper');
+      try {
+        // A wallet of another storage root: '../../other/.beekeeper/victim' from this root's wallet directory.
+        const other = await provider.default({ storageRoot: path.join(base, 'other') });
+        const { wallet: victim } = await other.createSession('salt').createWallet('victim', 'victim-pass');
+        await victim.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+        await other.delete();
+        const victimFile = fs.readFileSync(path.join(otherDir, 'victim.wallet'));
+
+        const bk = await provider.default({ storageRoot: path.join(base, 'root') });
+        const session = bk.createSession('salt');
+        fs.mkdirSync(path.join(walletDir, 'sub'));
+
+        // Distinct names: a failed create or open can leave its name registered in the WASM core.
+        expect(() => session.openWallet('../../other/.beekeeper/victim')).toThrow('Invalid wallet name');
+        await expect(session.createWallet('../../other/.beekeeper/./victim', 'pass')).rejects.toThrow('Invalid wallet name');
+        await expect(session.createWallet('../../other/.beekeeper/created', 'pass')).rejects.toThrow('Invalid wallet name');
+        await expect(session.createWallet('..\\..\\other\\.beekeeper\\created', 'pass')).rejects.toThrow('Invalid wallet name');
+        await expect(session.createWallet('sub/inner', 'pass')).rejects.toThrow('Invalid wallet name');
+
+        // Names without a separator work as before, odd ones included.
+        const names = ['my wallet', '..', '.hidden'];
+        for (const name of names)
+          await session.createWallet(name, 'pass');
+        await bk.delete();
+
+        expect(fs.readdirSync(otherDir)).toEqual(['victim.wallet']);
+        expect(fs.readFileSync(path.join(otherDir, 'victim.wallet')).equals(victimFile)).toBe(true);
+        expect(fs.readdirSync(walletDir).sort()).toEqual(['...wallet', '.hidden.wallet', 'my wallet.wallet', 'sub']);
+        expect(fs.readdirSync(path.join(walletDir, 'sub'))).toEqual([]);
+
+        const reopened = await provider.default({ storageRoot: path.join(base, 'root') });
+        const session2 = reopened.createSession('salt');
+        for (const name of names)
+          await session2.openWallet(name).unlock('pass');
+        await reopened.delete();
+      } finally {
+        fs.rmSync(base, { recursive: true, force: true });
+      }
+    });
+  });
+
   test.afterAll(async () => {
     await browser.close();
   });

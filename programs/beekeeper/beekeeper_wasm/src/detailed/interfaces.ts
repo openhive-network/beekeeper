@@ -262,7 +262,7 @@ export interface IBeekeeperSession {
    * When used in {@link IBeekeeperOptions inMemory} mode, the wallet will be implicitly created as temporary.
    * The wallet will be created as persistent otherwise.
    *
-   * @param {string} name name of wallet
+   * @param {string} name name of wallet (the Node.js storage refuses a name with `/` or `\`)
    * @param {?string} password password used for creation of a wallet. Should be strong enough to protect your keys.
    *                           If not provided, safe password is automatically generated and returned.
    *
@@ -275,7 +275,7 @@ export interface IBeekeeperSession {
   /**
    * Creates a new Beekeeper wallet object owned by this session
    *
-   * @param {string} name name of wallet
+   * @param {string} name name of wallet (the Node.js storage refuses a name with `/` or `\`)
    * @param {string | undefined} password password used for creation of a wallet. Should be strong enough to protect your keys. Provide undefined to auto-generate a safe password.
    * @param {?boolean} isTemporary If `true` the wallet exists only in memory otherwise is saved into persistent storage. (defaults to `true` when {@link IBeekeeperOptions inMemory} is enabled, and `false` otherwise)
    *
@@ -288,7 +288,7 @@ export interface IBeekeeperSession {
   /**
    * Opens Beekeeper wallet object owned by this session
    *
-   * @param {string} name name of wallet
+   * @param {string} name name of wallet (the Node.js storage refuses a name with `/` or `\`)
    *
    * @returns {IBeekeeperWallet} the opened Beekeeper wallet object (may be unlocked if it has been previously unlocked)
    *
