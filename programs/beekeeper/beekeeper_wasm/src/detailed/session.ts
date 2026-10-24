@@ -2,7 +2,6 @@ import { BeekeeperError } from "./errors.js";
 import { BeekeeperApi } from "./api.js";
 import { IBeekeeperInfo, IBeekeeperInstance, IBeekeeperSession, IBeekeeperWallet, IWalletCreated } from "./interfaces.js";
 import { BeekeeperLockedWallet, BeekeeperUnlockedWallet } from "./wallet.js";
-import { safeAsyncWasmCall, safeWasmCall } from './util/wasm_error.js';
 
 export class BeekeeperSession implements IBeekeeperSession {
   public constructor(
@@ -20,7 +19,7 @@ export class BeekeeperSession implements IBeekeeperSession {
   }
 
   public hasWallet(name: string): boolean {
-    return safeWasmCall(
+    return this.api.runSync(
       () => this.api.api.has_wallet(this.token, name),
       `wallet '${name}' existence check`
     );
@@ -40,7 +39,7 @@ export class BeekeeperSession implements IBeekeeperSession {
     if (isTemporary === undefined)
       isTemporary = this.api.isInMemory;
 
-    const returnedPassword: string = await safeAsyncWasmCall(
+    const returnedPassword: string = await this.api.runAsync(
       () => this.api.api.create(this.token, name, password ?? "", isTemporary),
       `wallet '${name}' creation`
     );
@@ -62,11 +61,15 @@ export class BeekeeperSession implements IBeekeeperSession {
     if(this.wallets.has(name))
       return this.wallets.get(name) as IBeekeeperWallet;
 
-    safeWasmCall(
-      () => this.api.api.open(this.token, name),
-      `wallet '${name}' opening`
-    );
-    const wallet = new BeekeeperLockedWallet(this.api, this, name, false);
+    // While another call is in progress the module cannot be entered; the wallet is
+    // then opened by its first unlock(), which runs after that call.
+    const opened = !this.api.asyncCallInFlight;
+    if (opened)
+      this.api.runSync(
+        () => this.api.api.open(this.token, name),
+        `wallet '${name}' opening`
+      );
+    const wallet = new BeekeeperLockedWallet(this.api, this, name, false, opened);
 
     this.wallets.set(name, wallet);
 
@@ -77,7 +80,16 @@ export class BeekeeperSession implements IBeekeeperSession {
     if(!this.wallets.delete(name))
       throw new BeekeeperError(`This Beekeeper API session is not the owner of wallet identified by name: "${name}"`);
 
-    safeWasmCall(
+    if (this.api.asyncCallInFlight) {
+      // Close right after the calls in progress (see BeekeeperUnlockedWallet.lock()).
+      this.api.runAsync(
+        () => this.api.api.close(this.token, name),
+        `wallet '${name}' closing`
+      ).catch(() => undefined);
+      return;
+    }
+
+    this.api.runSync(
       () => this.api.api.close(this.token, name),
       `wallet '${name}' closing`
     );

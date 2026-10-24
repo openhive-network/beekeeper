@@ -5,7 +5,7 @@ import type { ICryptoCallbacks } from "./crypto.js";
 import type { IStorageCallbacks } from "./fs.js";
 import { IBeekeeperInstance, IBeekeeperOptions, IBeekeeperSession } from "./interfaces.js";
 import { BeekeeperSession } from "./session.js";
-import { safeWasmCall } from './util/wasm_error.js';
+import { safeAsyncWasmCall, safeWasmCall } from './util/wasm_error.js';
 
 /**
  * Adds the callbacks js_callback_storage uses where a failed storage operation
@@ -49,6 +49,12 @@ export class BeekeeperApi implements IBeekeeperInstance {
   /** Timestamp (ms) of last wallet activity. Used for TS-level timeout check. */
   #lastActivity: number = Date.now();
 
+  /** Tail of the queue of asynchronous WASM calls, see runAsync(). */
+  #queue: Promise<unknown> = Promise.resolve();
+
+  /** True while an asynchronous WASM call is suspended inside the module. */
+  #asyncCallInFlight = false;
+
   public constructor(
     private readonly provider: MainModule,
     private readonly options: Omit<IBeekeeperOptions, 'wasmLocation' | 'storageRoot'>,
@@ -64,6 +70,43 @@ export class BeekeeperApi implements IBeekeeperInstance {
       crypto,
       this.options.unlockTimeout
     );
+  }
+
+  /**
+   * Runs an asynchronous WASM call. The module suspends such calls with Asyncify,
+   * which can keep only one call suspended at a time: a second call entering the
+   * module while another one waits (e.g. for the KDF) corrupts its state and can
+   * persist a wallet that no password opens. Async calls therefore run one at a
+   * time, in the order they were made.
+   */
+  public runAsync<T extends () => any>(fn: T, errorCommentDuring: string): Promise<ReturnType<T>> {
+    const run = this.#queue.then(async (): Promise<ReturnType<T>> => {
+      this.#asyncCallInFlight = true;
+      try {
+        return await safeAsyncWasmCall(fn, errorCommentDuring);
+      } finally {
+        this.#asyncCallInFlight = false;
+      }
+    });
+    this.#queue = run.catch(() => undefined);
+
+    return run;
+  }
+
+  /**
+   * Runs a synchronous WASM call. It cannot wait for the queue of async calls,
+   * so it is refused while one of them is suspended inside the module.
+   */
+  public runSync<T extends () => any>(fn: T, errorCommentDuring: string): ReturnType<T> {
+    if (this.#asyncCallInFlight)
+      throw new BeekeeperError(`Error during ${errorCommentDuring}: another asynchronous Beekeeper call is still in progress, await it first`);
+
+    return safeWasmCall(fn, errorCommentDuring);
+  }
+
+  /** True while an asynchronous WASM call is in progress. */
+  public get asyncCallInFlight(): boolean {
+    return this.#asyncCallInFlight;
   }
 
   /** Refresh the inactivity timer. Called on every wallet operation. */
@@ -105,7 +148,7 @@ export class BeekeeperApi implements IBeekeeperInstance {
   }
 
   public createSession(salt: string): IBeekeeperSession {
-    const token = safeWasmCall(() => this.api.create_session(salt), "session creation");
+    const token = this.runSync(() => this.api.create_session(salt), "session creation");
     const session = new BeekeeperSession(this, token);
 
     this.sessions.set(token, session);
@@ -117,14 +160,17 @@ export class BeekeeperApi implements IBeekeeperInstance {
     if(!this.sessions.delete(token))
       throw new BeekeeperError(`This Beekeeper API instance is not the owner of session identified by token: "${token}"`);
 
-    safeWasmCall(() => this.api.close_session(token), "session closing");
+    this.runSync(() => this.api.close_session(token), "session closing");
   }
 
   public async delete(): Promise<void> {
+    // Let the calls already made finish: nothing may be suspended in the module when it is deleted.
+    await this.#queue;
+
     for(const session of this.sessions.values())
       session.close();
 
-    safeWasmCall(() => this.api.delete(), "WASM api deletion");
+    this.runSync(() => this.api.delete(), "WASM api deletion");
 
     await this.#storage.sync?.();
     this.#storage.close?.();
