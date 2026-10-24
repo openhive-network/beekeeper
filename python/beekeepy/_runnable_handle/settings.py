@@ -46,7 +46,8 @@ class RunnableHandleSettings(RemoteHandleSettings):
     http_endpoint: HttpUrl | None = None
     """
     Endpoint on which python will communicate with beekeeper, required for remote beekeeper.
-    In case of local beekeeper, this address will be used for beekeeper to start listening on.
+    In case of local beekeeper, this address will be used for beekeeper to start listening on
+    (if not set, it listens on 127.0.0.1 on a random port).
     """
 
     binary_path: Path | None = None

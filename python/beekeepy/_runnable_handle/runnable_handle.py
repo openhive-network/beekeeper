@@ -219,7 +219,7 @@ class RunnableHandle(ABC, Generic[ExecutableT, ConfigT, ArgumentT, SettingsT]):
 
     def __choose_http_endpoint(self, settings: SettingsT) -> HttpUrl:
         return self.__choose_value(
-            default_value=HttpUrl("http://0.0.0.0:0"),
+            default_value=HttpUrl("http://127.0.0.1:0"),
             argument_value=self._get_http_endpoint_from_cli_arguments(),
             config_value=self._get_http_endpoint_from_config(),
             settings_value=settings.http_endpoint,

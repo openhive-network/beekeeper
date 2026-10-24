@@ -2,14 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path  # noqa: TCH003
 
-from beekeepy._communication.url import HttpUrl, WsUrl
+from beekeepy._communication.url import HttpUrl, WsUrl  # noqa: TCH001
 from beekeepy._executable.abc.config import Config
 from beekeepy._executable.defaults import BeekeeperDefaults, ExportKeysWalletParams
 from schemas.base import field
-
-
-def http_webserver_default() -> HttpUrl:
-    return HttpUrl("0.0.0.0:0")
 
 
 class BeekeeperConfig(Config):
@@ -17,7 +13,7 @@ class BeekeeperConfig(Config):
     unlock_timeout: int = BeekeeperDefaults.DEFAULT_UNLOCK_TIMEOUT
     unlock_interval: int = BeekeeperDefaults.DEFAULT_UNLOCK_INTERVAL
     log_json_rpc: Path | None = BeekeeperDefaults.DEFAULT_LOG_JSON_RPC
-    webserver_http_endpoint: HttpUrl | None = field(default_factory=http_webserver_default)
+    webserver_http_endpoint: HttpUrl | None = None
     webserver_unix_endpoint: HttpUrl | None = None
     webserver_ws_endpoint: WsUrl | None = None
     webserver_ws_deflate: int = 0
