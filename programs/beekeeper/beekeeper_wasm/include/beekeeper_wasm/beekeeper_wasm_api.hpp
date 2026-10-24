@@ -14,20 +14,27 @@ namespace beekeeper_wasm {
 
 /// wallet_storage implementation that delegates to a JS storage object.
 /// The JS object must provide: save_fn, load_fn, list_dir_fn callbacks.
+/// Optional try_save_fn / try_load_fn must never throw (the TS layer adds them):
+/// they report failure as false / null, because a JS exception cannot be caught
+/// in C++ and would fail an unlock that converts a legacy wallet.
 class js_callback_storage final : public beekeeper_minimal::wallet_storage
 {
 public:
-  /// @param storage  JS object: { save_fn, load_fn, list_dir_fn }
+  /// @param storage  JS object: { save_fn, load_fn, list_dir_fn[, try_save_fn, try_load_fn] }
   explicit js_callback_storage(emscripten::val storage);
 
   void save(const std::string& name, const std::vector<char>& buffer) override;
   std::vector<char> load(const std::string& name) override;
   bool scan_dir(const std::string& wallet_name) override;
+  bool try_save(const std::string& name, const std::vector<char>& buffer) override;
+  std::optional<std::vector<char>> try_load(const std::string& name) override;
 
 private:
   emscripten::val save_fn_;
   emscripten::val load_fn_;
   emscripten::val list_dir_fn_;
+  emscripten::val try_save_fn_;
+  emscripten::val try_load_fn_;
 };
 
 /// Thin embind-friendly API that wraps core_minimal::beekeeper.

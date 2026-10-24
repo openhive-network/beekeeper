@@ -43,10 +43,17 @@ public:
 
   std::vector<char> encrypt_wallet_keys(
       const std::string& password, const keys_map& keys) override;
+  wallet_key derive_wallet_key(
+      const std::string& password, uint32_t iterations) override;
+  std::vector<char> encrypt_wallet_keys(
+      const wallet_key& key, const keys_map& keys) override;
   std::vector<char> encrypt_wallet_data(
       const std::string& password, const keys_map& keys) override;
   keys_map decrypt_wallet_data(
       const std::string& password, const std::vector<char>& cipher_keys) override;
+  keys_map decrypt_wallet_data(
+      const std::string& password, const std::vector<char>& cipher_keys,
+      wallet_key& key) override;
   std::vector<char> parse_wallet_file(
       const std::vector<char>& wallet_file_content) override;
   void validate_password(
@@ -74,9 +81,30 @@ private:
   /// SHA512(pack(nonce) || shared_secret) — matches FC's generate_encrypted_key
   sha512_hash generate_encrypted_key(uint64_t nonce, const sha512_hash& shared_secret);
 
+  /// Header fields of a current-format (v1) wallet blob.
+  struct wallet_header_v1
+  {
+    uint32_t                iterations = 0;
+    std::vector<uint8_t>    salt;
+    std::array<uint8_t, 16> iv{};
+    size_t                  cipher_offset = 0;  ///< position of the ciphertext in the blob
+    size_t                  cipher_len = 0;
+  };
+
   /// Current wallet format: salted PBKDF2-HMAC-SHA512 + AES-256-CBC + HMAC-SHA256 tag.
-  std::vector<char> encrypt_wallet_keys_v1(const std::string& password, const keys_map& keys);
-  keys_map decrypt_wallet_data_v1(const std::string& password, const std::vector<char>& cipher_keys);
+  /// Header sanity checks happen here, before any KDF work.
+  wallet_header_v1 parse_wallet_header_v1(const std::vector<char>& cipher_keys) const;
+
+  /// PBKDF2 of the password into key.dk, using key.salt and key.iterations.
+  void derive_wallet_key_material(const std::string& password, wallet_key& key);
+
+  /// Derive the key from the header parameters and check the HMAC tag; the
+  /// tag doubles as the password check. Throws "Invalid password" on mismatch.
+  void verify_wallet_mac_v1(const std::string& password, const std::vector<char>& cipher_keys,
+                            const wallet_header_v1& header, wallet_key& key);
+
+  keys_map decrypt_wallet_data_v1(const std::vector<char>& cipher_keys,
+                                  const wallet_header_v1& header, const wallet_key& key);
 
   /// Legacy format: unsalted SHA-512 of the password as AES key+IV, no MAC.
   /// Kept for reading wallets created before the v1 format; never written.

@@ -7,6 +7,32 @@ import { IBeekeeperInstance, IBeekeeperOptions, IBeekeeperSession } from "./inte
 import { BeekeeperSession } from "./session.js";
 import { safeWasmCall } from './util/wasm_error.js';
 
+/**
+ * Adds the callbacks js_callback_storage uses where a failed storage operation
+ * must not fail the call (converting a legacy wallet on unlock). They report
+ * failure instead of throwing: C++ cannot catch a JS exception.
+ */
+const withNeverThrowingCallbacks = (storage: IStorageCallbacks) => ({
+  save_fn: (name: string, data: Uint8Array): void => storage.save_fn(name, data),
+  load_fn: (name: string): Uint8Array => storage.load_fn(name),
+  list_dir_fn: (): string[] => storage.list_dir_fn(),
+  try_save_fn: (name: string, data: Uint8Array): boolean => {
+    try {
+      storage.save_fn(name, data);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  try_load_fn: (name: string): Uint8Array | null => {
+    try {
+      return storage.load_fn(name);
+    } catch {
+      return null;
+    }
+  }
+});
+
 // We would like to expose our api using BeekeeperInstance interface, but we would not like to expose users a way of creating instance of BeekeeperApi
 export class BeekeeperApi implements IBeekeeperInstance {
   public readonly api!: Readonly<beekeeper_api>;
@@ -34,7 +60,7 @@ export class BeekeeperApi implements IBeekeeperInstance {
     this.unlockTimeoutMs = this.options.unlockTimeout * 1000;
 
     this.api = new this.provider.beekeeper_api(
-      storage,
+      withNeverThrowingCallbacks(storage),
       crypto,
       this.options.unlockTimeout
     );

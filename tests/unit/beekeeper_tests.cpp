@@ -1498,17 +1498,27 @@ namespace {
 constexpr char v1_magic[] = "BEEKWLT"; // 7 bytes, see crypto_provider_impl.cpp
 constexpr size_t v1_iterations_offset = 9;  // magic[7] + version + kdf_id
 constexpr size_t v1_salt_offset       = 14; // ... + iterations u32 + salt_len
+constexpr size_t v1_iv_offset         = 31; // ... + salt[16] + iv_len
+constexpr size_t v1_cipher_offset     = 47; // ... + iv[16]
 
 bool blob_has_v1_magic(const std::vector<char>& blob)
 {
   return blob.size() >= 7 && std::memcmp(blob.data(), v1_magic, 7) == 0;
 }
 
+/// Header integers are little-endian regardless of the host byte order.
 uint32_t blob_iterations(const std::vector<char>& blob)
 {
-  uint32_t iterations = 0;
-  std::memcpy(&iterations, blob.data() + v1_iterations_offset, 4);
-  return iterations;
+  beekeeper_minimal::unpacker u(blob.data() + v1_iterations_offset, 4);
+  return u.unpack_uint32();
+}
+
+void set_blob_iterations(std::vector<char>& blob, uint32_t iterations)
+{
+  std::vector<char> le;
+  beekeeper_minimal::packer p(le);
+  p.pack_uint32(iterations);
+  std::copy(le.begin(), le.end(), blob.begin() + v1_iterations_offset);
 }
 
 /// Reproduces the pre-v1 wallet scheme byte-for-byte: AES-256-CBC keyed by one
@@ -1622,10 +1632,14 @@ BOOST_AUTO_TEST_CASE(wallet_v1_tamper_detection)
   auto good = b_mgr.read_wallet_blob("tamper");
   bk.close_wallet("tamper");
 
-  // Flipping a single bit anywhere — salt, ciphertext or tag — must be rejected.
-  const size_t probes[] = { v1_salt_offset + 3,  // inside salt
-                            good.size() - 40,    // inside ciphertext
-                            good.size() - 1 };   // inside HMAC tag
+  // Flipping a single bit anywhere — salt, IV, ciphertext or tag — must be
+  // rejected. The IV and first-block probes are the ones that need the MAC:
+  // without it they decrypt to a silently altered first public key.
+  const size_t probes[] = { v1_salt_offset + 3,    // inside salt
+                            v1_iv_offset + 1,      // inside IV
+                            v1_cipher_offset + 1,  // first ciphertext block
+                            good.size() - 40,      // inside ciphertext
+                            good.size() - 1 };     // inside HMAC tag
   for (auto pos : probes)
   {
     auto bad = good;
@@ -1652,18 +1666,22 @@ BOOST_AUTO_TEST_CASE(wallet_v1_salt_uniqueness)
   auto _token = bk.create_session();
 
   // Identical password and identical (empty) key set must never produce
-  // identical files — salt and IV are drawn fresh for every encryption.
+  // identical files — every new wallet gets its own random salt.
   bk.create_wallet(_token, "salt_a", "same-pass", false);
   bk.create_wallet(_token, "salt_b", "same-pass", false);
   auto blob_a = b_mgr.read_wallet_blob("salt_a");
   auto blob_b = b_mgr.read_wallet_blob("salt_b");
-  BOOST_REQUIRE(blob_a != blob_b);
+  BOOST_REQUIRE(!std::equal(blob_a.begin() + v1_salt_offset, blob_a.begin() + v1_salt_offset + 16,
+                            blob_b.begin() + v1_salt_offset));
 
-  // Re-encrypting the same wallet refreshes the salt as well.
+  // Re-encrypting the same wallet reuses its derived key (same salt, no KDF
+  // run) but always draws a fresh IV.
   bk.import_key("salt_a", fc::ecc::private_key::generate().key_to_wif(), "STM");
   auto blob_a2 = b_mgr.read_wallet_blob("salt_a");
-  BOOST_REQUIRE(!std::equal(blob_a.begin() + v1_salt_offset, blob_a.begin() + v1_salt_offset + 16,
-                            blob_a2.begin() + v1_salt_offset));
+  BOOST_REQUIRE(std::equal(blob_a.begin() + v1_salt_offset, blob_a.begin() + v1_salt_offset + 16,
+                           blob_a2.begin() + v1_salt_offset));
+  BOOST_REQUIRE(!std::equal(blob_a.begin() + v1_iv_offset, blob_a.begin() + v1_iv_offset + 16,
+                            blob_a2.begin() + v1_iv_offset));
 
 } FC_LOG_AND_RETHROW() }
 
@@ -1689,7 +1707,7 @@ BOOST_AUTO_TEST_CASE(wallet_v1_kdf_iteration_bounds)
   for (uint32_t bad_iterations : { 0u, 10'000'001u, 0xFFFFFFFFu })
   {
     auto bad = good;
-    std::memcpy(bad.data() + v1_iterations_offset, &bad_iterations, 4);
+    set_blob_iterations(bad, bad_iterations);
     b_mgr.write_wallet_blob("bounds", bad);
     bk.open_wallet(_token, "bounds");
     BOOST_REQUIRE_EXCEPTION(bk.unlock("bounds", "pass"), std::exception, is_iteration_range_error);
@@ -1906,6 +1924,190 @@ BOOST_AUTO_TEST_CASE(wallet_default_kdf_profile)
   }
   bk.open_wallet(_token, "fast");
   bk.unlock("fast", "pass2");
+
+} FC_LOG_AND_RETHROW() }
+
+namespace {
+
+/// fc primitives that count PBKDF2 runs and remember the last work factor.
+struct counting_primitives final : public beekeeper_minimal::crypto_primitives
+{
+  beekeeper_minimal::fc_crypto_primitives inner;
+  size_t   kdf_runs = 0;
+  uint32_t last_iterations = 0;
+
+  beekeeper_minimal::digest_type sha256(const uint8_t* data, size_t len) override { return inner.sha256(data, len); }
+  beekeeper_minimal::sha512_hash sha512(const uint8_t* data, size_t len) override { return inner.sha512(data, len); }
+  std::array<uint8_t, 20> ripemd160(const uint8_t* data, size_t len) override { return inner.ripemd160(data, len); }
+  beekeeper_minimal::digest_type hmac_sha256(const uint8_t* key, size_t key_len,
+                                             const uint8_t* data, size_t data_len) override
+  {
+    return inner.hmac_sha256(key, key_len, data, data_len);
+  }
+  std::vector<uint8_t> pbkdf2_hmac_sha512(const uint8_t* password, size_t password_len,
+                                          const uint8_t* salt, size_t salt_len,
+                                          uint32_t iterations, size_t dk_len) override
+  {
+    ++kdf_runs;
+    last_iterations = iterations;
+    return inner.pbkdf2_hmac_sha512(password, password_len, salt, salt_len, iterations, dk_len);
+  }
+  std::vector<uint8_t> aes256_cbc_encrypt(const uint8_t* key, const uint8_t* iv,
+                                          const uint8_t* data, size_t len) override
+  {
+    return inner.aes256_cbc_encrypt(key, iv, data, len);
+  }
+  std::vector<uint8_t> aes256_cbc_decrypt(const uint8_t* key, const uint8_t* iv,
+                                          const uint8_t* data, size_t len) override
+  {
+    return inner.aes256_cbc_decrypt(key, iv, data, len);
+  }
+  beekeeper_minimal::private_key_type generate_private_key() override { return inner.generate_private_key(); }
+  beekeeper_minimal::public_key_type get_public_key(const beekeeper_minimal::private_key_type& key) override
+  {
+    return inner.get_public_key(key);
+  }
+  beekeeper_minimal::signature_type sign_compact(const beekeeper_minimal::private_key_type& key,
+                                                 const beekeeper_minimal::digest_type& digest) override
+  {
+    return inner.sign_compact(key, digest);
+  }
+  beekeeper_minimal::sha512_hash ecdh_shared_secret(const beekeeper_minimal::private_key_type& key,
+                                                    const beekeeper_minimal::public_key_type& pub) override
+  {
+    return inner.ecdh_shared_secret(key, pub);
+  }
+  size_t base58_encode(const uint8_t* data, size_t data_len, char* out, size_t out_size) override
+  {
+    return inner.base58_encode(data, data_len, out, out_size);
+  }
+  size_t base58_decode(const char* str, size_t str_len, uint8_t* out, size_t out_size) override
+  {
+    return inner.base58_decode(str, str_len, out, out_size);
+  }
+  void get_random_bytes(uint8_t* buf, size_t len) override { inner.get_random_bytes(buf, len); }
+};
+
+keys_map generate_keys(beekeeper_minimal::crypto_provider& crypto, size_t count)
+{
+  keys_map keys;
+  for (size_t i = 0; i < count; ++i)
+  {
+    auto priv = crypto.wif_to_key(fc::ecc::private_key::generate().key_to_wif());
+    keys.emplace(crypto.get_public_key(*priv), beekeeper_minimal::key_data(*priv, "STM"));
+  }
+  return keys;
+}
+
+} // anonymous namespace
+
+BOOST_AUTO_TEST_CASE(wallet_kdf_runs_once_per_unlock)
+{ try {
+  // The key derived at create/unlock is kept while the wallet is unlocked:
+  // saves only draw a fresh IV, and the password check of an unlocked wallet
+  // compares against the password held in memory.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  counting_primitives prims;
+  beekeeper_minimal::crypto_provider_impl crypto(prims, test_utils::beekeeper_mgr::test_kdf_iterations);
+  beekeeper_minimal::wallet w(crypto, b_mgr.storage.get(), "kdf_once");
+
+  w.create("pass");
+  BOOST_REQUIRE_EQUAL(1u, prims.kdf_runs);
+
+  for (int i = 0; i < 3; ++i)
+    w.import_key(fc::ecc::private_key::generate().key_to_wif(), "STM");
+  auto first_pub = w.get_keys().begin()->first;
+  w.remove_key(first_pub);
+  w.check_password("pass");
+  BOOST_REQUIRE_THROW(w.check_password("wrong"), std::exception);
+  BOOST_REQUIRE_EQUAL(1u, prims.kdf_runs);
+
+  // Every save is still a complete v1 file: it reopens with the same keys.
+  w.lock();
+  w.open();
+  w.unlock("pass");
+  BOOST_REQUIRE_EQUAL(2u, prims.kdf_runs);
+  BOOST_REQUIRE_EQUAL(2u, w.get_keys().size());
+  w.import_key(fc::ecc::private_key::generate().key_to_wif(), "STM");
+  BOOST_REQUIRE_EQUAL(2u, prims.kdf_runs);
+
+  // Checking the password of a locked wallet needs the KDF (MAC check only).
+  w.lock();
+  w.check_password("pass");
+  BOOST_REQUIRE_THROW(w.check_password("wrong"), std::exception);
+  BOOST_REQUIRE_EQUAL(4u, prims.kdf_runs);
+
+  // Converting a legacy wallet derives one new key; later saves reuse it.
+  b_mgr.write_wallet_blob("kdf_legacy", make_legacy_wallet_blob("legacy-pass", generate_keys(crypto, 1)));
+  beekeeper_minimal::wallet legacy(crypto, b_mgr.storage.get(), "kdf_legacy");
+  legacy.open();
+  prims.kdf_runs = 0;
+  legacy.unlock("legacy-pass");
+  BOOST_REQUIRE_EQUAL(1u, prims.kdf_runs);
+  BOOST_REQUIRE(blob_has_v1_magic(b_mgr.read_wallet_blob("kdf_legacy")));
+  legacy.import_key(fc::ecc::private_key::generate().key_to_wif(), "STM");
+  BOOST_REQUIRE_EQUAL(1u, prims.kdf_runs);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_temporary_minimal_work_factor)
+{ try {
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  counting_primitives prims;
+  beekeeper_minimal::crypto_provider_impl crypto(prims, test_utils::beekeeper_mgr::test_kdf_iterations);
+  beekeeper_minimal::beekeeper bk(crypto, *b_mgr.storage, 900);
+  auto _token = bk.create_session();
+
+  // A temporary wallet never reaches storage, so it gets the minimal work factor.
+  bk.create_wallet(_token, "temp", "pass", true);
+  BOOST_REQUIRE_EQUAL(1u, prims.last_iterations);
+  bk.lock("temp");
+  BOOST_REQUIRE_THROW(bk.unlock("temp", "wrong"), std::exception);
+  bk.unlock("temp", "pass");
+  BOOST_REQUIRE_EQUAL(1u, prims.last_iterations);
+  BOOST_REQUIRE(!b_mgr.exists_wallet("temp"));
+
+  // A persistent wallet gets the provider's work factor.
+  bk.create_wallet(_token, "persistent", "pass", false);
+  BOOST_REQUIRE_EQUAL(test_utils::beekeeper_mgr::test_kdf_iterations, prims.last_iterations);
+  BOOST_REQUIRE_EQUAL(test_utils::beekeeper_mgr::test_kdf_iterations,
+                      blob_iterations(b_mgr.read_wallet_blob("persistent")));
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_legacy_conversion_skipped_when_stored_wallet_changed)
+{ try {
+  // Two instances share the storage. This one opened a legacy wallet, then the
+  // other one rewrote it with an extra key. Converting the older copy on unlock
+  // would drop that key, so the conversion is skipped; the next open converts.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto keys1 = generate_keys(b_mgr.crypto, 1);
+  auto keys2 = keys1;
+  for (auto& kv : generate_keys(b_mgr.crypto, 1))
+    keys2.insert(kv);
+
+  b_mgr.write_wallet_blob("shared", make_legacy_wallet_blob("pass", keys1));
+  beekeeper_minimal::wallet stale(b_mgr.crypto, b_mgr.storage.get(), "shared");
+  stale.open();
+
+  auto newer = make_legacy_wallet_blob("pass", keys2);
+  b_mgr.write_wallet_blob("shared", newer);
+
+  stale.unlock("pass");
+  BOOST_REQUIRE_EQUAL(1u, stale.get_keys().size());
+  BOOST_REQUIRE(b_mgr.read_wallet_blob("shared") == newer);
+
+  beekeeper_minimal::wallet fresh(b_mgr.crypto, b_mgr.storage.get(), "shared");
+  fresh.open();
+  fresh.unlock("pass");
+  BOOST_REQUIRE_EQUAL(2u, fresh.get_keys().size());
+  BOOST_REQUIRE(blob_has_v1_magic(b_mgr.read_wallet_blob("shared")));
 
 } FC_LOG_AND_RETHROW() }
 

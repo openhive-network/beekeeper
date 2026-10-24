@@ -59,6 +59,18 @@ struct crypto_provider
       const std::string& password,
       const keys_map& keys) = 0;
 
+  /// Derive key material for encrypting a wallet with the given password:
+  /// a fresh random salt and `iterations` (0 = the provider's work factor).
+  virtual wallet_key derive_wallet_key(
+      const std::string& password,
+      uint32_t iterations) = 0;
+
+  /// Encrypt wallet keys with already derived key material: a fresh IV for
+  /// every call, no KDF run.
+  virtual std::vector<char> encrypt_wallet_keys(
+      const wallet_key& key,
+      const keys_map& keys) = 0;
+
   /// Encrypt wallet data: password + key pairs -> wallet file content (JSON bytes).
   /// Convenience wrapper: calls encrypt_wallet_keys() then wraps as JSON hex string.
   virtual std::vector<char> encrypt_wallet_data(
@@ -70,6 +82,15 @@ struct crypto_provider
   virtual keys_map decrypt_wallet_data(
       const std::string& password,
       const std::vector<char>& cipher_keys) = 0;
+
+  /// Same, and for the current format also returns the key material that
+  /// decrypted the blob (salt and work factor from its header), so the wallet
+  /// can re-encrypt without another KDF run. For a legacy blob `key` is left
+  /// empty (iterations == 0).
+  virtual keys_map decrypt_wallet_data(
+      const std::string& password,
+      const std::vector<char>& cipher_keys,
+      wallet_key& key) = 0;
 
   /// Extract the cipher_keys blob from a wallet file (JSON parsing only, no decryption).
   virtual std::vector<char> parse_wallet_file(

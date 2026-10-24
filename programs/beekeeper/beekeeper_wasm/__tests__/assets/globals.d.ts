@@ -4,6 +4,7 @@ import type { IBeekeeperInstance } from '../../src/index.js';
 import type * as BeekeeperModule from '../../src/index.js';
 import type { BeekeeperInstanceHelper } from './run_node_helper.js';
 import type { ICryptoCallbacks } from '../../src/detailed/crypto.js';
+import type { IStorageCallbacks } from '../../src/detailed/fs.js';
 
 export type TEnvType = 'web' | 'node';
 
@@ -34,4 +35,5 @@ declare global {
   function createBeekeeperTestFor (env: TEnvType): Promise<IBeekeeperGlobals>;
   function createBeekeeperWasmTestFor (env: TEnvType): Promise<IBeekeeperWasmGlobals>;
   function createIdbStorage (dbName: string): Promise<IIdbStorage>;
+  function createBeekeeperWithStorage (storage: IStorageCallbacks, options?: { unlockTimeout?: number; inMemory?: boolean }): Promise<IBeekeeperInstance>;
 }

@@ -206,9 +206,14 @@ std::string beekeeper::create_wallet(const std::string& token,
 
   std::string pw = password.empty() ? gen_password() : password;
 
+  // A temporary wallet's blob never leaves memory, where its password is held
+  // next to it anyway, so it gets the minimal work factor: a full KDF run would
+  // only slow down every create/unlock of short-lived wallets.
+  constexpr uint32_t temporary_wallet_kdf_iterations = 1;
+
   wallet_storage* ws = is_temporary ? &mem_storage_ : &storage_;
   auto [it, _] = wallets_.emplace(wallet_name, wallet(crypto_, ws, wallet_name));
-  it->second.create(pw);
+  it->second.create(pw, is_temporary ? temporary_wallet_kdf_iterations : 0);
 
   token_wallets_[token].insert(wallet_name);
 
