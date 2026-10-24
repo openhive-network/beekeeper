@@ -1,7 +1,6 @@
 import { BeekeeperApi } from "./api.js";
 import { BeekeeperSession } from "./session.js";
 import { IBeekeeperUnlockedWallet, IBeekeeperSession, TPublicKey, IBeekeeperWallet, TSignature } from "./interfaces.js";
-import { safeAsyncWasmCall, safeWasmCall } from './util/wasm_error.js';
 
 export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   public constructor(
@@ -19,7 +18,19 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   }
 
   public lock(): BeekeeperLockedWallet {
-    safeWasmCall(
+    if (this.api.asyncCallInFlight) {
+      // The module cannot be entered while an async call is suspended in it (e.g. the
+      // timeout check runs during another call): lock right after the queued calls.
+      this.locked._unlocked = undefined;
+      this.api.runAsync(
+        () => this.api.api.lock(this.session.token, this.locked.name),
+        `wallet '${this.locked.name}' locking`
+      ).catch(() => undefined);
+
+      return this.locked;
+    }
+
+    this.api.runSync(
       () => this.api.api.lock(this.session.token, this.locked.name),
       `wallet '${this.locked.name}' locking`
     );
@@ -30,7 +41,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
 
   public async importKey(wifKey: string): Promise<TPublicKey> {
     this.api.throwIfTimedOutAndRefresh();
-    return await safeAsyncWasmCall(
+    return await this.api.runAsync(
       () => this.api.api.import_key(this.session.token, this.locked.name, wifKey),
       `importing key to wallet '${this.locked.name}'`
     );
@@ -38,7 +49,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
 
   public hasMatchingPrivateKey(publicKey: TPublicKey): boolean {
     this.api.throwIfTimedOutAndRefresh();
-    return safeWasmCall(
+    return this.api.runSync(
       () => this.api.api.has_matching_private_key(this.session.token, this.locked.name, publicKey),
       `checking for matching key '${publicKey}' in wallet '${this.locked.name}'`
     );
@@ -46,7 +57,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
 
   public async removeKey(publicKey: TPublicKey): Promise<void> {
     this.api.throwIfTimedOutAndRefresh();
-    await safeAsyncWasmCall(
+    await this.api.runAsync(
       () => this.api.api.remove_key(this.session.token, this.locked.name, publicKey),
       `removing key '${publicKey}' from wallet '${this.locked.name}'`
     );
@@ -59,7 +70,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
       sigDigest = Array.from(sigDigest).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    return await safeAsyncWasmCall(
+    return await this.api.runAsync(
       () => this.api.api.sign_digest(this.session.token, sigDigest, publicKey, this.locked.name),
       `signing digest with key '${publicKey}' using wallet '${this.locked.name}'`
     );
@@ -67,7 +78,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
 
   public getPublicKeys(): TPublicKey[] {
     this.api.throwIfTimedOutAndRefresh();
-    const vec = safeWasmCall(
+    const vec = this.api.runSync(
       () => this.api.api.get_public_keys(this.session.token, this.locked.name),
       `public keys retrieval from wallet '${this.locked.name}'`
     );
@@ -77,7 +88,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   public async encryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey, nonce?: number): Promise<string> {
     this.api.throwIfTimedOutAndRefresh();
     const toKey = anotherKey ?? key;
-    return await safeAsyncWasmCall(
+    return await this.api.runAsync(
       () => this.api.api.encrypt_data(this.session.token, this.locked.name, key, toKey, content, nonce ?? 0),
       `encrypting data in wallet '${this.locked.name}'`
     );
@@ -86,7 +97,7 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
   public async decryptData(content: string, key: TPublicKey, anotherKey?: TPublicKey): Promise<string> {
     this.api.throwIfTimedOutAndRefresh();
     const toKey = anotherKey ?? key;
-    return await safeAsyncWasmCall(
+    return await this.api.runAsync(
       () => this.api.api.decrypt_data(this.session.token, this.locked.name, key, toKey, content),
       `decrypting data in wallet '${this.locked.name}'`
     );
@@ -116,23 +127,19 @@ export class BeekeeperLockedWallet implements IBeekeeperWallet {
     return this._unlocked;
   }
 
-  /** Opens the wallet in C++ and registers it in the session if not already done. */
-  private ensureOpened(): void {
-    if (!this.opened) {
-      safeWasmCall(
-        () => this.api.api.open(this.session.token, this.name),
-        `wallet '${this.name}' opening`
-      );
-      this.session.wallets.set(this.name, this);
-      this.opened = true;
-    }
-  }
-
   public async unlock(password: string): Promise<IBeekeeperUnlockedWallet> {
-    this.ensureOpened();
     this.api.refreshTimeout();
-    await safeAsyncWasmCall(
-      () => this.api.api.unlock(this.session.token, this.name, password),
+    await this.api.runAsync(
+      () => {
+        // A lazily opened wallet (listCreatedWallets(), or openWallet() while another call
+        // was in progress) is opened here, where no other call runs in the module.
+        if (!this.opened) {
+          this.api.api.open(this.session.token, this.name);
+          this.session.wallets.set(this.name, this);
+          this.opened = true;
+        }
+        return this.api.api.unlock(this.session.token, this.name, password);
+      },
       `wallet '${this.name}' unlocking`
     );
     this._unlocked = new BeekeeperUnlockedWallet(this.api, this.session, this);

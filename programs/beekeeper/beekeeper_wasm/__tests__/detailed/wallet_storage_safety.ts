@@ -62,4 +62,58 @@ test.describe('Wallet conversion and concurrency', () => {
     expect(result.stillLegacy).toBe(true);
     expect(result.convertedAfterRecovery).toBe(true);
   });
+
+  test('Overlapping calls run one at a time and leave every wallet openable', async ({ beekeeperWasmTest }) => {
+    const result = await beekeeperWasmTest(async (_globals, legacyHex, password, extraWifKeys) => {
+      const encoder = new TextEncoder();
+      const store = new Map<string, Uint8Array>();
+      for (const name of ['a', 'b'])
+        store.set(name, encoder.encode('"' + legacyHex + '"'));
+      const storage = {
+        save_fn: (name: string, data: Uint8Array) => { store.set(name, new Uint8Array(data)); },
+        load_fn: (name: string) => { const data = store.get(name); if (!data) throw new Error('Wallet not found: ' + name); return data; },
+        list_dir_fn: () => Array.from(store.keys())
+      };
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+      const bk = await createBeekeeperWithStorage(storage);
+      const session = bk.createSession('salt');
+
+      // A double-submitted unlock of the same legacy wallet: each would convert it.
+      const walletA = session.openWallet('a');
+      const first = walletA.unlock(password);
+      const second = walletA.unlock(password);
+
+      // Once the first call is suspended in the module (deriving the new key),
+      // openWallet() of another wallet opens it lazily inside the queue, and
+      // synchronous calls are refused instead of entering the busy module.
+      await sleep(20);
+      const third = session.openWallet('b').unlock(password);
+      let syncRefused = false;
+      try {
+        session.hasWallet('a');
+      } catch {
+        syncRefused = true;
+      }
+
+      const outcomes = await Promise.allSettled([first, second, third]);
+      const unlockedA = await first;
+      await Promise.all(extraWifKeys.map((key: string) => unlockedA.importKey(key)));
+      await bk.delete();
+
+      // Everything written meanwhile opens with the right password in a new instance.
+      const bk2 = await createBeekeeperWithStorage(storage);
+      const session2 = bk2.createSession('salt');
+      const keysA = (await session2.openWallet('a').unlock(password)).getPublicKeys().length;
+      const keysB = (await session2.openWallet('b').unlock(password)).getPublicKeys().length;
+      await bk2.delete();
+
+      return { statuses: outcomes.map(outcome => outcome.status), syncRefused, keysA, keysB };
+    }, LEGACY_WALLET_HEX, FIXTURE_PASSWORD, EXTRA_WIF_KEYS);
+
+    expect(result.statuses).toEqual(['fulfilled', 'rejected', 'fulfilled']);
+    expect(result.syncRefused).toBe(true);
+    expect(result.keysA).toBe(1 + EXTRA_WIF_KEYS.length);
+    expect(result.keysB).toBe(1);
+  });
 });
