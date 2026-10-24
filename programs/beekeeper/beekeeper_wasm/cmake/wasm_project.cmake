@@ -64,9 +64,10 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*wallet::encrypt_and_save*"
     # The wallet / beekeeper methods between the embind entry points and the
     # crypto calls (unlock also re-encrypts legacy wallets with the async
-    # KDF/AES/HMAC). -Oz currently inlines most of them into the beekeeper_api
-    # entry points, so the linker may warn these patterns match nothing; they
-    # are a safety net that activates exactly when inlining stops.
+    # KDF/AES/HMAC, and unlock of a wallet another session unlocked checks the
+    # password with async crypto). -Oz currently inlines most of them into the
+    # beekeeper_api entry points, so the linker may warn these patterns match
+    # nothing; they are a safety net that activates exactly when inlining stops.
     "*wallet::unlock*"
     "*wallet::create*"
     "*wallet::import_key*"
@@ -74,9 +75,9 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*wallet::check_password*"
     "*beekeeper::unlock*"
     "*beekeeper::create_wallet*"
+    "*beekeeper::gen_password*"
     "*beekeeper::import_key*"
     "*beekeeper::remove_key*"
-    "*beekeeper::check_password*"
     "*beekeeper::encrypt_data*"
     "*beekeeper::decrypt_data*"
     # beekeeper_api — embind entry points (only those that transitively call async crypto)

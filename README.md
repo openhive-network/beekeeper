@@ -20,6 +20,12 @@ ninja beekeeper
 ./programs/beekeeper/beekeeper/beekeeper --webserver-http-endpoint=127.0.0.1:5001
 ```
 
+Every API call carries the token of a session (`create_session`). Wallets are
+opened, unlocked and locked per session: a wallet unlocked in one session stays
+locked in another one until that session unlocks it with the wallet's password,
+and `lock`, `lock_all`, `close`, `set_timeout` and the unlock timeout act on the
+calling session only.
+
 ## Testing
 
 Native unit tests (Boost.Test; configure with `-DBUILD_TESTS=ON`, run from the repository root):

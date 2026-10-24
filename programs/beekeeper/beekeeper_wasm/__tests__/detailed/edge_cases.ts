@@ -554,6 +554,103 @@ test.describe('Edge cases: high-level factory API', () => {
     })).resolves.toStrictEqual(['w0']);
   });
 
+  test('Should lock the wallets of every session when the instance timeout expires', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const bk = await provider.default({ unlockTimeout: 2 });
+      const session1 = bk.createSession("salt1");
+      const session2 = bk.createSession("salt2");
+
+      await session1.createWallet('w0', 'pass');
+      await session2.openWallet('w0').unlock('pass');
+
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Reading the state of session1's wallet after the timeout locks session2's wallet too
+      const lockedInSession1 = session1.listWallets()[0].unlocked === undefined;
+      let lockedInSession2 = false;
+      try {
+        (bk as any).api.get_public_keys(session2.token, 'w0');
+      } catch {
+        lockedInSession2 = true;
+      }
+
+      await bk.delete();
+
+      return { lockedInSession1, lockedInSession2 };
+    });
+
+    expect(retVal).toStrictEqual({ lockedInSession1: true, lockedInSession2: true });
+  });
+
+  test('Should keep timed-out wallets locked after a later unlock attempt', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const bk = await provider.default({ unlockTimeout: 2 });
+      const session1 = bk.createSession("salt1");
+      const session2 = bk.createSession("salt2");
+
+      const { wallet } = await session1.createWallet('w0', 'pass');
+      const publicKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+      await session1.createWallet('w1', 'pass1');
+
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      let wrongPasswordRefused = false;
+      try {
+        await session2.openWallet('w1').unlock('wrong');
+      } catch {
+        wrongPasswordRefused = true;
+      }
+
+      // The unlock attempt restarted the timer; the wallets that timed out stay locked
+      let signRefused = false;
+      try {
+        await wallet.signDigest(publicKey, '9b29ba0710af3918e81d7b935556d7ab205d8a8f5ca2e2427535980c2e8bdaff');
+      } catch {
+        signRefused = true;
+      }
+
+      await bk.delete();
+
+      return { wrongPasswordRefused, signRefused };
+    });
+
+    expect(retVal).toStrictEqual({ wrongPasswordRefused: true, signRefused: true });
+  });
+
+  test('Should require each session to unlock a shared wallet with its password', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+      const session1 = beekeeper.createSession("salt1");
+      const session2 = beekeeper.createSession("salt2");
+
+      const { wallet } = await session1.createWallet('w0', 'pass');
+      const publicKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      const opened = session2.openWallet('w0');
+      let wrongPasswordRefused = false;
+      try {
+        await opened.unlock('wrong');
+      } catch {
+        wrongPasswordRefused = true;
+      }
+
+      const unlocked = await opened.unlock('pass');
+      const keys = unlocked.getPublicKeys();
+
+      // Locking and closing the wallet in session2 leaves it unlocked in session1
+      unlocked.lock();
+      opened.close();
+      const signature = await wallet.signDigest(publicKey, '9b29ba0710af3918e81d7b935556d7ab205d8a8f5ca2e2427535980c2e8bdaff');
+
+      return { wrongPasswordRefused, keys, signed: signature.length > 0 };
+    });
+
+    expect(retVal).toStrictEqual({
+      wrongPasswordRefused: true,
+      keys: ['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh'],
+      signed: true
+    });
+  });
+
   test.afterAll(async () => {
     await browser.close();
   });
@@ -910,7 +1007,89 @@ test.describe('Edge cases: low-level WASM API', () => {
 
   // --- cross-session wallet visibility ---
 
-  test('Should allow accessing same wallet from different sessions', async ({ beekeeperWasmTest }) => {
+  test('Should let another session use a wallet only after it unlocks the wallet itself', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+      const digest = '9b29ba0710af3918e81d7b935556d7ab205d8a8f5ca2e2427535980c2e8bdaff';
+
+      const session1 = api.createSession('s1');
+      const session2 = api.createSession('s2');
+      const session3 = api.createSession('s3');
+
+      await api.create_with_password(session1, 'shared', 'pass');
+      await api.importKey(session1, 'shared', keys[0][0]);
+      const encrypted = await api.encryptData(session1, 'shared', keys[0][1], keys[0][1], 'content', 1);
+
+      const fails = async (call: () => unknown) => {
+        try {
+          await call();
+          return false;
+        } catch {
+          return true;
+        }
+      };
+      const keyOperationsFail = async (session: string) => [
+        await fails(() => api.getPublicKeys(session, 'shared')),
+        await fails(() => api.signDigest(session, digest, keys[0][1], 'shared')),
+        await fails(() => api.encryptData(session, 'shared', keys[0][1], keys[0][1], 'content', 1)),
+        await fails(() => api.decryptData(session, 'shared', keys[0][1], keys[0][1], encrypted)),
+        await fails(() => api.importKey(session, 'shared', keys[1][0])),
+        await fails(() => api.removeKey(session, 'shared', keys[0][1]))
+      ];
+
+      // session3 never opened the wallet
+      const notOpened = [
+        ...await keyOperationsFail(session3),
+        await fails(() => api.hasMatchingPrivateKey(session3, 'shared', keys[0][1])),
+        await fails(() => api.unlock(session3, 'shared', 'pass'))
+      ];
+
+      // session2 opened it, but did not unlock it
+      api.open(session2, 'shared');
+      const opened = await keyOperationsFail(session2);
+      const openedHasKey = api.hasMatchingPrivateKey(session2, 'shared', keys[0][1]);
+      const wrongPassword = await fails(() => api.unlock(session2, 'shared', 'wrong'));
+
+      // With the password session2 gets the wallet as session1 has it
+      await api.unlock(session2, 'shared', 'pass');
+      const unlockedKeys = api.getPublicKeys(session2, 'shared').keys;
+      const decrypted = await api.decryptData(session2, 'shared', keys[0][1], keys[0][1], encrypted);
+
+      return { notOpened, opened, openedHasKey, wrongPassword, unlockedKeys, decrypted };
+    }, WALLET_OPTIONS_NODE, keys);
+
+    expect(retVal).toStrictEqual({
+      notOpened: [true, true, true, true, true, true, true, true],
+      opened: [true, true, true, true, true, true],
+      openedHasKey: false,
+      wrongPassword: true,
+      unlockedKeys: [{ public_key: 'STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh' }],
+      decrypted: 'content'
+    });
+  });
+
+  test('Should leave nothing behind when a wallet cannot be opened', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+      const session = api.createSession('s1');
+
+      let openFailed = false;
+      try {
+        api.open(session, 'missing');
+      } catch {
+        openFailed = true;
+      }
+
+      const listedAfterFailure = api.hasWallet(session, 'missing');
+      await api.create_with_password(session, 'missing', 'pass');
+
+      return { openFailed, listedAfterFailure, created: api.hasWallet(session, 'missing') };
+    }, WALLET_OPTIONS_NODE);
+
+    expect(retVal).toStrictEqual({ openFailed: true, listedAfterFailure: false, created: true });
+  });
+
+  test('Should keep a wallet unlocked in one session when another session locks or closes it', async ({ beekeeperWasmTest }) => {
     const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, keys) => {
       const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
 
@@ -920,11 +1099,16 @@ test.describe('Edge cases: low-level WASM API', () => {
       await api.create_with_password(session1, 'shared', 'pass');
       await api.importKey(session1, 'shared', keys[0][0]);
 
-      // session2 can open the same wallet
       api.open(session2, 'shared');
-      const keys2 = api.getPublicKeys(session2, 'shared').keys;
+      await api.unlock(session2, 'shared', 'pass');
+      api.lock(session2, 'shared');
+      await api.unlock(session2, 'shared', 'pass');
+      api.lockAll(session2);
+      await api.unlock(session2, 'shared', 'pass');
+      api.close(session2, 'shared');
+      api.closeSession(session2);
 
-      return keys2;
+      return api.getPublicKeys(session1, 'shared').keys;
     }, WALLET_OPTIONS_NODE, keys);
 
     expect(retVal).toStrictEqual([

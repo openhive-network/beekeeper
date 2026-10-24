@@ -24,6 +24,8 @@ As a an example you can check [`examples`](https://gitlab.syncad.com/hive/beekee
 
 Note: between different beekeeper instances, session names can be repeated, but not the wallet names!
 
+Wallets are unlocked per session: a session that opens a wallet another session has unlocked gets it locked, and has to unlock it with its password before it can use its keys. Locking or closing a wallet affects only the session that does it. The inactivity timeout (`unlockTimeout`) covers the whole Beekeeper instance: once it expires, the wallets of all its sessions lock.
+
 For salts, you should always use strong random values, such as `crypto.randomUUID()`. Also, remember to always use strong passwords for wallets! If you provide `undefined` as a password when creating a wallet, a strong random password will be generated for you and returned in the result.
 
 For simplicity, and as `crypto` API may not be available in all environments, we are using `Math.random()` for salt generation. As for passwords, we are using simple strings. **Do not use this approach in production!**

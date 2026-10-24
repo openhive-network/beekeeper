@@ -713,7 +713,7 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
         await api.create_with_password(sessionTokens[i], walletNames[i], 'pass');
         const key = await api.importKey(sessionTokens[i], walletNames[i], keys[3][0]);
 
-        await api.signDigest(sessionTokens[i], signData[1].sig_digest, key);
+        await api.signDigest(sessionTokens[i], signData[1].sig_digest, key, walletNames[i]);
       }
 
       for(let i = 0; i < noWallets; i += 2)
@@ -723,7 +723,7 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
         if(i % 2 === 0)
           try {
             const key = await api.importKey(sessionTokens[i], walletNames[i], keys[3][0]);
-            await api.signDigest(sessionTokens[i], signData[1].sig_digest, key);
+            await api.signDigest(sessionTokens[i], signData[1].sig_digest, key, walletNames[i]);
 
             return false
           } catch {
@@ -731,7 +731,7 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
           }
         else {
           const key = await api.importKey(sessionTokens[i], walletNames[i], keys[3][0])
-          await api.signDigest(sessionTokens[i], signData[1].sig_digest, key);
+          await api.signDigest(sessionTokens[i], signData[1].sig_digest, key, walletNames[i]);
           api.lock(sessionTokens[i], walletNames[i]); // For the next stage
         }
 
