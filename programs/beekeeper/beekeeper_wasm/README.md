@@ -196,6 +196,14 @@ console.log('Decrypted message:', decrypted); // 'Hello, Hive!'
 session.close();
 ```
 
+## 🔐 Wallet storage
+
+Wallets are stored encrypted with a key derived from the wallet password by PBKDF2-HMAC-SHA512 (random salt; the 600,000 iterations are recorded in the wallet data) and authenticated with HMAC-SHA256. Creating or unlocking a persistent wallet therefore takes a noticeable fraction of a second; importing keys and signing do not. Temporary and in-memory wallets use a minimal work factor, because their data never leaves memory.
+
+Wallets saved by earlier versions are still read and are converted to the current format the first time they are unlocked. The conversion is one-way: earlier versions of this package report an invalid password for a converted wallet, so do not roll an application back to an older `@hiveio/beekeeper` once users have unlocked their wallets with this one.
+
+Calls run one at a time per Beekeeper instance: asynchronous calls are queued in the order they are made. A synchronous call such as `getPublicKeys()` or `hasWallet()` made while an asynchronous call is still running throws a `BeekeeperError`; await the pending call first.
+
 ## 📖 API Reference
 
 For a detailed API definition, please see our [Wiki](${GEN_DOC_URL}).

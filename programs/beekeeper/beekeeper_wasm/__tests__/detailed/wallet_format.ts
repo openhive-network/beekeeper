@@ -84,12 +84,20 @@ test.describe('Wallet-at-rest format', () => {
       await api.create(token, 'w0', 'format-pass', false);
 
       const storedHex = new TextDecoder().decode(store.get('w0')).replace(/"/g, '');
+
+      // The production work factor also on the decrypt side: reload and unlock it.
+      await api.close(token, 'w0');
+      await api.open(token, 'w0');
+      await api.unlock(token, 'w0', 'format-pass');
+      const unlockedAtDefault = await api.has_wallet(token, 'w0');
+
       api.delete();
-      return { isV1: storedHex.startsWith(magicHex), iterationsHex: storedHex.slice(18, 26) };
+      return { isV1: storedHex.startsWith(magicHex), iterationsHex: storedHex.slice(18, 26), unlockedAtDefault };
     }, V1_MAGIC_HEX);
 
     expect(result.isV1).toBe(true);
     expect(result.iterationsHex).toBe(DEFAULT_ITERATIONS_HEX);
+    expect(result.unlockedAtDefault).toBe(true);
   });
 
   test('Legacy and independently generated v1 wallets unlock; legacy migrates on unlock', async ({ beekeeperWasmTest }) => {
