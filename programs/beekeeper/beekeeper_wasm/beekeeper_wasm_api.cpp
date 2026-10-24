@@ -8,32 +8,64 @@ namespace beekeeper_wasm {
 
 // ── js_callback_storage ───────────────────────────────────
 
-js_callback_storage::js_callback_storage(emscripten::val storage)
-  : save_fn_(storage["save_fn"])
-  , load_fn_(storage["load_fn"])
-  , list_dir_fn_(storage["list_dir_fn"])
-{
-}
+namespace {
 
-void js_callback_storage::save(const std::string& name, const std::vector<char>& buffer)
+emscripten::val to_js_bytes(const std::vector<char>& buffer)
 {
   auto js_uint8 = emscripten::val::global("Uint8Array").new_(buffer.size());
   auto mem_view = emscripten::val(emscripten::typed_memory_view(buffer.size(),
                     reinterpret_cast<const uint8_t*>(buffer.data())));
   js_uint8.call<void>("set", mem_view);
+  return js_uint8;
+}
 
-  save_fn_(std::string(name), js_uint8);
+std::vector<char> from_js_bytes(const emscripten::val& data)
+{
+  unsigned len = data["length"].as<unsigned>();
+  std::vector<char> buf(len);
+  emscripten::val(emscripten::typed_memory_view(len, reinterpret_cast<uint8_t*>(buf.data())))
+    .call<void>("set", data);
+  return buf;
+}
+
+} // anonymous namespace
+
+js_callback_storage::js_callback_storage(emscripten::val storage)
+  : save_fn_(storage["save_fn"])
+  , load_fn_(storage["load_fn"])
+  , list_dir_fn_(storage["list_dir_fn"])
+  , try_save_fn_(storage["try_save_fn"])
+  , try_load_fn_(storage["try_load_fn"])
+{
+}
+
+void js_callback_storage::save(const std::string& name, const std::vector<char>& buffer)
+{
+  save_fn_(std::string(name), to_js_bytes(buffer));
 }
 
 std::vector<char> js_callback_storage::load(const std::string& name)
 {
-  emscripten::val result = load_fn_(std::string(name));
+  return from_js_bytes(load_fn_(std::string(name)));
+}
 
-  unsigned len = result["length"].as<unsigned>();
-  std::vector<char> buf(len);
-  emscripten::val(emscripten::typed_memory_view(len, reinterpret_cast<uint8_t*>(buf.data())))
-    .call<void>("set", result);
-  return buf;
+bool js_callback_storage::try_save(const std::string& name, const std::vector<char>& buffer)
+{
+  if (try_save_fn_.isUndefined())
+    return wallet_storage::try_save(name, buffer);
+
+  return try_save_fn_(std::string(name), to_js_bytes(buffer)).as<bool>();
+}
+
+std::optional<std::vector<char>> js_callback_storage::try_load(const std::string& name)
+{
+  if (try_load_fn_.isUndefined())
+    return wallet_storage::try_load(name);
+
+  emscripten::val result = try_load_fn_(std::string(name));
+  if (result.isNull() || result.isUndefined())
+    return std::nullopt;
+  return from_js_bytes(result);
 }
 
 bool js_callback_storage::scan_dir(const std::string& wallet_name)

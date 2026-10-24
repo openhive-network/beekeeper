@@ -26,7 +26,8 @@ public:
   // ── lifecycle ──────────────────────────────────────────────
 
   /// Initialise a brand-new wallet with a password.  Leaves the wallet unlocked.
-  void     create(const std::string& password);
+  /// @param kdf_iterations  PBKDF2 work factor (0 = the crypto provider's default).
+  void     create(const std::string& password, uint32_t kdf_iterations = 0);
 
   /// Load cipher_keys from storage, then remain locked until unlock() is called.
   void     open();
@@ -40,6 +41,7 @@ public:
   bool     is_locked() const;
 
   /// Validate the password without changing the lock state.
+  /// While unlocked this compares against the password held in memory (no KDF run).
   void     check_password(const std::string& password) const;
 
   // ── key management (wallet must be unlocked) ───────────────
@@ -68,8 +70,12 @@ public:
                                                 const public_key_type& public_key) const;
 
 private:
+  /// Re-encrypt keys_ with key_ (fresh IV, no KDF) and persist. Throws if the save fails.
   void encrypt_and_save();
-  void encrypt_and_save(const std::string& password, const keys_map& keys);
+
+  /// Persist `keys` encrypted with `key` unless the stored wallet changed since it was
+  /// opened here. Never throws for storage failures; returns whether it was saved.
+  bool encrypt_and_save_if_unchanged(const keys_map& keys, const wallet_key& key);
 
   crypto_provider&   crypto_;
   wallet_storage*    storage_;
@@ -78,6 +84,7 @@ private:
   wallet_data        wallet_data_;   // encrypted blob
   keys_map           keys_;          // plaintext keys (empty when locked)
   std::string        password_;      // stored while unlocked, cleared on lock
+  wallet_key         key_;           // derived key material while unlocked, wiped on lock
   bool               unlocked_{false};
   bool               dirty_{false};    // true when keys_ changed but not yet saved
 };

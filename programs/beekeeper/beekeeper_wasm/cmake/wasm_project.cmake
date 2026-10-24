@@ -53,6 +53,8 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*crypto_provider_impl::encrypt_wallet_keys*"
     "*crypto_provider_impl::encrypt_wallet_data*"
     "*crypto_provider_impl::decrypt_wallet_data*"
+    "*crypto_provider_impl::derive_wallet_key*"
+    "*crypto_provider_impl::verify_wallet_mac*"
     "*crypto_provider_impl::validate_password*"
     "*crypto_provider_impl::ecdh_encrypt*"
     "*crypto_provider_impl::ecdh_decrypt*"
@@ -60,13 +62,23 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*crypto_provider_impl::key_to_wif*"
     # wallet — encrypt_and_save calls async crypto, but lock() is now sync (no longer saves)
     "*wallet::encrypt_and_save*"
-    # wallet::unlock re-encrypts legacy wallets (async KDF/AES/HMAC) after a
-    # successful decrypt; keep the whole unlock chain instrumented explicitly.
-    # -Oz currently inlines both into beekeeper_api::unlock, so the linker may
-    # warn these patterns match nothing — they are a safety net that activates
-    # exactly when inlining stops.
+    # The wallet / beekeeper methods between the embind entry points and the
+    # crypto calls (unlock also re-encrypts legacy wallets with the async
+    # KDF/AES/HMAC). -Oz currently inlines most of them into the beekeeper_api
+    # entry points, so the linker may warn these patterns match nothing; they
+    # are a safety net that activates exactly when inlining stops.
     "*wallet::unlock*"
+    "*wallet::create*"
+    "*wallet::import_key*"
+    "*wallet::remove_key*"
+    "*wallet::check_password*"
     "*beekeeper::unlock*"
+    "*beekeeper::create_wallet*"
+    "*beekeeper::import_key*"
+    "*beekeeper::remove_key*"
+    "*beekeeper::check_password*"
+    "*beekeeper::encrypt_data*"
+    "*beekeeper::decrypt_data*"
     # beekeeper_api — embind entry points (only those that transitively call async crypto)
     "*beekeeper_api::create*"
     "*beekeeper_api::unlock*"

@@ -59,4 +59,16 @@ globalThis.createIdbStorage = async function createIdbStorage(dbName) {
   };
 };
 
+/**
+ * Creates a Beekeeper instance through the public TS API (the detailed bundle's
+ * factory) on top of the given storage callbacks, e.g. an in-memory Map with
+ * planted wallet fixtures or a storage whose save fails.
+ */
+globalThis.createBeekeeperWithStorage = async function createBeekeeperWithStorage(storage, options = {}) {
+  const detailedModule = await import('../../dist/bundle/detailed/index.js');
+  const wasm = await import('../../dist/bundle/build/beekeeper_wasm.common');
+
+  return detailedModule.default(wasm.default, {}, { unlockTimeout: 900, inMemory: false, ...options }, storage);
+};
+
 export {};

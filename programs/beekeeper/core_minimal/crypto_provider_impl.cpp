@@ -235,27 +235,49 @@ std::string crypto_provider_impl::signature_to_hex(const signature_type& sig)
 std::vector<char> crypto_provider_impl::encrypt_wallet_keys(
     const std::string& password, const keys_map& keys)
 {
-  return encrypt_wallet_keys_v1(password, keys);
+  return encrypt_wallet_keys(derive_wallet_key(password, 0), keys);
 }
 
-std::vector<char> crypto_provider_impl::encrypt_wallet_keys_v1(
-    const std::string& password, const keys_map& keys)
+wallet_key crypto_provider_impl::derive_wallet_key(
+    const std::string& password, uint32_t iterations)
 {
   // Note: an empty password is accepted. Current APIs generate a password
   // when none is given, but historical wallets created with an explicitly
   // empty password exist and must stay unlockable and re-encryptable.
-  uint8_t salt[v1_salt_size];
-  uint8_t iv[v1_iv_size];
-  prims_.get_random_bytes(salt, sizeof(salt));
-  prims_.get_random_bytes(iv, sizeof(iv));
+  wallet_key key;
+  key.iterations = iterations == 0 ? kdf_iterations_ : iterations;
+  if (key.iterations > max_kdf_iterations)
+    throw std::invalid_argument("KDF iteration count out of range");
 
+  key.salt.resize(v1_salt_size);
+  prims_.get_random_bytes(key.salt.data(), key.salt.size());
+  derive_wallet_key_material(password, key);
+  return key;
+}
+
+void crypto_provider_impl::derive_wallet_key_material(
+    const std::string& password, wallet_key& key)
+{
   auto dk = prims_.pbkdf2_hmac_sha512(
     reinterpret_cast<const uint8_t*>(password.data()), password.size(),
-    salt, sizeof(salt), kdf_iterations_, v1_derived_key_size);
+    key.salt.data(), key.salt.size(), key.iterations, v1_derived_key_size);
+  std::memcpy(key.dk.data(), dk.data(), v1_derived_key_size);
+  secure_wipe(dk.data(), dk.size());
+}
+
+std::vector<char> crypto_provider_impl::encrypt_wallet_keys(
+    const wallet_key& key, const keys_map& keys)
+{
+  if (key.iterations == 0 || key.iterations > max_kdf_iterations ||
+      key.salt.size() < v1_min_salt_size || key.salt.size() > v1_max_salt_size)
+    throw std::invalid_argument("Wallet key is not derived");
+
+  uint8_t iv[v1_iv_size];
+  prims_.get_random_bytes(iv, sizeof(iv));
 
   // aes_encrypt() takes key+IV packed as one 64-byte block: key[0:32], iv[32:48]
   sha512_hash key_iv;
-  std::memcpy(key_iv.data.data(), dk.data(), 32);
+  std::memcpy(key_iv.data.data(), key.dk.data(), 32);
   std::memcpy(key_iv.data.data() + 32, iv, v1_iv_size);
 
   std::vector<char> plain;
@@ -265,27 +287,25 @@ std::vector<char> crypto_provider_impl::encrypt_wallet_keys_v1(
 
   auto ciphertext = aes_encrypt(key_iv, plain);
   secure_wipe(plain.data(), plain.size());
+  secure_wipe(key_iv.data.data(), key_iv.size());
 
   std::vector<char> blob;
-  blob.reserve(64 + v1_salt_size + v1_iv_size + ciphertext.size() + v1_tag_size);
+  blob.reserve(64 + key.salt.size() + v1_iv_size + ciphertext.size() + v1_tag_size);
   packer p(blob);
   p.write(wallet_magic, sizeof(wallet_magic));
   p.pack_uint8(wallet_format_v1);
   p.pack_uint8(kdf_pbkdf2_hmac_sha512);
-  p.pack_uint32(kdf_iterations_);
-  p.pack_uint8(v1_salt_size);
-  p.write(salt, sizeof(salt));
+  p.pack_uint32(key.iterations);
+  p.pack_uint8(static_cast<uint8_t>(key.salt.size()));
+  p.write(key.salt.data(), key.salt.size());
   p.pack_uint8(v1_iv_size);
   p.write(iv, sizeof(iv));
   p.write(ciphertext.data(), ciphertext.size());
 
   auto tag = prims_.hmac_sha256(
-    dk.data() + 32, 32,
+    key.dk.data() + 32, 32,
     reinterpret_cast<const uint8_t*>(blob.data()), blob.size());
   p.write(tag.data.data(), v1_tag_size);
-
-  secure_wipe(dk.data(), dk.size());
-  secure_wipe(key_iv.data.data(), key_iv.size());
   return blob;
 }
 
@@ -304,15 +324,27 @@ std::vector<char> crypto_provider_impl::encrypt_wallet_data(
 keys_map crypto_provider_impl::decrypt_wallet_data(
     const std::string& password, const std::vector<char>& cipher_keys)
 {
-  if (has_wallet_magic(cipher_keys))
-    return decrypt_wallet_data_v1(password, cipher_keys);
-  return decrypt_wallet_data_legacy(password, cipher_keys);
+  wallet_key key;
+  return decrypt_wallet_data(password, cipher_keys, key);
 }
 
-keys_map crypto_provider_impl::decrypt_wallet_data_v1(
-    const std::string& password, const std::vector<char>& cipher_keys)
+keys_map crypto_provider_impl::decrypt_wallet_data(
+    const std::string& password, const std::vector<char>& cipher_keys, wallet_key& key)
+{
+  key.wipe();
+  if (!has_wallet_magic(cipher_keys))
+    return decrypt_wallet_data_legacy(password, cipher_keys);
+
+  auto header = parse_wallet_header_v1(cipher_keys);
+  verify_wallet_mac_v1(password, cipher_keys, header, key);
+  return decrypt_wallet_data_v1(cipher_keys, header, key);
+}
+
+crypto_provider_impl::wallet_header_v1 crypto_provider_impl::parse_wallet_header_v1(
+    const std::vector<char>& cipher_keys) const
 {
   unpacker u(cipher_keys);
+  wallet_header_v1 header;
 
   uint8_t magic[sizeof(wallet_magic)];
   u.read(magic, sizeof(magic)); // presence already checked by the dispatcher
@@ -325,53 +357,64 @@ keys_map crypto_provider_impl::decrypt_wallet_data_v1(
   if (kdf_id != kdf_pbkdf2_hmac_sha512)
     throw std::runtime_error("Unsupported wallet KDF");
 
-  auto iterations = u.unpack_uint32();
-  if (iterations == 0 || iterations > max_kdf_iterations)
+  header.iterations = u.unpack_uint32();
+  if (header.iterations == 0 || header.iterations > max_kdf_iterations)
     throw std::runtime_error("Wallet KDF iteration count out of range");
 
   auto salt_len = u.unpack_uint8();
   if (salt_len < v1_min_salt_size || salt_len > v1_max_salt_size)
     throw std::runtime_error("Wallet KDF salt length out of range");
-  uint8_t salt[v1_max_salt_size];
-  u.read(salt, salt_len);
+  header.salt.resize(salt_len);
+  u.read(header.salt.data(), salt_len);
 
   auto iv_len = u.unpack_uint8();
   if (iv_len != v1_iv_size)
     throw std::runtime_error("Wallet cipher IV length invalid");
-  uint8_t iv[v1_iv_size];
-  u.read(iv, iv_len);
+  u.read(header.iv.data(), iv_len);
 
   // Everything left is ciphertext followed by the 32-byte tag.
   // CBC output of a non-empty plaintext is at least one block.
   if (u.remaining() < v1_tag_size + 16)
     throw std::runtime_error("Wallet data truncated");
-  size_t cipher_len = u.remaining() - v1_tag_size;
-  if (cipher_len % 16 != 0)
+  header.cipher_len = u.remaining() - v1_tag_size;
+  if (header.cipher_len % 16 != 0)
     throw std::runtime_error("Wallet ciphertext length invalid");
+  header.cipher_offset = cipher_keys.size() - u.remaining();
 
-  auto dk = prims_.pbkdf2_hmac_sha512(
-    reinterpret_cast<const uint8_t*>(password.data()), password.size(),
-    salt, salt_len, iterations, v1_derived_key_size);
+  return header;
+}
+
+void crypto_provider_impl::verify_wallet_mac_v1(
+    const std::string& password, const std::vector<char>& cipher_keys,
+    const wallet_header_v1& header, wallet_key& key)
+{
+  key.salt = header.salt;
+  key.iterations = header.iterations;
+  derive_wallet_key_material(password, key);
 
   size_t mac_covered = cipher_keys.size() - v1_tag_size;
   auto expected_tag = prims_.hmac_sha256(
-    dk.data() + 32, 32,
+    key.dk.data() + 32, 32,
     reinterpret_cast<const uint8_t*>(cipher_keys.data()), mac_covered);
 
   auto stored_tag = reinterpret_cast<const uint8_t*>(cipher_keys.data()) + mac_covered;
   if (!constant_time_equal(expected_tag.data.data(), stored_tag, v1_tag_size))
   {
-    secure_wipe(dk.data(), dk.size());
+    key.wipe();
     // A wrong password and a tampered blob are indistinguishable here by design.
     throw std::runtime_error("Invalid password");
   }
+}
 
+keys_map crypto_provider_impl::decrypt_wallet_data_v1(
+    const std::vector<char>& cipher_keys, const wallet_header_v1& header, const wallet_key& key)
+{
   sha512_hash key_iv;
-  std::memcpy(key_iv.data.data(), dk.data(), 32);
-  std::memcpy(key_iv.data.data() + 32, iv, v1_iv_size);
-  secure_wipe(dk.data(), dk.size());
+  std::memcpy(key_iv.data.data(), key.dk.data(), 32);
+  std::memcpy(key_iv.data.data() + 32, header.iv.data(), v1_iv_size);
 
-  std::vector<char> ciphertext(u.ptr, u.ptr + cipher_len);
+  std::vector<char> ciphertext(cipher_keys.begin() + header.cipher_offset,
+                               cipher_keys.begin() + header.cipher_offset + header.cipher_len);
   auto decrypted = aes_decrypt(key_iv, ciphertext);
   secure_wipe(key_iv.data.data(), key_iv.size());
 
@@ -431,7 +474,15 @@ std::vector<char> crypto_provider_impl::parse_wallet_file(
 void crypto_provider_impl::validate_password(
     const std::string& password, const std::vector<char>& cipher_keys)
 {
-  decrypt_wallet_data(password, cipher_keys);
+  if (!has_wallet_magic(cipher_keys))
+  {
+    decrypt_wallet_data_legacy(password, cipher_keys);
+    return;
+  }
+
+  // The MAC check is the password check; the keys are not decrypted.
+  wallet_key key;
+  verify_wallet_mac_v1(password, cipher_keys, parse_wallet_header_v1(cipher_keys), key);
 }
 
 // ── ECDH encrypt / decrypt ─────────────────────────────────────

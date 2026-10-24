@@ -7,3 +7,4 @@ import "./detailed/edge_cases";
 import "./detailed/storage";
 import "./detailed/csp";
 import "./detailed/wallet_format";
+import "./detailed/wallet_storage_safety";
