@@ -116,4 +116,36 @@ test.describe('Wallet conversion and concurrency', () => {
     expect(result.keysA).toBe(1 + EXTRA_WIF_KEYS.length);
     expect(result.keysB).toBe(1);
   });
+
+  test('Node storage writes wallet files atomically and owner-only', async ({ beekeeperTest }) => {
+    await beekeeperTest.dynamic(async ({ provider, env }) => {
+      if (env !== 'node')
+        return;
+
+      // Module names in variables keep the browser run from resolving them.
+      const fsName = 'fs', pathName = 'path', osName = 'os';
+      const fs = await import(fsName) as typeof import('fs');
+      const path = await import(pathName) as typeof import('path');
+      const os = await import(osName) as typeof import('os');
+
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-node-storage-'));
+      try {
+        const bk = await provider.default({ storageRoot: root });
+        const session = bk.createSession('salt');
+        const { wallet } = await session.createWallet('w0', 'pass');
+        await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+        const dir = path.join(root, '.beekeeper');
+        fs.writeFileSync(path.join(dir, 'notes.txt'), 'not a wallet');
+
+        expect(fs.statSync(path.join(dir, 'w0.wallet')).mode & 0o777).toBe(0o600);
+        expect(fs.readdirSync(dir).filter(name => name.endsWith('.tmp'))).toEqual([]);
+        expect(session.listCreatedWallets().map(created => created.name)).toEqual(['w0']);
+
+        await bk.delete();
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+  });
 });

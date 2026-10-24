@@ -2,8 +2,14 @@
 
 #include <boost/filesystem.hpp>
 
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <stdexcept>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace bfs = boost::filesystem;
 
@@ -21,41 +27,74 @@ boost::filesystem::path file_storage::wallet_path(const std::string& name) const
 
 void file_storage::save(const std::string& name, const std::vector<char>& buffer)
 {
-  // Write to a temp file and rename it over the target, so an interrupted
-  // save (crash, full disk) cannot leave a truncated wallet — the wallet file
-  // is the only copy of the user's keys. No fsync: imports save once per key,
-  // and a per-save fsync makes bulk imports several times slower; rename
-  // atomicity covers process crashes, which is the realistic risk here.
+  write_wallet_file(name, buffer, false);
+}
+
+bool file_storage::try_save(const std::string& name, const std::vector<char>& buffer)
+{
+  try
+  {
+    write_wallet_file(name, buffer, true);
+    return true;
+  }
+  catch (...)
+  {
+    return false;
+  }
+}
+
+void file_storage::write_wallet_file(const std::string& name, const std::vector<char>& buffer, bool durable)
+{
+  // Write a new owner-only temp file and rename it over the target, so an
+  // interrupted save cannot leave a truncated wallet: the wallet file is the
+  // only copy of the user's keys. O_EXCL after removing a stale temp file means
+  // a symlink planted at the temp path is never followed. A durable write also
+  // flushes the file and the directory, so a power loss cannot lose it either;
+  // regular saves skip that, as an fsync per imported key makes bulk imports
+  // tens of times slower on some filesystems.
   auto path = wallet_path(name);
   auto tmp_path = path;
   tmp_path += ".tmp";
+  const auto tmp = tmp_path.string();
 
+  ::unlink(tmp.c_str());
+  int fd = ::open(tmp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR);
+  if (fd < 0)
+    throw std::runtime_error("Cannot write wallet file: " + tmp + ": " + std::strerror(errno));
+
+  bool written = true;
+  for (size_t done = 0; written && done < buffer.size(); )
   {
-    std::ofstream ofs(tmp_path.string(), std::ios::binary | std::ios::trunc);
-    if (!ofs)
-      throw std::runtime_error("Cannot write wallet file: " + tmp_path.string());
-
-    ofs.write(buffer.data(), buffer.size());
-    ofs.flush();
-    if (!ofs)
-    {
-      ofs.close();
-      boost::system::error_code ec;
-      bfs::remove(tmp_path, ec);
-      throw std::runtime_error("Error writing wallet file: " + tmp_path.string());
-    }
+    auto n = ::write(fd, buffer.data() + done, buffer.size() - done);
+    if (n < 0 && errno == EINTR)
+      continue;
+    written = n > 0;
+    if (written)
+      done += static_cast<size_t>(n);
+  }
+  written = written && (!durable || ::fsync(fd) == 0);
+  written = ::close(fd) == 0 && written;
+  if (!written)
+  {
+    ::unlink(tmp.c_str());
+    throw std::runtime_error("Error writing wallet file: " + tmp);
   }
 
-  // Wallet files hold encrypted keys — keep them owner-only. Set on the tmp
-  // file so the permissions are in place before the file becomes the wallet.
-  boost::system::error_code ec;
-  bfs::permissions(tmp_path, bfs::owner_read | bfs::owner_write, ec);
-
-  bfs::rename(tmp_path, path, ec);
-  if (ec)
+  if (::rename(tmp.c_str(), path.string().c_str()) != 0)
   {
-    bfs::remove(tmp_path, ec);
+    ::unlink(tmp.c_str());
     throw std::runtime_error("Cannot replace wallet file: " + path.string());
+  }
+
+  if (durable)
+  {
+    // Persist the rename itself; a failure here does not make the save fail.
+    int dir_fd = ::open(wallet_dir_.string().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (dir_fd >= 0)
+    {
+      ::fsync(dir_fd);
+      ::close(dir_fd);
+    }
   }
 }
 
