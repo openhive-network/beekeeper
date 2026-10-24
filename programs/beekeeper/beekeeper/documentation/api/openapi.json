@@ -317,7 +317,7 @@
             "type": "string"
           },
           "wallet_name": {
-            "description": "A name of a wallet",
+            "description": "A name of a wallet. `exists` is `false` for a name with other chars than alphanumeric and '._-@'.",
             "example": "my_second_wallet",
             "type": "string"
           }
@@ -541,7 +541,7 @@
             "type": "string"
           },
           "wallet_name": {
-            "description": "A name of a wallet",
+            "description": "A name of a wallet. Only alphanumeric and '._-@' chars are allowed, as in `create`.",
             "example": "my_second_wallet",
             "type": "string"
           }
@@ -660,7 +660,7 @@
             "type": "string"
           },
           "wallet_name": {
-            "description": "A name of a wallet to unlock",
+            "description": "A name of a wallet to unlock. Only alphanumeric and '._-@' chars are allowed, as in `create`.",
             "example": "my_second_wallet",
             "type": "string"
           }

@@ -14,8 +14,25 @@ file_storage::file_storage(const boost::filesystem::path& wallet_dir)
 {
 }
 
+bool file_storage::is_valid_name(const std::string& name)
+{
+  if (name.empty())
+    return false;
+
+  for (char ch : name)
+  {
+    const bool alnum = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+    if (!alnum && ch != '.' && ch != '_' && ch != '-' && ch != '@')
+      return false;
+  }
+  return true;
+}
+
 boost::filesystem::path file_storage::wallet_path(const std::string& name) const
 {
+  if (!is_valid_name(name))
+    throw std::runtime_error("Invalid wallet name");
+
   return wallet_dir_ / (name + ".wallet");
 }
 
@@ -53,7 +70,7 @@ std::vector<char> file_storage::load(const std::string& name)
 
 bool file_storage::scan_dir(const std::string& wallet_name)
 {
-  return bfs::exists(wallet_path(wallet_name));
+  return is_valid_name(wallet_name) && bfs::exists(wallet_path(wallet_name));
 }
 
 std::vector<std::string> file_storage::list_dir()

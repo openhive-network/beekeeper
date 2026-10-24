@@ -666,7 +666,7 @@ components:
         wallet_name:
           type: string
           example: my_second_wallet
-          description: A name of a wallet
+          description: A name of a wallet. Only alphanumeric and '._-@' chars are allowed, as in `create`.
     open_response:
       type: object
     close:
@@ -699,7 +699,7 @@ components:
         wallet_name:
           type: string
           example: my_second_wallet
-          description: A name of a wallet to unlock
+          description: A name of a wallet to unlock. Only alphanumeric and '._-@' chars are allowed, as in `create`.
         password:
           type: string
           example: PW5JViFn5gd4rt6ohk7DQMgHzQN6Z9FuMRfKoE5Ysk25mkjy5AY1b
@@ -909,7 +909,7 @@ components:
         wallet_name:
           type: string
           example: my_second_wallet
-          description: A name of a wallet
+          description: A name of a wallet. `exists` is `false` for a name with other chars than alphanumeric and '._-@'.
     has_wallet_response:
       type: object
       properties:

@@ -11,7 +11,6 @@
 #include <fc/git_revision.hpp>
 #include <fc/exception/exception.hpp>
 
-#include <cctype>
 #include <optional>
 
 namespace beekeeper {
@@ -28,20 +27,10 @@ class beekeeper_api_impl
 
     extended_api ex_api;
 
-    static bool is_wallet_name_valid( const std::string& name )
+    void check_wallet_name( const std::string& name )
     {
-      if( name.empty() )
-        return false;
-
-      for( char ch : name )
-      {
-        if( std::isalnum( static_cast<unsigned char>( ch ) ) )
-          continue;
-        if( ch == '.' || ch == '_' || ch == '-' || ch == '@' )
-          continue;
-        return false;
-      }
-      return true;
+      if( !file_storage::is_valid_name( name ) )
+        throw_api_error( "Name of wallet is incorrect." );
     }
 
     std::optional<beekeeper_minimal::wallet_details> find_session_wallet( const std::string& token, const std::string& name )
@@ -114,8 +103,7 @@ DEFINE_API_IMPL( beekeeper_api_impl, create )
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
-  if( !is_wallet_name_valid( args.wallet_name ) )
-    throw_api_error( "Name of wallet is incorrect." );
+  check_wallet_name( args.wallet_name );
 
   if( _bk.has_wallet( args.wallet_name ) )
     throw_api_error( "Wallet with name: '" + args.wallet_name + "' already exists" );
@@ -129,6 +117,7 @@ DEFINE_API_IMPL( beekeeper_api_impl, open )
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
+  check_wallet_name( args.wallet_name );
   _bk.open_wallet( args.token, args.wallet_name );
   return open_return();
 }
@@ -180,6 +169,7 @@ DEFINE_API_IMPL( beekeeper_api_impl, unlock )
   std::unique_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
+  check_wallet_name( args.wallet_name );
 
   auto w = find_session_wallet( args.token, args.wallet_name );
   const bool in_session = static_cast<bool>( w );
@@ -510,6 +500,8 @@ DEFINE_API_IMPL( beekeeper_api_impl, has_wallet )
   std::shared_lock guard( _mtx_handler->get_mutex() );
 
   _bk.validate_token( args.token );
+  if( !file_storage::is_valid_name( args.wallet_name ) )
+    return { false };
   return { _bk.has_wallet( args.wallet_name ) };
 }
 

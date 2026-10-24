@@ -1280,6 +1280,71 @@ BOOST_AUTO_TEST_CASE(has_wallet)
   } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(wallet_names_stay_in_wallet_dir)
+{
+  try
+  {
+    test_utils::beekeeper_mgr b_mgr;
+    b_mgr.remove_wallets();
+
+    // A wallet file next to the wallet directory, which only a name with a path could reach.
+    const auto _outside_dir = b_mgr.dir.parent_path() / "beekeeper-storage-outside";
+    boost::filesystem::remove_all( _outside_dir );
+    boost::filesystem::create_directories( _outside_dir );
+
+    const std::vector<std::string> _valid_names{ "outside", ".", "..", "...x", ".hidden", "a@b", "_-." };
+    {
+      // Written by another instance, so that the one under test has not loaded them.
+      auto _writer = b_mgr.create_beekeeper();
+      auto _writer_token = _writer.create_session();
+      for( const auto& _name : _valid_names )
+        _writer.create_wallet( _writer_token, _name, "avocado", false );
+    }
+    boost::filesystem::rename( b_mgr.dir / "outside.wallet", _outside_dir / "outside.wallet" );
+    const auto _outside_size = boost::filesystem::file_size( _outside_dir / "outside.wallet" );
+
+    auto bk = b_mgr.create_beekeeper();
+    auto _token = bk.create_session();
+
+    const auto _refused = []( const std::runtime_error& e ) { return std::string( e.what() ) == "Invalid wallet name"; };
+
+    const std::vector<std::string> _names{
+      "../beekeeper-storage-outside/outside",
+      ( _outside_dir / "outside" ).string(),
+      std::string( "../beekeeper-storage-outside/outside.wallet" ) + '\0',
+      "beekeeper-storage-outside/outside",
+      "..\\beekeeper-storage-outside\\outside",
+      "outside wallet",
+      ""
+    };
+
+    for( const auto& _name : _names )
+    {
+      BOOST_REQUIRE( !beekeeper::file_storage::is_valid_name( _name ) );
+      BOOST_REQUIRE( !b_mgr.storage->scan_dir( _name ) );
+      BOOST_REQUIRE( !bk.has_wallet( _name ) );
+      BOOST_REQUIRE_EXCEPTION( b_mgr.storage->load( _name ), std::runtime_error, _refused );
+      BOOST_REQUIRE_EXCEPTION( b_mgr.storage->save( _name, std::vector<char>{ '"', '"' } ), std::runtime_error, _refused );
+      BOOST_REQUIRE_EXCEPTION( bk.open_wallet( _token, _name ), std::runtime_error, _refused );
+    }
+
+    BOOST_REQUIRE( bk.list_wallets( _token ).empty() );
+    BOOST_REQUIRE_EQUAL( boost::filesystem::file_size( _outside_dir / "outside.wallet" ), _outside_size );
+
+    // Names in the allowed set open as before, odd ones included, and so does the moved file once it is back.
+    boost::filesystem::rename( _outside_dir / "outside.wallet", b_mgr.dir / "outside.wallet" );
+    for( const auto& _name : _valid_names )
+    {
+      BOOST_REQUIRE( beekeeper::file_storage::is_valid_name( _name ) );
+      BOOST_REQUIRE( bk.has_wallet( _name ) );
+      bk.open_wallet( _token, _name );
+    }
+    BOOST_REQUIRE_EQUAL( bk.list_wallets( _token ).size(), _valid_names.size() );
+
+    boost::filesystem::remove_all( _outside_dir );
+  } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE(temporary_wallets)
 {
   try
