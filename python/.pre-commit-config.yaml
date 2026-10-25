@@ -45,6 +45,8 @@ repos:
         args: ["--config-file", "./python/pyproject.toml"]
         language: system
         types: [python]
+        # parallel batches share .mypy_cache, which crashes mypy
+        require_serial: true
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
