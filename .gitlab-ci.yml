@@ -52,7 +52,6 @@ include:
   file:
   - '/templates/python_projects.gitlab-ci.yml'
   - '/templates/npm_projects.gitlab-ci.yml'
-  - '/templates/verify_submodule_ref.gitlab-ci.yml'
 
 default:
   image: ${PYTHON_IMAGE}
@@ -71,14 +70,6 @@ default:
     # Initialize nested submodules in plugins (fc, appbase)
     cd libraries/plugins && git submodule update --init --recursive --jobs 4 && cd ../..
     echo -e "\e[0Ksection_end:$(date +%s):init_submodules\r\e[0K"
-
-verify_include_refs:
-  extends: .verify_multiple_refs_template
-  needs: []
-  variables:
-    # Override global GIT_SUBMODULE_STRATEGY: none - script needs submodule checkout
-    GIT_SUBMODULE_STRATEGY: normal
-    VERIFY_REFS: "programs/beekeeper/beekeeper_wasm/npm-common-config:hive/common-ci-configuration"
 
 verify_poetry_lock_stability:
   stage: static_code_analysis
@@ -162,6 +153,8 @@ beekeeper_wasm_test:
     artifacts: true
   before_script:
   - git config --global --add safe.directory '*'
+    # pnpm-workspace.yaml (the catalogs the lockfile was resolved with) links into npm-common-config
+  - !reference [.submodule_init, script]
   - . "${NVM_DIR}/nvm.sh"
   - nvm use "${NODEJS_VERSION}"
   script:
@@ -409,6 +402,9 @@ push_to_wiki:
     DIST_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm/dist"
     PROJECT_URL: "https://gitlab.syncad.com/hive/beekeeper-doc"
     PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_based_job_base, before_script]
   tags:
   - public-runner-docker
 
