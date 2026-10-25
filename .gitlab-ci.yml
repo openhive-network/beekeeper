@@ -151,6 +151,7 @@ beekeeper_wasm_test:
   stage: test
   image: ${EMSCRIPTEN_IMAGE}
   variables:
+    GIT_STRATEGY: clone
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
   needs:
   - job: beekeeper_wasm_build
@@ -401,6 +402,7 @@ push_to_wiki:
   - job: beekeeper_wasm_pack
     artifacts: true
   variables:
+    GIT_STRATEGY: clone
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
     WIKI_PUSH_TOKEN: "$BEEKEEPER_DOC_WIKI_PUSH_TOKEN"
     DIST_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm/dist"
