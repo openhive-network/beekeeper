@@ -30,19 +30,19 @@ class CommunicationSettings(PreconfiguredBaseModel):
 
     max_retries: int = Defaults.default_factory(
         EnvironNames.RETRIES,
-        lambda x: (CommunicationSettings.Defaults.RETRIES if x is None else timedelta(seconds=int(x))),
+        lambda x: CommunicationSettings.Defaults.RETRIES if x is None else timedelta(seconds=int(x)),
     )
     """Amount of retries when sending request to service."""
 
     timeout: timedelta = Defaults.default_factory(
         EnvironNames.TIMEOUT,
-        lambda x: (CommunicationSettings.Defaults.TIMEOUT if x is None else timedelta(seconds=int(x))),
+        lambda x: CommunicationSettings.Defaults.TIMEOUT if x is None else timedelta(seconds=int(x)),
     )
     """Maximum time for single request to finish."""
 
     period_between_retries: timedelta = Defaults.default_factory(
         EnvironNames.PERIOD_BETWEEN_RETRIES,
-        lambda x: (CommunicationSettings.Defaults.PERIOD_BETWEEN_RETRIES if x is None else timedelta(seconds=int(x))),
+        lambda x: CommunicationSettings.Defaults.PERIOD_BETWEEN_RETRIES if x is None else timedelta(seconds=int(x)),
     )
     """Period between failed request and next retry."""
 
@@ -52,4 +52,4 @@ class CommunicationSettings(PreconfiguredBaseModel):
     @classmethod
     def import_settings(cls, settings: str) -> Self:
         decoder = get_hf26_decoder(cls)
-        return cast(Self, decoder.decode(settings))
+        return cast("Self", decoder.decode(settings))

@@ -9,7 +9,7 @@ from beekeepy._utilities.context_settings_updater import ContextSettingsUpdater,
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-__all__ = ["SettingsT", "UniqueSettingsHolder", "SharedSettingsHolder"]
+__all__ = ["SettingsT", "SharedSettingsHolder", "UniqueSettingsHolder"]
 
 
 class _SettingsHolderBase(ABC, ContextSettingsUpdater[SettingsT]):

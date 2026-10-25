@@ -42,9 +42,9 @@ class CliParser:
                     ordered_cli[key] = {dict_value, item}
                 continue
 
-            assert (
-                previous_key is not None
-            ), "parsing failed, previous_key was not set and following argument is not prefixed"
+            assert previous_key is not None, (
+                "parsing failed, previous_key was not set and following argument is not prefixed"
+            )
             ordered_cli[previous_key] = item
             previous_key = None
 

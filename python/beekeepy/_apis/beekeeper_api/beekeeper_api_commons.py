@@ -21,9 +21,9 @@ class BeekeeperApiCommons(Generic[HandleT]):
         return endpoint_name != "beekeeper_api.create_session"
 
     def _verify_is_owner_can_hold_session_token(self, owner: HandleT) -> None:
-        assert isinstance(
-            owner, self._get_requires_session_holder_type()
-        ), f"owner `{owner}` is not able to handle this request"
+        assert isinstance(owner, self._get_requires_session_holder_type()), (
+            f"owner `{owner}` is not able to handle this request"
+        )
 
     @abstractmethod
     def _get_requires_session_holder_type(self) -> type[SyncSessionHolder | AsyncSessionHolder]: ...

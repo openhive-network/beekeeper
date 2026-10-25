@@ -45,7 +45,7 @@ def _convert_pascal_case_to_sneak_case(pascal_case_input: str) -> str:
 class AbstractApi(ABC, Generic[HandleT]):
     """Base class for apis."""
 
-    __registered_apis: ClassVar[RegisteredApisT] = defaultdict(lambda: defaultdict(lambda: set()))
+    __registered_apis: ClassVar[RegisteredApisT] = defaultdict(lambda: defaultdict(set))
 
     @staticmethod
     def _get_api_name_from_method(method: Callable[P, R] | Callable[P, Awaitable[R]]) -> str:

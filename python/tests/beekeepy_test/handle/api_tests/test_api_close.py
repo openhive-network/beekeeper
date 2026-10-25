@@ -25,9 +25,9 @@ def test_api_close(beekeeper: Beekeeper, wallet: WalletInfo) -> None:
     beekeeper.api.close(wallet_name=wallet.name)
 
     # ASSERT
-    assert (
-        len((beekeeper.api.list_wallets()).wallets) == 0
-    ), "After close, there should be no wallets hold by beekeeper."
+    assert len((beekeeper.api.list_wallets()).wallets) == 0, (
+        "After close, there should be no wallets hold by beekeeper."
+    )
 
 
 def test_api_close_import_key_to_closed_wallet(

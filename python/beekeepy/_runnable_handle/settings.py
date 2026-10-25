@@ -4,7 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import ClassVar
 
-from beekeepy._communication.url import HttpUrl  # noqa: TCH001
+from beekeepy._communication.url import HttpUrl  # noqa: TC001
 from beekeepy._remote_handle.settings import RemoteHandleSettings
 from beekeepy.exceptions import UnknownValueForBooleanConversionError
 
@@ -54,7 +54,7 @@ class RunnableHandleSettings(RemoteHandleSettings):
 
     propagate_sigint: bool = Defaults.default_factory(
         EnvironNames.PROPAGATE_SIGINT,
-        lambda x: (RunnableHandleSettings.Defaults.PROPAGATE_SIGINT if x is None else strtobool(x)),
+        lambda x: RunnableHandleSettings.Defaults.PROPAGATE_SIGINT if x is None else strtobool(x),
     )
     """If set to True (default), sigint will be sent to beekeeper without control of this library."""
 
@@ -63,13 +63,13 @@ class RunnableHandleSettings(RemoteHandleSettings):
 
     close_timeout: timedelta = Defaults.default_factory(
         EnvironNames.CLOSE_TIMEOUT,
-        lambda x: (RunnableHandleSettings.Defaults.CLOSE_TIMEOUT if x is None else timedelta(seconds=int(x))),
+        lambda x: RunnableHandleSettings.Defaults.CLOSE_TIMEOUT if x is None else timedelta(seconds=int(x)),
     )
     """Affects time handle waits before beekeepy closes."""
 
     initialization_timeout: timedelta = Defaults.default_factory(
         EnvironNames.INITIALIZATION_TIMEOUT,
-        lambda x: (RunnableHandleSettings.Defaults.INITIALIZATION_TIMEOUT if x is None else timedelta(seconds=int(x))),
+        lambda x: RunnableHandleSettings.Defaults.INITIALIZATION_TIMEOUT if x is None else timedelta(seconds=int(x)),
     )
     """Affects time handle waits for beekeeper to start."""
 

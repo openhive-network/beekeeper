@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 from beekeepy.exceptions import BeekeepyError, CommunicationResponseT, Json, OverseerError
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from beekeepy._communication.url import Url
 
 

@@ -15,12 +15,13 @@ Użycie:
 from __future__ import annotations
 
 import importlib
-from typing import Any, Callable, get_args
+from collections.abc import Callable
+from typing import Any, get_args
 
 __all__ = [
-    "smart_lazy_getattr",
-    "lazy_module_factory",
     "aggregate_same_import",
+    "lazy_module_factory",
+    "smart_lazy_getattr",
 ]
 
 

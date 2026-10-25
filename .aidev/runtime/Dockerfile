@@ -2,8 +2,8 @@
 # .aidev/project.yaml). Suites run with `--network none` and the caller's uid, so
 # everything they need is in the image:
 #
-# * the CI emsdk image the project's npm_projects template pins (EMSCRIPTEN_IMAGE_TAG
-#   5.0.2-4): emscripten, cmake, ninja, Node 24.21.0 and pnpm 10.0.0 under nvm (as
+# * the CI emsdk image ccc's npm_projects template defaults to (EMSCRIPTEN_IMAGE_TAG
+#   5.0.2-6): emscripten, cmake, ninja, Node 24.21.0 and pnpm 10.33.0 under nvm (as
 #   CI's `nvm use "${NODEJS_VERSION}"`);
 # * the chromium build the lockfile's Playwright wants, in /opt/pw-browsers (CI's
 #   beekeeper_wasm_test runs `playwright install chromium`; the emsdk image's own
@@ -19,7 +19,7 @@
 #   the subprocesses its tests start need.
 #
 # Build and pin it with .aidev/runtime/build.sh; see .aidev/README.md.
-FROM registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-4@sha256:966dd9e9da494d184fcc7f622bb24d93c41b8d58c814156aa79cd1d70f31d9ab
+FROM registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-6@sha256:9aec859476a9508693dba0d55c8637a2fcc572ec51dfcf87adaba21d6f64d67f
 
 USER root
 
@@ -44,7 +44,7 @@ RUN apt-get update \
 
 COPY js/ /tmp/pnpm-fetch/
 RUN cd /tmp/pnpm-fetch \
-    && test "$(node --version)" = v24.21.0 && test "$(pnpm --version)" = 10.0.0 \
+    && test "$(node --version)" = v24.21.0 && test "$(pnpm --version)" = 10.33.0 \
     && pnpm fetch \
     && pnpm install --offline --frozen-lockfile --ignore-scripts \
     && pnpm exec playwright install chromium \

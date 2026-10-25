@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from abc import ABC, abstractmethod
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Awaitable, TypeGuard, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar, cast
 
 from beekeepy._communication.abc.communicator_models import (
     AsyncCallback,
@@ -21,6 +21,8 @@ from beekeepy._utilities.settings_holder import SharedSettingsHolder
 from beekeepy.exceptions import TimeoutExceededError
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+
     from beekeepy._communication.url import HttpUrl
 
 
@@ -173,9 +175,9 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
         request = self._prepare_request(url, method, data)
         if self.__is_available(callbacks.prepare_request):
             request = await self.__call_async_callback(
-                cast(AsyncCallback, callbacks.prepare_request),
+                cast("AsyncCallback", callbacks.prepare_request),
                 Request,
-                cast(AsyncErrorCallback | ErrorCallback, callbacks.request_error),
+                cast("AsyncErrorCallback | ErrorCallback", callbacks.request_error),
                 request=request,
             )
 
@@ -184,7 +186,7 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
         except Exception as error:
             if self.__is_available(callbacks.communicator_error):
                 await self.__call_async_callback(
-                    cast(AsyncCallback, callbacks.communicator_error),
+                    cast("AsyncCallback", callbacks.communicator_error),
                     type(None),
                     None,
                     request=request,
@@ -196,9 +198,9 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
 
         if self.__is_available(callbacks.process_response):
             response = await self.__call_async_callback(
-                cast(AsyncCallback, callbacks.process_response),
+                cast("AsyncCallback", callbacks.process_response),
                 Response,
-                cast(AsyncErrorCallback | ErrorCallback, callbacks.response_error),
+                cast("AsyncErrorCallback | ErrorCallback", callbacks.response_error),
                 request=request,
                 response=response,
             )
@@ -214,7 +216,7 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
     ) -> T:
         """Calls given callback with given arguments."""
         try:
-            return cast(T, callback(**kwargs))
+            return cast("T", callback(**kwargs))
         except Exception as error:
             if self.__is_available(error_callback):
                 error_callback(**kwargs, exception=error)
@@ -230,12 +232,12 @@ class AbstractCommunicator(SharedSettingsHolder[CommunicationSettings], ABC):
         """Calls given callback with given arguments."""
         try:
             if asyncio.iscoroutinefunction(callback):
-                return cast(T, await callback(**kwargs))
-            return cast(T, callback(**kwargs))
+                return cast("T", await callback(**kwargs))
+            return cast("T", callback(**kwargs))
         except Exception as error:
             if self.__is_available(error_callback):
                 await self.__call_async_callback(
-                    cast(AsyncCallback, error_callback), type(None), None, **kwargs, exception=error
+                    cast("AsyncCallback", error_callback), type(None), None, **kwargs, exception=error
                 )
             raise
 

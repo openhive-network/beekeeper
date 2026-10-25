@@ -11,4 +11,4 @@ from beekeepy._apis.beekeeper_api.sync_api import (
     BeekeeperApi as SyncBeekeeperApi,
 )
 
-__all__ = ["AsyncBeekeeperApi", "SyncBeekeeperApi", "BeekeeperAsyncApiCollection", "BeekeeperSyncApiCollection"]
+__all__ = ["AsyncBeekeeperApi", "BeekeeperAsyncApiCollection", "BeekeeperSyncApiCollection", "SyncBeekeeperApi"]

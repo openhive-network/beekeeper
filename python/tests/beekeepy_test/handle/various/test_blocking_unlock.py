@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, AsyncIterator, Final, Iterator
+from typing import TYPE_CHECKING, Final
 
 import pytest
 from beekeepy.handle.runnable import AsyncBeekeeper
@@ -13,6 +13,8 @@ from local_tools.beekeepy.network import async_raw_http_call
 from schemas.jsonrpc import JSONRPCRequest
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Iterator
+
     from beekeepy.interfaces import HttpUrl as Url
 
 

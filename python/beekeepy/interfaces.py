@@ -14,9 +14,7 @@ __all__ = [
     "ErrorLogger",
     "HttpUrl",
     "KeyPair",
-    "mask",
     "P2PUrl",
-    "sanitize",
     "SelfContextAsync",
     "SelfContextSync",
     "SharedSettingsHolder",
@@ -27,6 +25,8 @@ __all__ = [
     "UniqueSettingsHolder",
     "Url",
     "WsUrl",
+    "mask",
+    "sanitize",
 ]
 
 if TYPE_CHECKING:

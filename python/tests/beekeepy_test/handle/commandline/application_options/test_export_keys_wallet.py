@@ -38,9 +38,9 @@ def check_dumped_keys(wallet_path: Path, extracted_keys: list[KeyPair]) -> None:
     with wallet_path.open() as keys_file:
         keys = json.load(keys_file)
         assert [key.dict() for key in extracted_keys] == keys, "Keys in dumped file do not match the expected keys."
-        assert (
-            extracted_keys == PRIVATE_AND_PUBLIC_KEYS
-        ), "Keys in dumped file do not match the expected keys from PRIVATE_AND_PUBLIC_KEYS."
+        assert extracted_keys == PRIVATE_AND_PUBLIC_KEYS, (
+            "Keys in dumped file do not match the expected keys from PRIVATE_AND_PUBLIC_KEYS."
+        )
 
     wallet_path.unlink()
 

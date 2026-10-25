@@ -211,7 +211,7 @@ class Executable(Closeable, Generic[ConfigT, ArgumentT]):
         self.__arguments = new_arguments or self.__arguments
         try:
             yield
-        except:  # noqa: TRY302 # https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager
+        except:  # noqa: TRY203 # https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager
             raise
         finally:
             self.__arguments = __backup

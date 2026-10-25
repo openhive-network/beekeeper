@@ -95,9 +95,9 @@ class Beekeeper(BeekeeperInterface, StateInvalidator):
     @classmethod
     def _remote_factory(cls, *, url_or_settings: InterfaceSettings | HttpUrl) -> BeekeeperInterface:
         if isinstance(url_or_settings, InterfaceSettings):
-            assert (
-                url_or_settings.http_endpoint is not None
-            ), "Settings.http_endpoint has to be set when passing to remote_factory"
+            assert url_or_settings.http_endpoint is not None, (
+                "Settings.http_endpoint has to be set when passing to remote_factory"
+            )
         settings = (
             url_or_settings
             if isinstance(url_or_settings, InterfaceSettings)

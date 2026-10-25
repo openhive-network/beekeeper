@@ -29,14 +29,11 @@ variables:
   GIT_CONFIG_KEY_0: "protocol.file.allow"
   GIT_CONFIG_VALUE_0: "always"
   # Common CI configuration reference
-  COMMON_CI_REF: "7dffa23eb3612b0e2f049e98260028c0134c0156"
+  COMMON_CI_REF: "develop"
 
   # Python/beekeepy configuration
   PYTHON_DIR: ${CI_PROJECT_DIR}/python
   PACKAGES_TO_CHECK: "${PYTHON_DIR}/tests/ ${PYTHON_DIR}/beekeepy/"
-
-  CI_BASE_IMAGE_TAG: ":pypa_2_28-4"
-  CI_BASE_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${CI_BASE_IMAGE_TAG}"
 
   # colors
   TXT_BLUE: "\e[1;34m"
@@ -51,14 +48,14 @@ variables:
 
 include:
 - project: 'hive/common-ci-configuration'
-  ref: 7dffa23eb3612b0e2f049e98260028c0134c0156
+  ref: develop
   file:
   - '/templates/python_projects.gitlab-ci.yml'
   - '/templates/npm_projects.gitlab-ci.yml'
   - '/templates/verify_submodule_ref.gitlab-ci.yml'
 
 default:
-  image: ${CI_BASE_IMAGE}
+  image: ${PYTHON_IMAGE}
   tags:
   - public-runner-docker
 
@@ -86,7 +83,6 @@ verify_include_refs:
 verify_poetry_lock_stability:
   stage: static_code_analysis
   extends: .verify_poetry_lock_stability_template
-  image: ${CI_BASE_IMAGE}
   variables:
     PYPROJECT_DIR: "${PYTHON_DIR}"
   tags:
@@ -207,13 +203,12 @@ beekeepy_pre_commit_checks:
 
 beekeepy_formatting_with_ruff_check:
   stage: static_code_analysis
-  extends: .project_develop_configuration_template
+  extends: .job-defaults
+  image: "${PYTHON_TEST_TOOLS_IMAGE}"
   variables:
-    PYPROJECT_DIR: "${PYTHON_DIR}"
     PYPROJECT_CONFIG_PATH: "${PYTHON_DIR}/pyproject.toml"
   before_script:
-  - !reference [.project_develop_configuration_template, before_script]
-  - !reference [.update_deps_for_static_analysis, script]
+  - ruff --version
   script:
   - echo -e "${TXT_BLUE}Checking code formatting with Ruff...${TXT_CLEAR}" && ruff
     format --config "${PYPROJECT_CONFIG_PATH}" --check --diff ${PACKAGES_TO_CHECK}
@@ -277,7 +272,6 @@ beekeepy_type_check_with_mypy:
 run_beekeepy_tests:
   stage: beekeepy
   extends: .beekeepy_run_tests_template
-  image: ${CI_BASE_IMAGE}
   parallel:
     matrix:
     - PYTHON_VERSION: ["3.12", "3.14"]

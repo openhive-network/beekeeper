@@ -4,13 +4,14 @@ import asyncio
 import json
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from beekeepy._communication.abc.rules import ContinueMode
 from beekeepy._utilities.context import SelfContextSync
 from beekeepy.exceptions import GroupedErrorsError, Json, UnknownDecisionPathError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
     from types import TracebackType
 
     from beekeepy._communication.abc.communicator import AbstractCommunicator

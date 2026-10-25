@@ -36,8 +36,10 @@ class WalletWithSuchNameAlreadyExistsError(DetectableError):
         return isinstance(ex, overseer_errors.ErrorInResponseError) and any(
             error_message in ex.error
             for error_message in [
-                "Assert Exception:!bfs::exists(wallet_filename):"
-                f" Wallet with name: '{self.wallet_name}' already exists",
+                (
+                    "Assert Exception:!bfs::exists(wallet_filename):"
+                    f" Wallet with name: '{self.wallet_name}' already exists"
+                ),
                 f"Wallet with name: '{self.wallet_name}' already exists",
             ]
         )
@@ -147,8 +149,10 @@ class InvalidWalletError(DetectableError):
             for error_message in [
                 "Name of wallet is incorrect. Is empty.",
                 "Name of wallet is incorrect.",
-                f"Name of wallet is incorrect. Name: {self.wallet_name}."
-                " Only alphanumeric and '._-@' chars are allowed",
+                (
+                    f"Name of wallet is incorrect. Name: {self.wallet_name}."
+                    " Only alphanumeric and '._-@' chars are allowed"
+                ),
                 f"Name of wallet is incorrect. Name: {self.wallet_name}. File creation with given name is impossible.",
             ]
         )

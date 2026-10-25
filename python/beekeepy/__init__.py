@@ -7,18 +7,17 @@ from beekeepy._utilities.smart_lazy_import import aggregate_same_import, lazy_mo
 __all__ = [
     "AsyncBeekeeper",
     "AsyncSession",
-    "AsyncWallet",
     "AsyncUnlockedWallet",
-    "close_already_running_beekeeper",
-    "find_running_beekeepers",
-    "PackedAsyncBeekeeper",
-    "InterfaceSettings",
+    "AsyncWallet",
     "Beekeeper",
+    "InterfaceSettings",
+    "PackedAsyncBeekeeper",
     "PackedSyncBeekeeper",
     "Session",
-    "InterfaceSettings",
-    "Wallet",
     "UnlockedWallet",
+    "Wallet",
+    "close_already_running_beekeeper",
+    "find_running_beekeepers",
 ]
 
 if TYPE_CHECKING:
