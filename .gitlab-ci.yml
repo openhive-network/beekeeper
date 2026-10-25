@@ -84,6 +84,10 @@ verify_poetry_lock_stability:
 
 beekeeper_native_build:
   stage: build
+  # Temporary: the fc pinned through libraries/plugins does not build against the
+  # Boost 1.90 of ccc's current ci-base-image (boost_system component, removed
+  # boost::filesystem APIs). Drop this image once plugins carries an fc that does.
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:pypa_2_28-4
   needs: []  # Start immediately, don't wait for static_code_analysis (allows tests to run even if verify_poetry_lock_stability fails)
   before_script:
   - !reference [.submodule_init, script]

@@ -39,7 +39,6 @@ if(DEFINED ENV{OPENSSL_SSL_LIBRARY} AND NOT DEFINED CACHE{OPENSSL_SSL_LIBRARY})
 endif()
 
 # Add plugins submodule (includes fc and appbase)
-set(CMAKE_PROJECT_fc_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/drop_boost_system_component.cmake")
 add_subdirectory(libraries/plugins)
 
 # Re-enable tests for beekeeper itself
