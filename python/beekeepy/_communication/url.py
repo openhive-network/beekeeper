@@ -137,7 +137,7 @@ class Url(Resolvable["Url[ProtocolT]", str], Generic[ProtocolT]):
     @staticmethod
     def resolve(incoming_cls: type, value: str) -> Url[ProtocolT]:
         """Resolve string to Url."""
-        return cast(Url[ProtocolT], incoming_cls(value))
+        return cast("Url[ProtocolT]", incoming_cls(value))
 
     def serialize(self) -> Any:
         return self.as_string(with_protocol=False)
@@ -189,7 +189,7 @@ class Url(Resolvable["Url[ProtocolT]", str], Generic[ProtocolT]):
         self.__fill_url(
             address=parsed_url.hostname,
             port=parsed_url.port,
-            protocol=cast(ProtocolT, parsed_url.scheme),
+            protocol=cast("ProtocolT", parsed_url.scheme),
             path=parsed_url.path,
             query=parsed_url.query,
         )

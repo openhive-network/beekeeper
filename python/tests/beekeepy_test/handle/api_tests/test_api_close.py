@@ -3,13 +3,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from beekeepy.exceptions import ErrorInResponseError
 from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
 from local_tools.beekeepy.models import WalletInfo
 
+from beekeepy.exceptions import ErrorInResponseError
+
 if TYPE_CHECKING:
-    from beekeepy.handle.runnable import Beekeeper
     from local_tools.beekeepy.account_credentials import AccountCredentials
+
+    from beekeepy.handle.runnable import Beekeeper
 
 
 # NOTE 1: Beekeeper should not raise exception while calling close on already closed wallet or not existing wallet.
@@ -25,9 +27,9 @@ def test_api_close(beekeeper: Beekeeper, wallet: WalletInfo) -> None:
     beekeeper.api.close(wallet_name=wallet.name)
 
     # ASSERT
-    assert (
-        len((beekeeper.api.list_wallets()).wallets) == 0
-    ), "After close, there should be no wallets hold by beekeeper."
+    assert len((beekeeper.api.list_wallets()).wallets) == 0, (
+        "After close, there should be no wallets hold by beekeeper."
+    )
 
 
 def test_api_close_import_key_to_closed_wallet(

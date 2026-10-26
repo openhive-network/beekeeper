@@ -26,12 +26,12 @@ def test_api_list_wallets_dynamic_number(beekeeper: Beekeeper) -> None:
     # ACT & ASSERT
     for number, wallet in enumerate(wallets):
         beekeeper.api.create(wallet_name=wallet.name, password=wallet.password)
-        assert number + 1 == len(
-            (beekeeper.api.list_wallets()).wallets
-        ), "Number of wallets should match the ones kept by beekeeper"
+        assert number + 1 == len((beekeeper.api.list_wallets()).wallets), (
+            "Number of wallets should match the ones kept by beekeeper"
+        )
 
     for number, wallet in reversed(list(enumerate(wallets))):
         beekeeper.api.close(wallet_name=wallet.name)
-        assert number == len(
-            (beekeeper.api.list_wallets()).wallets
-        ), "Number of wallets should match the ones kept by beekeeper"
+        assert number == len((beekeeper.api.list_wallets()).wallets), (
+            "Number of wallets should match the ones kept by beekeeper"
+        )

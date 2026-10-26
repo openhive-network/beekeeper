@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Any, Callable, Final, TypeVar
+from typing import TYPE_CHECKING, Any, Final, TypeVar
 
 from loguru import logger
 
 from beekeepy.exceptions import InvalidatedStateError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 T = TypeVar("T")
 

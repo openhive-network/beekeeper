@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, AsyncIterator, Final, Iterator
+from typing import TYPE_CHECKING, Final
 
 import pytest
-from beekeepy.handle.runnable import AsyncBeekeeper
-from beekeepy.interfaces import DelayGuardBase
 from local_tools.beekeepy.generators import default_wallet_credentials
 from local_tools.beekeepy.models import SettingsLoggerFactory, WalletInfo
 from local_tools.beekeepy.network import async_raw_http_call
 
+from beekeepy.handle.runnable import AsyncBeekeeper
+from beekeepy.interfaces import DelayGuardBase
 from schemas.jsonrpc import JSONRPCRequest
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Iterator
+
     from beekeepy.interfaces import HttpUrl as Url
 
 

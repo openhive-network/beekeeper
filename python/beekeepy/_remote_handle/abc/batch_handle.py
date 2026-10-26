@@ -43,13 +43,13 @@ class _DelayedResponseWrapper:
             return response.result
         return response
 
-    def __setattr__(self, __name: str, __value: Any) -> None:
+    def __setattr__(self, name: str, value: Any, /) -> None:
         self.__check_is_response_available()
-        setattr(self.__get_data(), __name, __value)
+        setattr(self.__get_data(), name, value)
 
-    def __getattr__(self, __name: str) -> Any:
+    def __getattr__(self, name: str, /) -> Any:
         self.__check_is_response_available()
-        return getattr(self.__get_data(), __name)
+        return getattr(self.__get_data(), name)
 
     def _set_response(self, **kwargs: Any) -> None:
         expected_type = super().__getattribute__("_expected_type")
@@ -104,14 +104,14 @@ class _PostRequestManager(ContextSync["_PostRequestManager"]):
         ):
             return False
 
-        assert isinstance(
-            exception.whole_response, list
-        ), f"response has to be list, but is: `{type(exception.response)}`, content: '{exception.response=}'"
+        assert isinstance(exception.whole_response, list), (
+            f"response has to be list, but is: `{type(exception.response)}`, content: '{exception.response=}'"
+        )
         all_exceptions = exception.cause
         assert all_exceptions is not None, "Cause is set to None"
-        assert isinstance(
-            all_exceptions, exceptions.GroupedErrorsError
-        ), f"Cause (after from clause) have to be GroupedErrorsError, but is: {type(all_exceptions)}"
+        assert isinstance(all_exceptions, exceptions.GroupedErrorsError), (
+            f"Cause (after from clause) have to be GroupedErrorsError, but is: {type(all_exceptions)}"
+        )
 
         for response in exception.whole_response:
             request_id = response["id"]
@@ -129,7 +129,7 @@ class _PostRequestManager(ContextSync["_PostRequestManager"]):
         return None
 
 
-class _BatchHandle(ContextSync[EnterReturnT], ContextAsync[EnterReturnT], Generic[EnterReturnT], ABC):
+class _BatchHandle(ContextSync[EnterReturnT], ContextAsync[EnterReturnT], ABC, Generic[EnterReturnT]):
     def __init__(
         self,
         url: HttpUrl,

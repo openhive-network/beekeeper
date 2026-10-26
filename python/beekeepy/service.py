@@ -6,8 +6,8 @@ from beekeepy._utilities.smart_lazy_import import aggregate_same_import, lazy_mo
 
 __all__ = [
     "AsyncBeekeepyService",
-    "create_async_beekeeper_service",
     "BeekeepyService",
+    "create_async_beekeeper_service",
     "create_beekeepy_service",
 ]
 

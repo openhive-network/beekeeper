@@ -29,14 +29,11 @@ variables:
   GIT_CONFIG_KEY_0: "protocol.file.allow"
   GIT_CONFIG_VALUE_0: "always"
   # Common CI configuration reference
-  COMMON_CI_REF: "7dffa23eb3612b0e2f049e98260028c0134c0156"
+  COMMON_CI_REF: "develop"
 
   # Python/beekeepy configuration
   PYTHON_DIR: ${CI_PROJECT_DIR}/python
   PACKAGES_TO_CHECK: "${PYTHON_DIR}/tests/ ${PYTHON_DIR}/beekeepy/"
-
-  CI_BASE_IMAGE_TAG: ":pypa_2_28-4"
-  CI_BASE_IMAGE: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image${CI_BASE_IMAGE_TAG}"
 
   # colors
   TXT_BLUE: "\e[1;34m"
@@ -51,14 +48,13 @@ variables:
 
 include:
 - project: 'hive/common-ci-configuration'
-  ref: 7dffa23eb3612b0e2f049e98260028c0134c0156
+  ref: develop
   file:
   - '/templates/python_projects.gitlab-ci.yml'
   - '/templates/npm_projects.gitlab-ci.yml'
-  - '/templates/verify_submodule_ref.gitlab-ci.yml'
 
 default:
-  image: ${CI_BASE_IMAGE}
+  image: ${PYTHON_IMAGE}
   tags:
   - public-runner-docker
 
@@ -75,18 +71,9 @@ default:
     cd libraries/plugins && git submodule update --init --recursive --jobs 4 && cd ../..
     echo -e "\e[0Ksection_end:$(date +%s):init_submodules\r\e[0K"
 
-verify_include_refs:
-  extends: .verify_multiple_refs_template
-  needs: []
-  variables:
-    # Override global GIT_SUBMODULE_STRATEGY: none - script needs submodule checkout
-    GIT_SUBMODULE_STRATEGY: normal
-    VERIFY_REFS: "programs/beekeeper/beekeeper_wasm/npm-common-config:hive/common-ci-configuration"
-
 verify_poetry_lock_stability:
   stage: static_code_analysis
   extends: .verify_poetry_lock_stability_template
-  image: ${CI_BASE_IMAGE}
   variables:
     PYPROJECT_DIR: "${PYTHON_DIR}"
   tags:
@@ -97,6 +84,10 @@ verify_poetry_lock_stability:
 
 beekeeper_native_build:
   stage: build
+  # Temporary: the fc pinned through libraries/plugins does not build against the
+  # Boost 1.90 of ccc's current ci-base-image (boost_system component, removed
+  # boost::filesystem APIs). Drop this image once plugins carries an fc that does.
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:pypa_2_28-4
   needs: []  # Start immediately, don't wait for static_code_analysis (allows tests to run even if verify_poetry_lock_stability fails)
   before_script:
   - !reference [.submodule_init, script]
@@ -160,12 +151,15 @@ beekeeper_wasm_test:
   stage: test
   image: ${EMSCRIPTEN_IMAGE}
   variables:
+    GIT_STRATEGY: clone
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
   needs:
   - job: beekeeper_wasm_build
     artifacts: true
   before_script:
   - git config --global --add safe.directory '*'
+    # pnpm-workspace.yaml (the catalogs the lockfile was resolved with) links into npm-common-config
+  - !reference [.submodule_init, script]
   - . "${NVM_DIR}/nvm.sh"
   - nvm use "${NODEJS_VERSION}"
   script:
@@ -207,13 +201,12 @@ beekeepy_pre_commit_checks:
 
 beekeepy_formatting_with_ruff_check:
   stage: static_code_analysis
-  extends: .project_develop_configuration_template
+  extends: .job-defaults
+  image: "${PYTHON_TEST_TOOLS_IMAGE}"
   variables:
-    PYPROJECT_DIR: "${PYTHON_DIR}"
     PYPROJECT_CONFIG_PATH: "${PYTHON_DIR}/pyproject.toml"
   before_script:
-  - !reference [.project_develop_configuration_template, before_script]
-  - !reference [.update_deps_for_static_analysis, script]
+  - ruff --version
   script:
   - echo -e "${TXT_BLUE}Checking code formatting with Ruff...${TXT_CLEAR}" && ruff
     format --config "${PYPROJECT_CONFIG_PATH}" --check --diff ${PACKAGES_TO_CHECK}
@@ -277,7 +270,6 @@ beekeepy_type_check_with_mypy:
 run_beekeepy_tests:
   stage: beekeepy
   extends: .beekeepy_run_tests_template
-  image: ${CI_BASE_IMAGE}
   parallel:
     matrix:
     - PYTHON_VERSION: ["3.12", "3.14"]
@@ -410,11 +402,15 @@ push_to_wiki:
   - job: beekeeper_wasm_pack
     artifacts: true
   variables:
+    GIT_STRATEGY: clone
     SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
     WIKI_PUSH_TOKEN: "$BEEKEEPER_DOC_WIKI_PUSH_TOKEN"
     DIST_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm/dist"
     PROJECT_URL: "https://gitlab.syncad.com/hive/beekeeper-doc"
     PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_based_job_base, before_script]
   tags:
   - public-runner-docker
 

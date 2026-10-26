@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final
 
 import pytest
-from beekeepy.exceptions import ErrorInResponseError
 from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
 from local_tools.beekeepy.models import WalletInfo
+
+from beekeepy.exceptions import ErrorInResponseError
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper
@@ -79,7 +80,7 @@ def test_api_create_correct_wallet_name(beekeeper: Beekeeper, name: str) -> None
 def test_api_create_verify_not_allowed_chars(beekeeper: Beekeeper, name: str) -> None:
     """Test test_api_create will test beekeeper_api.create will check all not allowed wallet name chars."""
     # ARRANGE & ACT & ASSERT
-    with pytest.raises(ErrorInResponseError, match="Name of wallet is incorrect."):
+    with pytest.raises(ErrorInResponseError, match=r"Name of wallet is incorrect\."):
         beekeeper.api.create(wallet_name=name)
 
     # ASSERT
@@ -94,7 +95,7 @@ def test_api_create_verify_not_allowed_chars(beekeeper: Beekeeper, name: str) ->
 def test_api_create_not_correct_wallet_name(beekeeper: Beekeeper, name: str) -> None:
     """Test test_api_create will test beekeeper_api.create will try to create wallet with wrong name."""
     # ARRANGE & ACT & ASSERT
-    with pytest.raises(ErrorInResponseError, match="Name of wallet is incorrect."):
+    with pytest.raises(ErrorInResponseError, match=r"Name of wallet is incorrect\."):
         beekeeper.api.create(wallet_name=name)
 
     # ASSERT

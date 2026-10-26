@@ -19,10 +19,10 @@ from schemas.fields.hex import Hex
 
 __all__ = [
     "validate_account_names",
+    "validate_digest",
     "validate_private_keys",
     "validate_public_keys",
     "validate_timeout",
-    "validate_digest",
 ]
 
 wallet_name_regex: Final[Pattern[str]] = re.compile(r"^[a-zA-Z0-9_\._\-\@]+$")

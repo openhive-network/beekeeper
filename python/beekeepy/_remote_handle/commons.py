@@ -5,8 +5,8 @@ from typing import NoReturn
 
 __all__ = [
     "handle_target_service_name",
-    "random_string",
     "raise_acquire_not_possible",
+    "random_string",
 ]
 
 handle_target_service_name = "beekeeper"

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+
 from beekeepy import Beekeeper, close_already_running_beekeeper
 from beekeepy.exceptions import (
     CommunicationError,
@@ -16,9 +17,11 @@ if TYPE_CHECKING:
 
 def test_match_by_cwd(settings: SettingsFactory) -> None:
     # ARRANGE
-    with Beekeeper.factory(settings=settings()) as b1, Beekeeper.factory(settings=settings()) as b2, Beekeeper.factory(
-        settings=settings()
-    ) as b3:
+    with (
+        Beekeeper.factory(settings=settings()) as b1,
+        Beekeeper.factory(settings=settings()) as b2,
+        Beekeeper.factory(settings=settings()) as b3,
+    ):
         assert b1.settings.working_directory != b2.settings.working_directory != b3.settings.working_directory
 
         # ACT
@@ -35,9 +38,11 @@ def test_match_by_cwd(settings: SettingsFactory) -> None:
 
 def test_match_by_port(settings: SettingsFactory) -> None:
     # ARRANGE
-    with Beekeeper.factory(settings=settings()) as b1, Beekeeper.factory(settings=settings()) as b2, Beekeeper.factory(
-        settings=settings()
-    ) as b3:
+    with (
+        Beekeeper.factory(settings=settings()) as b1,
+        Beekeeper.factory(settings=settings()) as b2,
+        Beekeeper.factory(settings=settings()) as b3,
+    ):
         # ACT
         close_already_running_beekeeper(port=b2.http_endpoint.port)
 
@@ -51,9 +56,11 @@ def test_match_by_port(settings: SettingsFactory) -> None:
 
 def test_match_fail_multiple_beekeepers(settings: SettingsFactory) -> None:
     # ARRANGE
-    with Beekeeper.factory(settings=settings()) as b1, Beekeeper.factory(settings=settings()) as b2, Beekeeper.factory(
-        settings=settings()
-    ) as b3:
+    with (
+        Beekeeper.factory(settings=settings()) as b1,
+        Beekeeper.factory(settings=settings()) as b2,
+        Beekeeper.factory(settings=settings()) as b3,
+    ):
         # ACT
         with pytest.raises(UndistinguishableBeekeeperInstancesError):
             close_already_running_beekeeper()
@@ -66,9 +73,11 @@ def test_match_fail_multiple_beekeepers(settings: SettingsFactory) -> None:
 @pytest.mark.skip("Not sure how to run this test, as it kills beekeepers in other tests")
 def test_match_multiple_beekeepers(settings: SettingsFactory) -> None:
     # ARRANGE
-    with Beekeeper.factory(settings=settings()) as b1, Beekeeper.factory(settings=settings()) as b2, Beekeeper.factory(
-        settings=settings()
-    ) as b3:
+    with (
+        Beekeeper.factory(settings=settings()) as b1,
+        Beekeeper.factory(settings=settings()) as b2,
+        Beekeeper.factory(settings=settings()) as b3,
+    ):
         # ACT
         close_already_running_beekeeper(on_multiple_match_kill_all=True)
 
@@ -80,9 +89,11 @@ def test_match_multiple_beekeepers(settings: SettingsFactory) -> None:
 
 def test_no_match_fail(settings: SettingsFactory) -> None:
     # ARRANGE
-    with Beekeeper.factory(settings=settings()) as b1, Beekeeper.factory(settings=settings()) as b2, Beekeeper.factory(
-        settings=settings()
-    ) as b3:
+    with (
+        Beekeeper.factory(settings=settings()) as b1,
+        Beekeeper.factory(settings=settings()) as b2,
+        Beekeeper.factory(settings=settings()) as b3,
+    ):
         # ACT
         with pytest.raises(FailedToDetectRunningBeekeeperError):
             close_already_running_beekeeper(port=2137)

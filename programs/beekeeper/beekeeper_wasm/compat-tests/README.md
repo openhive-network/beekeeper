@@ -5,7 +5,7 @@
 cd ../ && pnpm build && cd compat-tests
 
 # Install dependencies and run tests
-pnpm install --ignore-workspace
+pnpm install
 
 # Run the tests
 pnpm test

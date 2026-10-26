@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from beekeepy.settings import RemoteHandleSettings
 from local_tools.beekeepy.simple_api import InputTypeSchema, TestCaller, WitnessesVotersResponseSchema
+
+from beekeepy.settings import RemoteHandleSettings
 
 if TYPE_CHECKING:
     from beekeepy._communication.url import HttpUrl
@@ -18,9 +19,9 @@ def caller(hived_http_endpoint: HttpUrl) -> TestCaller:
 
 
 def validate_type(result: Any, expected_type: type[Any]) -> None:
-    assert isinstance(
-        result, expected_type
-    ), f"Expected result to be a {type(expected_type)}, but got: `{result}` of type `{type(result)}`"
+    assert isinstance(result, expected_type), (
+        f"Expected result to be a {type(expected_type)}, but got: `{result}` of type `{type(result)}`"
+    )
 
 
 def test_no_args(caller: TestCaller) -> None:

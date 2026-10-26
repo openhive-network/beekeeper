@@ -4,11 +4,12 @@ import shutil
 from typing import TYPE_CHECKING
 
 import pytest
+from local_tools.beekeepy import checkers
+from loguru import logger
+
 from beekeepy.exceptions import BeekeeperFailedToStartError, FailedToStartExecutableError
 from beekeepy.handle.runnable import Beekeeper
 from beekeepy.settings import RunnableHandleSettings
-from local_tools.beekeepy import checkers
-from loguru import logger
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -54,9 +55,10 @@ def test_multiply_beekeepeer_different_storage(working_directory: Path) -> None:
 
     # ACT
     bks: list[Beekeeper] = []
-    with Beekeeper(settings=RunnableHandleSettings(working_directory=bk1_path), logger=logger) as bk1, Beekeeper(
-        settings=RunnableHandleSettings(working_directory=bk2_path), logger=logger
-    ) as bk2:
+    with (
+        Beekeeper(settings=RunnableHandleSettings(working_directory=bk1_path), logger=logger) as bk1,
+        Beekeeper(settings=RunnableHandleSettings(working_directory=bk2_path), logger=logger) as bk2,
+    ):
         # ASSERT
         assert bk1.is_running(), "First instance of beekeeper should be working."
         assert bk2.is_running(), "Second instance of beekeeper should be working."

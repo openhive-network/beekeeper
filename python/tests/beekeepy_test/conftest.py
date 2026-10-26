@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 import pytest
-from beekeepy.settings import InterfaceSettings
 from loguru import logger
 
+from beekeepy.settings import InterfaceSettings
+
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from local_tools.beekeepy.models import SettingsFactory, SettingsLoggerFactory

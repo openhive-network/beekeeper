@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
-from beekeepy.handle.runnable import Beekeeper
 from local_tools.beekeepy.account_credentials import AccountCredentials
 from local_tools.beekeepy.generators import (
     default_wallet_credentials,
@@ -17,6 +16,11 @@ from local_tools.beekeepy.models import (
     WalletInfoWithImportedAccounts,
     WalletsGeneratorT,
 )
+
+from beekeepy.handle.runnable import Beekeeper
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture

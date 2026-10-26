@@ -3,8 +3,8 @@ from __future__ import annotations
 import contextlib
 import os
 import signal
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import psutil
 from loguru import logger

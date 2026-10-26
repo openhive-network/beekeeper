@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 import pytest
-from beekeepy import Beekeeper
-from beekeepy.exceptions import InvalidatedStateByClosingBeekeeperError, InvalidatedStateByClosingSessionError
 from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
 
+from beekeepy import Beekeeper
+from beekeepy.exceptions import InvalidatedStateByClosingBeekeeperError, InvalidatedStateByClosingSessionError
+
 if TYPE_CHECKING:
-    from beekeepy import Session, Wallet
+    from collections.abc import Iterator
+
     from local_tools.beekeepy.models import SettingsFactory
+
+    from beekeepy import Session, Wallet
 
 
 @pytest.fixture

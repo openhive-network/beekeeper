@@ -31,7 +31,7 @@ class StreamRepresentation(ContextSync[TextIO]):
         assert self.stream is None, "Stream is already opened"
         self.__next_filename()
         self.__create_user_friendly_link()
-        self.stream = cast(TextIO, self.__get_path().open(mode))
+        self.stream = cast("TextIO", self.__get_path().open(mode))
         assert not self.stream.closed, f"Failed to open stream: `{self.stream.errors}`"
         return self.stream
 

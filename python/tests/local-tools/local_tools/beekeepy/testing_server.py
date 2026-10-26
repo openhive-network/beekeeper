@@ -9,11 +9,13 @@ from threading import Thread
 from typing import TYPE_CHECKING
 
 from aiohttp import web
+
 from beekeepy.interfaces import HttpUrl, SelfContextAsync
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from socket import socket
-    from typing import Any, Iterator, Self
+    from typing import Any, Self
 
 
 class AsyncHttpServerError(Exception):

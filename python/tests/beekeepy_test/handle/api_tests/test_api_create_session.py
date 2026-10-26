@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from beekeepy.exceptions import ErrorInResponseError
 from local_tools.beekeepy import checkers
 from local_tools.beekeepy.constants import MAX_BEEKEEPER_SESSION_AMOUNT
+
+from beekeepy.exceptions import ErrorInResponseError
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 
 def create_session(beekeeper: Beekeeper, salt: str) -> None:
     # ARRANGE
-    message_to_check = '"id":0,"jsonrpc":"2.0","method":"beekeeper_api.create_session",' f'"params":{{"salt":"{salt}"}}'
+    message_to_check = f'"id":0,"jsonrpc":"2.0","method":"beekeeper_api.create_session","params":{{"salt":"{salt}"}}'
 
     # ACT
     token = (
