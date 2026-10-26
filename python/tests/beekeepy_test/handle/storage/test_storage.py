@@ -4,12 +4,11 @@ import shutil
 from typing import TYPE_CHECKING
 
 import pytest
-from local_tools.beekeepy import checkers
-from loguru import logger
-
 from beekeepy.exceptions import BeekeeperFailedToStartError, FailedToStartExecutableError
 from beekeepy.handle.runnable import Beekeeper
 from beekeepy.settings import RunnableHandleSettings
+from local_tools.beekeepy import checkers
+from loguru import logger
 
 if TYPE_CHECKING:
     from pathlib import Path

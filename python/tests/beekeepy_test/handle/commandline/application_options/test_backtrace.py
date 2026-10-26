@@ -4,9 +4,8 @@ import time
 from typing import TYPE_CHECKING, Literal
 
 import pytest
-from local_tools.beekeepy import checkers
-
 from beekeepy.handle.runnable import BeekeeperArguments
+from local_tools.beekeepy import checkers
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import (

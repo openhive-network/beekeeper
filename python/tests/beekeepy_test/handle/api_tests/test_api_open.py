@@ -3,9 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from local_tools.beekeepy.models import WalletsGeneratorT
-
     from beekeepy.handle.runnable import Beekeeper
+    from local_tools.beekeepy.models import WalletsGeneratorT
 
 
 def test_api_open(beekeeper: Beekeeper, setup_wallets: WalletsGeneratorT) -> None:

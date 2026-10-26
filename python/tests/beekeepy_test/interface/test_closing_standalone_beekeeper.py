@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-
 from beekeepy import Beekeeper, close_already_running_beekeeper
 from beekeepy.exceptions import (
     CommunicationError,
