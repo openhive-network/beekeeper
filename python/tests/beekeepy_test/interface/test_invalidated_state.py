@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 from beekeepy import Beekeeper
@@ -8,6 +8,8 @@ from beekeepy.exceptions import InvalidatedStateByClosingBeekeeperError, Invalid
 from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from beekeepy import Session, Wallet
     from local_tools.beekeepy.models import SettingsFactory
 

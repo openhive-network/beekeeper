@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Final
 
 from beekeepy._utilities.context import ContextAsync, ContextSync
@@ -36,7 +36,7 @@ class DelayGuardBase:
         return self._exception_occured
 
     def __now(self) -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
 class SyncDelayGuard(DelayGuardBase, ContextSync["SyncDelayGuard"]):

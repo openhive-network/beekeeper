@@ -10,8 +10,8 @@
     "@hiveio/beekeeper": "file:../"
   },
   "devDependencies": {
-    "@playwright/test": "1.59.1",
-    "http-server": "^14",
+    "@playwright/test": "catalog:playwright-toolset",
+    "http-server": "catalog:playwright-toolset",
     "vitest": "^3"
   }
 }

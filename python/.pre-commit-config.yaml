@@ -21,14 +21,12 @@ repos:
       - id: poetry-lock
         name: checking if python/poetry.lock is consistent with pyproject.toml
         args: [ "-C", "./python" ]
-        language_version: python3.12
   - repo: https://github.com/python-poetry/poetry
     rev: 2.1.3
     hooks:
       - id: poetry-lock
         name: checking if tests/local-tools/poetry.lock is consistent with pyproject.toml
         args: [ "-C", "./python/tests/local-tools" ]
-        language_version: python3.12
   - repo: local
     hooks:
       - id: ruff
@@ -47,6 +45,8 @@ repos:
         args: ["--config-file", "./python/pyproject.toml"]
         language: system
         types: [python]
+        # parallel batches share .mypy_cache, which crashes mypy
+        require_serial: true
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:

@@ -3,18 +3,18 @@
     "@hiveio/beekeeper": "file:../../beekeeper_wasm"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1",
+    "@playwright/test": "catalog:playwright-toolset",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-replace": "^6.0.2",
     "@types/sharedworker": "^0.0.159",
     "@web/rollup-plugin-import-meta-assets": "^2.2.1",
-    "http-server": "^14.1.1",
-    "playwright": "1.56.1",
+    "http-server": "catalog:playwright-toolset",
+    "playwright": "catalog:playwright-toolset",
     "rollup": "^4.40.2",
     "typescript": "^5.8.3"
   },
   "name": "shared-worker",
-  "packageManager": "pnpm@9.12.2+sha512.22721b3a11f81661ae1ec68ce1a7b879425a1ca5b991c975b074ac220b187ce56c708fe5db69f4c962c989452eee76c82877f4ee80f474cebd61ee13461b6228",
+  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
   "scripts": {
     "build": "tsc",
     "postbuild": "rollup -c",

@@ -8,7 +8,6 @@ __all__ = [
     "AbstractCommunicator",
     "AbstractOverseer",
     "AioHttpCommunicator",
-    "async_is_url_reachable",
     "AsyncCallback",
     "AsyncCallbacks",
     "AsyncErrorCallback",
@@ -18,16 +17,17 @@ __all__ = [
     "CommonOverseer",
     "CommunicationSettings",
     "ErrorCallback",
-    "get_communicator_cls",
     "Request",
     "RequestCallback",
     "RequestCommunicator",
     "Response",
     "ResponseCallback",
-    "rules",
     "StrictOverseer",
-    "sync_is_url_reachable",
     "SyncCallback",
+    "async_is_url_reachable",
+    "get_communicator_cls",
+    "rules",
+    "sync_is_url_reachable",
 ]
 
 if TYPE_CHECKING:

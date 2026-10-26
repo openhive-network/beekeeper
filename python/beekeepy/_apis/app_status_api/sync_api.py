@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from beekeepy._apis.abc.api import AbstractSyncApi
-from schemas.apis import app_status_api  # noqa: TCH001
+from schemas.apis import app_status_api  # noqa: TC001
 
 
 class AppStatusApi(AbstractSyncApi):

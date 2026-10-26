@@ -18,10 +18,13 @@ def test_backtrace(backtrace: Literal["yes", "no"], beekeeper_exe: BeekeeperExec
     """Test will check command line flag --backtrace."""
     # ARRANGE & ACT
 
-    with beekeeper_exe.restore_arguments(
-        BeekeeperArguments(data_dir=beekeeper_exe.working_directory, backtrace=backtrace)
-    ), beekeeper_exe.run(
-        blocking=False,
+    with (
+        beekeeper_exe.restore_arguments(
+            BeekeeperArguments(data_dir=beekeeper_exe.working_directory, backtrace=backtrace)
+        ),
+        beekeeper_exe.run(
+            blocking=False,
+        ),
     ):
         time.sleep(0.1)
         # ASSERT

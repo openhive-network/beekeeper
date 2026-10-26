@@ -5,23 +5,23 @@ from typing import TYPE_CHECKING
 from beekeepy._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
 
 __all__ = [
-    "Arguments",
     "ArgumentT",
+    "Arguments",
     "AsyncBeekeeper",
     "AsyncBeekeeperTemplate",
     "AutoCloser",
     "Beekeeper",
-    "BeekeeperTemplate",
     "BeekeeperArguments",
     "BeekeeperConfig",
     "BeekeeperExecutable",
+    "BeekeeperTemplate",
     "Config",
     "ConfigT",
     "Executable",
-    "match_ports",
     "PortMatchingResult",
     "RunnableHandle",
     "RunnableHandleSettings",
+    "match_ports",
 ]
 
 if TYPE_CHECKING:

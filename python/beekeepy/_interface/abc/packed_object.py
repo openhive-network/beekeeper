@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
-    "PackedSyncBeekeeper",
     "PackedAsyncBeekeeper",
+    "PackedSyncBeekeeper",
 ]
 
 

@@ -147,9 +147,7 @@ class UnparsableResponse(OverseerRule):
         if isinstance(parsed_response, json.JSONDecodeError):
             return [
                 self._construct_exception(
-                    message=(
-                        "Received response is not parsable, " f"probably plaintext or invalid json: {response_raw}"
-                    ),
+                    message=(f"Received response is not parsable, probably plaintext or invalid json: {response_raw}"),
                     response=parsed_response,
                     whole_response=response_raw,  # type: ignore[arg-type]
                     request_id=None,

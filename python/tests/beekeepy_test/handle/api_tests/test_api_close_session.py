@@ -21,7 +21,7 @@ def test_api_close_session(beekeeper: Beekeeper) -> None:
     beekeeper.api.close_session(token=token)
 
     # ASSERT
-    close_log_entry = '"id":0,"jsonrpc":"2.0","method":"beekeeper_api.close_session",' f'"params":{{"token":"{token}"}}'
+    close_log_entry = f'"id":0,"jsonrpc":"2.0","method":"beekeeper_api.close_session","params":{{"token":"{token}"}}'
     with pytest.raises(
         ErrorInResponseError,
         match=f"A session attached to {token} doesn't exist",

@@ -15,7 +15,7 @@ is forbidden to pass via Generic template argument by mypy and even if
 during `with` construction.
 """
 
-__all__ = ["ContextSync", "ContextAsync", "SelfContextAsync", "SelfContextSync"]
+__all__ = ["ContextAsync", "ContextSync", "SelfContextAsync", "SelfContextSync"]
 
 
 class ContextSyncBase:
