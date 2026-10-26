@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final
 
 import pytest
-from beekeepy.exceptions import ErrorInResponseError
 from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
 from local_tools.beekeepy.models import WalletInfo
+
+from beekeepy.exceptions import ErrorInResponseError
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper

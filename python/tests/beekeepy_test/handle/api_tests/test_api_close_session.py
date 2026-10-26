@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final
 
 import pytest
-from beekeepy.exceptions import CommunicationError, ErrorInResponseError
 from local_tools.beekeepy import checkers, waiters
+
+from beekeepy.exceptions import CommunicationError, ErrorInResponseError
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper

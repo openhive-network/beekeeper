@@ -18,7 +18,7 @@ class BeekeepyService:
 
 
 @contextmanager
-def create_beekeepy_service(*, wallet_name: str, password: str) -> Generator[BeekeepyService, None, None]:
+def create_beekeepy_service(*, wallet_name: str, password: str) -> Generator[BeekeepyService]:
     """
     Create a beekeepy service with a wallet and session.
 

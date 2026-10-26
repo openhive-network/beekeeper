@@ -9,6 +9,7 @@ from threading import Thread
 from typing import TYPE_CHECKING
 
 from aiohttp import web
+
 from beekeepy.interfaces import HttpUrl, SelfContextAsync
 
 if TYPE_CHECKING:
