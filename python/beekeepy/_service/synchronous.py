@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from beekeepy import Beekeeper, Session, UnlockedWallet
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from beekeepy._interface.abc.asynchronous.session import Password
 from beekeepy._interface.abc.asynchronous.session import Session as SessionInterface
@@ -21,6 +21,8 @@ from beekeepy.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from beekeepy._interface.abc.asynchronous.wallet import (
         UnlockedWallet as UnlockedWalletInterface,
     )

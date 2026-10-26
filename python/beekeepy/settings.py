@@ -6,8 +6,8 @@ from beekeepy._remote_handle.settings import RemoteHandleSettings
 from beekeepy._runnable_handle.settings import RunnableHandleSettings
 
 __all__ = [
-    "RunnableHandleSettings",
-    "RemoteHandleSettings",
     "CommunicationSettings",
     "InterfaceSettings",
+    "RemoteHandleSettings",
+    "RunnableHandleSettings",
 ]

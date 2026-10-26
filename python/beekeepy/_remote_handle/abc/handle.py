@@ -155,7 +155,7 @@ class AbstractHandle(UniqueSettingsHolder[RemoteSettingsT], ABC, Generic[RemoteS
 
     def _log_response(self, seconds_delta: float, response: Json | list[Json]) -> None:
         self.logger.trace(
-            f"got response in {seconds_delta :.5f}s from " + "`{}`: `{}`",
+            f"got response in {seconds_delta:.5f}s from " + "`{}`: `{}`",
             self.http_endpoint.as_string,
             lambda: self._sanitize_data(response),  # to reduce deepcopy
         )

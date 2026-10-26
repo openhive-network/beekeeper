@@ -13,10 +13,10 @@ if TYPE_CHECKING:
     from beekeepy._communication.url import HttpUrl
 
 __all__ = [
-    "sync_is_url_reachable",
+    "async_get_first_reachable_url",
     "async_is_url_reachable",
     "sync_get_first_reachable_url",
-    "async_get_first_reachable_url",
+    "sync_is_url_reachable",
 ]
 
 EXCEPTIONS_TO_CATCH = (CommunicationError, TimeoutError)

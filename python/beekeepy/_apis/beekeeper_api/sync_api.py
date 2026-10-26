@@ -5,7 +5,7 @@ from beekeepy._apis.abc.sendable import SyncSendable
 from beekeepy._apis.abc.session_holder import SyncSessionHolder
 from beekeepy._apis.apply_session_token import sync_apply_session_token
 from beekeepy._apis.beekeeper_api.beekeeper_api_commons import BeekeeperApiCommons
-from schemas.apis import beekeeper_api  # noqa: TCH001
+from schemas.apis import beekeeper_api  # noqa: TC001
 
 
 class BeekeeperApi(AbstractSyncApi, BeekeeperApiCommons[SyncSendable]):

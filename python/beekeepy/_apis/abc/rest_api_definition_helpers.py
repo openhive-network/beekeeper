@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, ParamSpec, TypeVar, get_type_hints
+from typing import TYPE_CHECKING, ParamSpec, TypeVar, get_type_hints
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from beekeepy._apis.abc.api import AbstractAsyncApi, AbstractSyncApi
     from beekeepy._communication.abc.communicator_models import Methods
 

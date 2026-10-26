@@ -6,7 +6,7 @@ from typing import Any
 from beekeepy._apis.abc.sendable import AsyncSendable, SyncSendable
 from schemas.apis.beekeeper_api import CreateSession
 
-__all__ = ["SyncSessionHolder", "AsyncSessionHolder"]
+__all__ = ["AsyncSessionHolder", "SyncSessionHolder"]
 
 
 class Session:

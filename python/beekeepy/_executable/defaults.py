@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from beekeepy.interfaces import HttpUrl  # noqa: TCH001
+from beekeepy.interfaces import HttpUrl  # noqa: TC001
 from schemas._preconfigured_base_model import PreconfiguredBaseModel
 
 

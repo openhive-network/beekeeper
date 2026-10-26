@@ -31,7 +31,7 @@ def verify_is_http_endpoint(address: HttpUrl) -> bool:
             sock.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
             response = sock.recv(1024)
             return response.startswith(b"HTTP") and WEBSERVER_SPECIFIC_RESPONSE not in response
-    except (OSError, socket.timeout, ConnectionRefusedError):
+    except (TimeoutError, OSError, ConnectionRefusedError):
         return False
 
 
@@ -39,13 +39,14 @@ def verify_is_https_endpoint(address: HttpUrl) -> bool:
     assert address.port is not None, "HTTPS CHECK: Port has to be set"
     try:
         context = ssl.create_default_context()
-        with socket.create_connection((address.address, address.port), timeout=1) as sock, context.wrap_socket(
-            sock, server_hostname="localhost"
-        ) as ssl_sock:
+        with (
+            socket.create_connection((address.address, address.port), timeout=1) as sock,
+            context.wrap_socket(sock, server_hostname="localhost") as ssl_sock,
+        ):
             ssl_sock.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
             response = ssl_sock.recv(1024)
             return response.startswith(b"HTTP") and WEBSERVER_SPECIFIC_RESPONSE not in response
-    except (OSError, socket.timeout, ConnectionRefusedError, ssl.SSLError):
+    except (TimeoutError, OSError, ConnectionRefusedError, ssl.SSLError):
         return False
 
 
@@ -56,7 +57,7 @@ def verify_is_websocket_endpoint(address: WsUrl) -> bool:
             sock.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
             response = sock.recv(1024)
             return WEBSERVER_SPECIFIC_RESPONSE in response
-    except (OSError, socket.timeout, ConnectionRefusedError):
+    except (TimeoutError, OSError, ConnectionRefusedError):
         return False
 
 

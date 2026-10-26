@@ -54,9 +54,10 @@ def test_multiply_beekeepeer_different_storage(working_directory: Path) -> None:
 
     # ACT
     bks: list[Beekeeper] = []
-    with Beekeeper(settings=RunnableHandleSettings(working_directory=bk1_path), logger=logger) as bk1, Beekeeper(
-        settings=RunnableHandleSettings(working_directory=bk2_path), logger=logger
-    ) as bk2:
+    with (
+        Beekeeper(settings=RunnableHandleSettings(working_directory=bk1_path), logger=logger) as bk1,
+        Beekeeper(settings=RunnableHandleSettings(working_directory=bk2_path), logger=logger) as bk2,
+    ):
         # ASSERT
         assert bk1.is_running(), "First instance of beekeeper should be working."
         assert bk2.is_running(), "Second instance of beekeeper should be working."

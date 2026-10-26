@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 
 from beekeepy import AsyncBeekeeper, AsyncSession, AsyncUnlockedWallet
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @dataclass

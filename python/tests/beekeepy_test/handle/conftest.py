@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 from beekeepy.handle.runnable import Beekeeper
@@ -17,6 +17,9 @@ from local_tools.beekeepy.models import (
     WalletInfoWithImportedAccounts,
     WalletsGeneratorT,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture

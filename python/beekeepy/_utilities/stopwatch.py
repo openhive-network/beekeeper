@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from beekeepy._utilities.context import ContextSync
@@ -42,4 +42,4 @@ class Stopwatch(ContextSync[StopwatchResult]):
 
     @classmethod
     def now(cls) -> datetime:
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)

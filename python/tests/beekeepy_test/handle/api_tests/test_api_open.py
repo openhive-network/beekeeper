@@ -19,9 +19,9 @@ def test_api_open(beekeeper: Beekeeper, setup_wallets: WalletsGeneratorT) -> Non
 
     # ASSERT
     assert wallet_path.exists() is True, "After creation there should be wallet file."
-    assert (
-        wallet.name == (beekeeper.api.list_wallets()).wallets[0].name
-    ), "After creation wallet should be visible in beekeeper."
+    assert wallet.name == (beekeeper.api.list_wallets()).wallets[0].name, (
+        "After creation wallet should be visible in beekeeper."
+    )
 
 
 def test_api_reopen_already_opened(beekeeper: Beekeeper, setup_wallets: WalletsGeneratorT) -> None:
