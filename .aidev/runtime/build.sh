@@ -5,7 +5,7 @@
 #
 # The tag is `aidev-<hash>`, the hash of the image inputs (the Dockerfile,
 # `packageManager` from package.json, pnpm-lock.yaml, pnpm-workspace.yaml,
-# .npmrc); the registry cleanup policy keeps `aidev-*` tags. When
+# .npmrc, and the digest of the emsdk image ccc names now); the registry cleanup policy keeps `aidev-*` tags. When
 # <repository>:aidev-<hash> is already in the registry nothing is built: the script
 # prints that image's digest.
 #
@@ -17,6 +17,11 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 REPOSITORY="${AIDEV_RUNTIME_REPOSITORY:-registry.gitlab.syncad.com/hive/beekeeper/aidev-tests}"
+# The base and its Node come from ccc; the image is built on the digest its tag names now.
+BASE_IMAGE="$(scripts/ccc_emscripten_image.sh)"
+BASE_DIGEST="$(docker buildx imagetools inspect "$BASE_IMAGE" --format '{{json .Manifest}}' \
+    | grep -o '"digest": *"sha256:[0-9a-f]*"' | head -1 | grep -o 'sha256:[0-9a-f]*')"
+BASE_IMAGE="${BASE_IMAGE%%@*}@${BASE_DIGEST:?cannot resolve $BASE_IMAGE}"
 
 PKG=programs/beekeeper/beekeeper_wasm
 CFG=$PKG/npm-common-config/pnpm-config
@@ -30,6 +35,7 @@ input_hash() {
         sha256sum .aidev/runtime/Dockerfile "$PKG/pnpm-lock.yaml" "$CFG/pnpm-workspace.yaml" "$CFG/.npmrc" \
             "$PY/pyproject.toml" "$PY/poetry.lock" "$PY/tests/local-tools/pyproject.toml" "$PY/tests/local-tools/poetry.lock"
         grep '"packageManager"' "$PKG/package.json"
+        echo "$BASE_IMAGE"
     } | sha256sum | cut -c1-16
 }
 TAG="aidev-$(input_hash)"
@@ -66,7 +72,8 @@ rm -rf "$context/python/tests/local-tools/"*.egg-info
 
 # buildx so it works with any builder (CI's docker-container builder keeps no local
 # image); no provenance, so the pushed digest is a plain image manifest.
-build=(docker buildx build --pull --provenance=false -f .aidev/runtime/Dockerfile -t "$REPOSITORY:$TAG")
+build=(docker buildx build --pull --provenance=false -f .aidev/runtime/Dockerfile \
+    --build-arg BASE_IMAGE="$BASE_IMAGE" -t "$REPOSITORY:$TAG")
 if [ "${1:-}" != "--push" ]; then
     "${build[@]}" --load "$context" >&2
     echo "$REPOSITORY:$TAG"

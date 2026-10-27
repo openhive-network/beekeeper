@@ -43,15 +43,16 @@ pre-commit hooks other than ruff/mypy, and packaging/publishing.
 ## The test runtime image (`runtime/`)
 
 The suites run in a container with `--network none` and your uid. The image is CI's
-`emsdk:5.0.2-6` (the npm_projects template's `EMSCRIPTEN_IMAGE_TAG`: emscripten, Node
-24.21.0, pnpm 10.33.0) plus the chromium build the lockfile's Playwright wants, a pnpm
+emsdk image (the one ccc's npm_projects template names as `EMSCRIPTEN_IMAGE`:
+emscripten and ccc's Node and pnpm; `runtime/build.sh` resolves it with
+`scripts/ccc_emscripten_image.sh` and builds on its current digest) plus the chromium build the lockfile's Playwright wants, a pnpm
 store filled from `beekeeper_wasm/pnpm-lock.yaml`, Ubuntu's g++/Boost/OpenSSL for the
 native build, and Python 3.12 with `python/poetry.lock` (dev and static-analysis
 groups) in `/opt/py`.
 
 When `beekeeper_wasm/pnpm-lock.yaml`, the npm-common-config submodule's
 `pnpm-workspace.yaml`/`.npmrc`, `packageManager`, `python/pyproject.toml`, either
-`poetry.lock` or `runtime/Dockerfile` change, rebuild and re-pin **in the same commit**:
+`poetry.lock` or `runtime/Dockerfile` change, or ccc moves its emsdk image (a Node bump), rebuild and re-pin **in the same commit**:
 
 ```bash
 .aidev/runtime/build.sh --push   # registry digest if aidev-<input hash> exists, else build + push
