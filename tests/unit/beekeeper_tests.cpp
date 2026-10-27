@@ -1105,6 +1105,16 @@ BOOST_AUTO_TEST_CASE(encrypt_decrypt_data)
       BOOST_REQUIRE( _888 != _999 );
       BOOST_REQUIRE( _empty_0 != _empty_1 );
     }
+    {
+      //content up to the maximum memo size
+      for( size_t _size : { 0, 1, 493, 494, 1000, 2048 } )
+      {
+        const std::string _content( _size, 'x' );
+        auto _encrypted_content = _encrypt_with_nonce( 0, 1, _wallets[0].name, _content, 777 );
+        BOOST_REQUIRE( !_encrypted_content.empty() );
+        _decrypt( _content, 0, 1, _wallets[0].name, _encrypted_content );
+      }
+    }
 
   } FC_LOG_AND_RETHROW()
 }

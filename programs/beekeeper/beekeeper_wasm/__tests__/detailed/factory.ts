@@ -240,6 +240,33 @@ test.describe('Beekeeper factory tests for Node.js', () => {
     expect(retVal).toBe("secret message");
   });
 
+  test('Should encrypt and decrypt content up to the maximum memo size', async ({ beekeeperTest }) => {
+    const multiByte = 'zażółć gęślą jaźń 🐝 '.repeat(20);
+    const contents = [0, 1, 493, 494, 1000, 2048].map(n => 'x'.repeat(n)).concat(multiByte);
+
+    const retVal = await beekeeperTest(async ({ beekeeper }, contents) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = await session.createWallet('w0', 'mypassword');
+
+      const key1 = await wallet.importKey('5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n');
+      const key2 = await wallet.importKey('5HqUkGuo62BfcJU5vNhTXKJRXuUi9QSE6jp8C3uBJ2BVHtB8WSd');
+
+      const results: Array<{ encryptedLength: number; decrypted: string }> = [];
+      for (const content of contents) {
+        const encrypted = await wallet.encryptData(content, key1, key2, 12345);
+        const decrypted = await wallet.decryptData(encrypted, key1, key2);
+        results.push({ encryptedLength: encrypted.length, decrypted });
+      }
+
+      return results;
+    }, contents);
+
+    expect(new TextEncoder().encode(multiByte).length).toBeGreaterThan(494);
+    expect(retVal.map(r => r.decrypted)).toStrictEqual(contents);
+    for (const { encryptedLength } of retVal)
+      expect(encryptedLength).toBeGreaterThan(0);
+  });
+
   test('Should produce deterministic encryption with explicit nonce', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest(async ({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");

@@ -279,6 +279,8 @@ std::string crypto_provider_impl::ecdh_encrypt(
   size_t enc_len = prims_.base58_encode(
     reinterpret_cast<const uint8_t*>(packed.data()),
     packed.size(), enc_buf.data(), enc_buf_size);
+  if (enc_len == 0)
+    throw std::runtime_error("Base58 encoding of encrypted content failed");
 
   return std::string(enc_buf.data(), enc_len);
 }
@@ -293,6 +295,8 @@ std::string crypto_provider_impl::ecdh_decrypt(
   size_t dec_len = prims_.base58_decode(
     encrypted_content.data(), encrypted_content.size(),
     dec_buf.data(), dec_buf_size);
+  if (dec_len == 0)
+    throw std::runtime_error("Base58 decoding of encrypted content failed");
   auto packed = std::vector<char>(
     reinterpret_cast<const char*>(dec_buf.data()),
     reinterpret_cast<const char*>(dec_buf.data()) + dec_len);
