@@ -23,68 +23,63 @@ static const uint8_t REVERSE[128] = {
    47, 48, 49, 50, 51, 52, 53, 54,  55, 56, 57,255,255,255,255,255  /* p..z */
 };
 
+/* Both directions accumulate the converted number least-significant digit
+   first directly in out_buf, so the input size is bounded only by the
+   caller's buffer, then reverse it into big-endian order. */
+
+static void reverse_bytes(uint8_t* buf, size_t len)
+{
+  size_t i;
+  for (i = 0; i < len / 2; ++i)
+  {
+    uint8_t tmp = buf[i];
+    buf[i] = buf[len - 1 - i];
+    buf[len - 1 - i] = tmp;
+  }
+}
+
 size_t standalone_base58_encode_c(const uint8_t* data, size_t data_len,
                                   char* out_buf, size_t out_buf_size)
 {
+  uint8_t* digits = (uint8_t*)out_buf;
   size_t zeros = 0;
-  size_t num_len;
-  uint8_t num_buf[512];
-  size_t pos;
-  size_t i;
+  size_t digits_len = 0;
+  size_t i, j;
   size_t result_len;
-
-  if (out_buf_size == 0)
-    return 0;
 
   /* Count leading zeros */
   while (zeros < data_len && data[zeros] == 0)
     ++zeros;
 
-  num_len = data_len - zeros;
-  if (num_len > sizeof(num_buf))
-    return 0; /* input too large for stack buffer */
-
-  memcpy(num_buf, data + zeros, num_len);
-
-  /* Write digits from the end of out_buf, working backward.
-     Division extracts least-significant digit first, which becomes
-     the rightmost character — so writing backward produces correct order. */
-  pos = out_buf_size;
-
-  while (num_len > 0)
+  for (i = zeros; i < data_len; ++i)
   {
-    uint32_t carry = 0;
-    size_t write_idx = 0;
-
-    for (i = 0; i < num_len; ++i)
+    /* Multiply existing number by 256 and add the next byte */
+    uint32_t carry = data[i];
+    for (j = 0; j < digits_len; ++j)
     {
-      uint32_t val = carry * 256 + num_buf[i];
-      num_buf[write_idx] = (uint8_t)(val / 58);
-      carry = val % 58;
-      if (num_buf[write_idx] != 0 || write_idx > 0)
-        ++write_idx;
+      carry += (uint32_t)digits[j] << 8;
+      digits[j] = (uint8_t)(carry % 58);
+      carry /= 58;
     }
-    num_len = write_idx;
-
-    if (pos == 0)
-      return 0; /* buffer too small */
-    out_buf[--pos] = ALPHABET[carry];
+    while (carry > 0)
+    {
+      if (digits_len >= out_buf_size)
+        return 0; /* buffer too small */
+      digits[digits_len++] = (uint8_t)(carry % 58);
+      carry /= 58;
+    }
   }
 
-  /* Prepend leading '1's */
-  for (i = 0; i < zeros; ++i)
-  {
-    if (pos == 0)
-      return 0;
-    out_buf[--pos] = '1';
-  }
-
-  /* Move result to front of buffer */
-  result_len = out_buf_size - pos;
+  result_len = zeros + digits_len;
   if (result_len + 1 > out_buf_size)
-    return 0; /* no room for NUL */
+    return 0; /* no room for leading '1's and NUL */
 
-  memmove(out_buf, out_buf + pos, result_len);
+  reverse_bytes(digits, digits_len);
+  for (i = 0; i < digits_len; ++i)
+    out_buf[i] = ALPHABET[digits[i]];
+
+  memmove(out_buf + zeros, out_buf, digits_len);
+  memset(out_buf, '1', zeros);
   out_buf[result_len] = '\0';
   return result_len;
 }
@@ -94,25 +89,18 @@ size_t standalone_base58_decode_c(const char* str, size_t str_len,
                                  void (*error_handler)(const char* error))
 {
   size_t zeros = 0;
-  uint8_t num_buf[512];
-  size_t num_start; /* index of first used byte in num_buf */
-  size_t num_len;
-  size_t i, result_len;
+  size_t num_len = 0;
+  size_t i, j, result_len;
 
   /* Count leading '1's → zero bytes */
   while (zeros < str_len && str[zeros] == '1')
     ++zeros;
-
-  /* Build number in num_buf, growing downward from the end.
-     This avoids memmove on every carry overflow. */
-  num_start = sizeof(num_buf);
 
   for (i = zeros; i < str_len; ++i)
   {
     unsigned char ch = (unsigned char)str[i];
     uint8_t digit;
     uint32_t carry;
-    size_t j;
 
     if (ch >= 128) {
       error_handler("Invalid Base58 character");
@@ -127,30 +115,28 @@ size_t standalone_base58_decode_c(const char* str, size_t str_len,
 
     /* Multiply existing number by 58 and add digit */
     carry = digit;
-    for (j = sizeof(num_buf); j > num_start; )
+    for (j = 0; j < num_len; ++j)
     {
-      --j;
-      carry += (uint32_t)num_buf[j] * 58;
-      num_buf[j] = (uint8_t)(carry & 0xFF);
+      carry += (uint32_t)out_buf[j] * 58;
+      out_buf[j] = (uint8_t)(carry & 0xFF);
       carry >>= 8;
     }
     while (carry > 0)
     {
-      if (num_start == 0)
-        return 0; /* overflow */
-      --num_start;
-      num_buf[num_start] = (uint8_t)(carry & 0xFF);
+      if (num_len >= out_buf_size)
+        return 0; /* buffer too small */
+      out_buf[num_len++] = (uint8_t)(carry & 0xFF);
       carry >>= 8;
     }
   }
 
   /* Total result = zeros + num bytes */
-  num_len = sizeof(num_buf) - num_start;
   result_len = zeros + num_len;
   if (result_len > out_buf_size)
     return 0;
 
+  reverse_bytes(out_buf, num_len);
+  memmove(out_buf + zeros, out_buf, num_len);
   memset(out_buf, 0, zeros);
-  memcpy(out_buf + zeros, num_buf + num_start, num_len);
   return result_len;
 }
