@@ -4,3 +4,4 @@
 [submodule "programs/beekeeper/beekeeper_wasm/npm-common-config"]
 	path = programs/beekeeper/beekeeper_wasm/npm-common-config
 	url = ../common-ci-configuration.git
+	branch = develop

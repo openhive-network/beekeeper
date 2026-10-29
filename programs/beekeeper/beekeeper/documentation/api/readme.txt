@@ -7,6 +7,7 @@ HTTP server or number ports presented in following information should be treated
 ./beekeeper --webserver-http-endpoint 127.0.0.1:7778
 
 2. Launch proxy server
+pnpm install --frozen-lockfile
 node proxy.js
 
 Note that in `proxy.js` script are settings:

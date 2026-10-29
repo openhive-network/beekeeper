@@ -13,12 +13,15 @@ catalogs:
       specifier: 14.1.1
       version: 14.1.1
 
+overrides:
+  '@hiveio/beekeeper': file:../
+
 importers:
 
   .:
     dependencies:
       '@hiveio/beekeeper':
-        specifier: file:../
+        specifier: file:..
         version: file:..
       '@hiveio/beekeeper-old':
         specifier: npm:@hiveio/beekeeper@1.28.7-rc0

@@ -1,4 +1,4 @@
-// npm i http-proxy
+// pnpm install --frozen-lockfile
 // node proxy.js
 
 const options = {
