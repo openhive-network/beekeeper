@@ -6,12 +6,11 @@ Two model sets are generated from programs/beekeeper/beekeeper/documentation/api
 annotations mapped as in hiveio_api (`api_client_generator.hive_variants`):
 
 - public models (beekeepy/_generated/beekeeper_api_description.py) - dataclasses
-  (`hiveio_api.HiveModel`) with builtin types named by the aliases of `schemas.fields.public` -
+  (`hiveio_api.HiveModel`) with builtin types named by the aliases of `hiveio_api.fields.public` -
   returned by API calls, never validated,
 - validation models (tests/local-tools/local_tools/beekeepy/beekeeper_api_validation.py) - msgspec models
-  (`PreconfiguredBaseModel`) with validation forms of the types (`schemas.fields.validation`) and
-  `ENDPOINT_RESULTS`, used by `hiveio_api.validate_schema` (`SchemaValidationRules`) in tests of beekeepy only - msgspec
-  is a dependency of the tests (the `dev` group), not of beekeepy.
+  (`PreconfiguredBaseModel`) with validation forms of the types (`hiveio_api.fields.validation`) and
+  `ENDPOINT_RESULTS`, used by `hiveio_api.validate_schema` (`SchemaValidationRules`) in tests of beekeepy only.
 
 The generated modules are committed - CI regenerates them and fails when they differ.
 
@@ -26,8 +25,7 @@ from typing import Final
 from api_client_generator import hive_variants
 from api_client_generator.json_rpc import append_endpoint_results, generate_api_description
 from api_client_generator.tidy import tidy_with_ruff
-
-from schemas.fields import public, validation
+from hiveio_api.fields import public, validation
 
 REPOSITORY_DIRECTORY: Final[Path] = Path(__file__).resolve().parents[2]
 OPENAPI_DEFINITION: Final[Path] = REPOSITORY_DIRECTORY / "programs/beekeeper/beekeeper/documentation/api/openapi.json"
