@@ -1,12 +1,13 @@
 {
   "dependencies": {
     "@hiveio/beekeeper": "file:../../beekeeper_wasm",
-    "nuxt": "^3.17.2",
-    "vue": "^3.5.13"
+    "nuxt": "catalog:vue-toolset",
+    "vue": "catalog:vue-toolset"
   },
   "devDependencies": {
     "@playwright/test": "catalog:playwright-toolset",
-    "playwright": "catalog:playwright-toolset"
+    "playwright": "catalog:playwright-toolset",
+    "typescript": "catalog:typescript-toolset"
   },
   "name": "nuxt-app",
   "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
@@ -17,5 +18,10 @@
     "test": "rm -rf ./.nuxt ./.output ./node_modules/.cache && unset CI && DEBUG=pw:webserver playwright test --workers 1 --max-failures 1 --project=beekeeper_nuxt_vite_testsuite",
     "pretest": "pnpm exec playwright install"
   },
-  "type": "module"
+  "type": "module",
+  "pnpm": {
+    "overrides": {
+      "@hiveio/beekeeper": "file:../../beekeeper_wasm"
+    }
+  }
 }

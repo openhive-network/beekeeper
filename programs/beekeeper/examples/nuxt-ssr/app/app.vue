@@ -23,7 +23,7 @@ if (import.meta.client) {
 <template>
   <div>
     <h3>SSR Version:</h3>
-    {{ data.version }}
+    {{ data?.version }}
     <h3>Client version:</h3>
     {{ version }}
   </div>

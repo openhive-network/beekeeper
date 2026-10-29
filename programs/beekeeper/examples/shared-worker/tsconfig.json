@@ -4,6 +4,7 @@
     "incremental": true,
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "skipLibCheck": true,
+    "types": ["sharedworker"],
 
     "rootDir": "./src",
     "outDir": "./dist"
