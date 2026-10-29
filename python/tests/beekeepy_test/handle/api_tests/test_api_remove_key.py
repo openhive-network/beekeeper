@@ -4,9 +4,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 from beekeepy.exceptions import ErrorInResponseError
+from hiveio_api.fields.user_friendly import PublicKey
 from local_tools.beekeepy.account_credentials import AccountCredentials
-
-from schemas.fields.user_friendly import PublicKey
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper
