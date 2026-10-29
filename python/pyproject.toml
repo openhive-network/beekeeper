@@ -37,10 +37,11 @@ psutil = "^7.0.0"
 python-dateutil = "^2.8.2"
 requests = "^2.32.3"
 
-# Ranges admit only development builds - final and .post releases of these versions predate the related merge
-# requests (they lack schemas.validation and the API base classes).
-hiveio-schemas = {version = ">=1.28.2.dev20261029021230,<1.28.2.dev99999999999999", source = "gitlab-hive", allow-prereleases = true}  # development builds of the related merge request
-hiveio-api = {version = ">=1.28.8rc3.dev20261029021805,<1.28.8rc3.dev99999999999999", source = "gitlab-hive", allow-prereleases = true}  # API base classes, models of app_status_api, validate_schema
+msgspec = "^0.20.0"  # configurations of executables (msgspec models of hiveio_api.validation)
+
+# The range admits only development builds - final and .post releases of this version predate the related merge
+# requests (they lack the API base classes, the field types and the validation).
+hiveio-api = {version = ">=1.28.8rc3.dev20261029052500,<1.28.8rc3.dev99999999999999", source = "gitlab-hive", allow-prereleases = true}  # API base classes, field types, models of app_status_api, validate_schema
 
 [tool.poetry.group.static-analysis.dependencies]
 mypy = "*"
@@ -56,14 +57,13 @@ pytest = "*"
 pytest-asyncio = "^1.3.0"
 pytest-xdist = "*"
 local-tools = { path = "tests/local-tools", develop = true }
-msgspec = "^0.20.0"  # generated validation models of beekeeper_api used by the tests (local_tools)
 
 [tool.poetry.group.generation]
 optional = true
 
 [tool.poetry.group.generation.dependencies]
 # generation of the models of beekeeper_api (scripts/generate_beekeeper_api.py), not needed by beekeepy itself
-hiveio-api-client-generator = {version = "1.7.1.dev20261029021255+unstable", source = "gitlab-hive", python = ">=3.14"}
+hiveio-api-client-generator = {version = "1.7.1.dev20261029052111+unstable", source = "gitlab-hive", python = ">=3.14"}
 
 [tool.mypy]
 disallow_untyped_decorators = false
@@ -124,12 +124,12 @@ select = ["ALL"]
 "**/beekeepy/_generated/*" = [
   "E501", # descriptions of the OpenAPI definition
   "ERA001", # header of datamodel-codegen
-  "TCH001", # types are resolved at runtime (get_type_hints of the dataclasses)
+  "TCH002", # types are resolved at runtime (get_type_hints of the dataclasses)
 ]
 "**/local_tools/beekeepy/beekeeper_api_validation.py" = [
   "E501", # descriptions of the OpenAPI definition
   "ERA001", # header of datamodel-codegen
-  "TCH001", # types are resolved at runtime by msgspec
+  "TCH002", # types are resolved at runtime by msgspec
 ]
 "**/beekeepy/__init__.py"   = ["TCH004"]
 "**/beekeepy/interfaces.py" = ["TCH004"]
@@ -140,7 +140,6 @@ select = ["ALL"]
 
 
 [tool.ruff.lint.isort]
-known-first-party = ["schemas"]
 required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.lint.pydocstyle]
