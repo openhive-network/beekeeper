@@ -730,37 +730,16 @@ files = [
 
 [[package]]
 name = "hiveio-api"
-version = "1.28.8rc3.dev20261029021805"
+version = "1.28.8rc3.dev20261029052500"
 description = "Hive JSON-RPC API client package with lazy-loaded submodules for all Hive APIs"
 optional = false
 python-versions = ">=3.12,<4"
 groups = ["main"]
 files = [
-    {file = "hiveio_api-1.28.8rc3.dev20261029021805-py3-none-any.whl", hash = "sha256:7311f21b926357383a7522f6d46ba061d5c1f1a230bc57c0369399778dec29fd"},
+    {file = "hiveio_api-1.28.8rc3.dev20261029052500-py3-none-any.whl", hash = "sha256:689fb350c9ac95aa41b6608d23522eba076cedc978721185795fbab9f6b3479e"},
 ]
 
 [package.dependencies]
-hiveio-schemas = "1.28.2.dev20261029021230"
-
-[package.source]
-type = "legacy"
-url = "https://gitlab.syncad.com/api/v4/groups/136/-/packages/pypi/simple"
-reference = "gitlab-hive"
-
-[[package]]
-name = "hiveio-api-client-generator"
-version = "1.7.1.dev20261029021255+unstable"
-description = ""
-optional = false
-python-versions = ">=3.14,<4"
-groups = ["generation"]
-markers = "python_version >= \"3.14\""
-files = [
-    {file = "hiveio_api_client_generator-1.7.1.dev20261029021255+unstable-py3-none-any.whl", hash = "sha256:b257fe70b0699ae77ab347a2146a3674ccbaeec9a8a00746b4343a18271c219c"},
-]
-
-[package.dependencies]
-datamodel-code-generator = ">=0.52.2,<0.53.0"
 msgspec = ">=0.20.0,<0.21.0"
 
 [package.source]
@@ -769,17 +748,19 @@ url = "https://gitlab.syncad.com/api/v4/groups/136/-/packages/pypi/simple"
 reference = "gitlab-hive"
 
 [[package]]
-name = "hiveio-schemas"
-version = "1.28.2.dev20261029021230"
-description = "Tools for checking if message fits expected format"
+name = "hiveio-api-client-generator"
+version = "1.7.1.dev20261029052111+unstable"
+description = ""
 optional = false
-python-versions = ">=3.12,<4"
-groups = ["main"]
+python-versions = ">=3.14,<4"
+groups = ["generation"]
+markers = "python_version >= \"3.14\""
 files = [
-    {file = "hiveio_schemas-1.28.2.dev20261029021230-py3-none-any.whl", hash = "sha256:5ba9cb79fcf64ad9e9bbb9f4fd18720ab2b0f7480d0ec004ba9716bf6fef01cf"},
+    {file = "hiveio_api_client_generator-1.7.1.dev20261029052111+unstable-py3-none-any.whl", hash = "sha256:3816c98c5af2facfb8f619c5d291918a5402328fce5852c1dc7f4d55e180af6c"},
 ]
 
 [package.dependencies]
+datamodel-code-generator = ">=0.52.2,<0.53.0"
 msgspec = ">=0.20.0,<0.21.0"
 
 [package.source]
@@ -1277,7 +1258,7 @@ version = "0.20.0"
 description = "A fast serialization and validation library, with builtin support for JSON, MessagePack, YAML, and TOML."
 optional = false
 python-versions = ">=3.9"
-groups = ["main", "dev", "generation"]
+groups = ["main", "generation"]
 files = [
     {file = "msgspec-0.20.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:23a6ec2a3b5038c233b04740a545856a068bc5cb8db184ff493a58e08c994fbf"},
     {file = "msgspec-0.20.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:cde2c41ed3eaaef6146365cb0d69580078a19f974c6cb8165cc5dcd5734f573e"},
@@ -2600,4 +2581,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4"
-content-hash = "f8f58e5858321e67b0ab10a77d762cb0fb567c56ec84af3cb39dc24fae35e16b"
+content-hash = "d979cb6867af943b0b9f4cab6e29677034bdc47efcb11613f6f169e0e02a6992"
