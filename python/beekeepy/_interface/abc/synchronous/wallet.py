@@ -3,14 +3,15 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from hiveio_api.fields import user_friendly
+
 from beekeepy._interface.wallets_common import ContainsWalletName
 from beekeepy._utilities.context import ContextSync
-from schemas.fields import user_friendly
 
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from schemas.fields.public import PublicKey, Signature
+    from hiveio_api.fields.public import PublicKey, Signature
 
 
 class Wallet(ContainsWalletName, ABC):

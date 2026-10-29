@@ -4,6 +4,9 @@ import re
 from re import Pattern
 from typing import Final
 
+from hiveio_api.fields.user_friendly import AccountName, Hex, PrivateKey, PublicKey
+from hiveio_api.validation.errors import ValidationError
+
 from beekeepy.exceptions import (
     InvalidAccountNameError,
     InvalidSchemaHexError,
@@ -13,8 +16,6 @@ from beekeepy.exceptions import (
     SchemaDetectableError,
     TimeTooBigError,
 )
-from schemas.errors import ValidationError
-from schemas.fields.user_friendly import AccountName, Hex, PrivateKey, PublicKey
 
 __all__ = [
     "validate_account_names",

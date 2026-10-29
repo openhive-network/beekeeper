@@ -4,7 +4,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from schemas._preconfigured_base_model import PreconfiguredBaseModel
+from hiveio_api.validation.model import PreconfiguredBaseModel
 
 if TYPE_CHECKING:
     from typing import Self

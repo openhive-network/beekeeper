@@ -22,6 +22,8 @@ from beekeepy.exceptions import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from hiveio_api.fields.public import PublicKey, Signature
+
     from beekeepy._generated.beekeeper_api_description import GetInfoResponse
     from beekeepy._interface.abc.synchronous.wallet import (
         UnlockedWallet as UnlockedWalletInterface,
@@ -32,7 +34,6 @@ if TYPE_CHECKING:
     from beekeepy._interface.settings import InterfaceSettings
     from beekeepy._remote_handle.sync_beekeeper import Beekeeper as SyncRemoteBeekeeper
     from beekeepy._utilities.delay_guard import SyncDelayGuard
-    from schemas.fields.public import PublicKey, Signature
 
 
 class Session(SessionInterface, StateInvalidator):
