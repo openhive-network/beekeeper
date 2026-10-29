@@ -6,8 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from hiveio_api import HiveModel
-
-from schemas.fields.public import Hex, HiveDateTime, PublicKey, Sha256, Signature, Uint32t
+from hiveio_api.fields.public import Hex, HiveDateTime, PublicKey, Sha256, Signature, Uint32t
 
 
 @dataclass(kw_only=True)

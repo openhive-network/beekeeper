@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
+from hiveio_api.fields.validation import Hex, HiveDateTime, PublicKey, Sha256, Signature, Uint32t
+from hiveio_api.validation.model import PreconfiguredBaseModel
 from msgspec import UNSET, UnsetType
-
-from schemas._preconfigured_base_model import PreconfiguredBaseModel
-from schemas.fields.validation import Hex, HiveDateTime, PublicKey, Sha256, Signature, Uint32t
 
 
 class Close(PreconfiguredBaseModel, kw_only=True):
