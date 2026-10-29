@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING, TypeAlias, overload
 from beekeepy._utilities.context import ContextSync
 
 if TYPE_CHECKING:
+    from hiveio_api.fields.public import PublicKey, Signature
+
     from beekeepy._generated.beekeeper_api_description import GetInfoResponse
     from beekeepy._interface.abc.synchronous.wallet import UnlockedWallet, Wallet
-    from schemas.fields.public import PublicKey, Signature
 
 Password: TypeAlias = str
 

@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path  # noqa: TC003
 
 from hiveio_api.client import HttpUrl, WsUrl
+from msgspec import field
 
 from beekeepy._executable.abc.config import Config
 from beekeepy._executable.defaults import BeekeeperDefaults, ExportKeysWalletParams
-from schemas.base import field
 
 
 def http_webserver_default() -> HttpUrl:

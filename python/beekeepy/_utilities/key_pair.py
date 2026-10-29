@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from hiveio_api import HiveModel
-
-from schemas.fields.public import PublicKey  # noqa: TC001  # resolved at runtime by get_type_hints
+from hiveio_api.fields.public import PublicKey  # noqa: TC002  # resolved at runtime by get_type_hints
 
 
 @dataclass(eq=False)

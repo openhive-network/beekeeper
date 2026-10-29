@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final
 
 from hiveio_api.client import Url
+from hiveio_api.validation.model import PreconfiguredBaseModel
 
 from beekeepy._runnable_handle.settings import strtobool
-from schemas._preconfigured_base_model import PreconfiguredBaseModel
 
 if TYPE_CHECKING:
     from typing import Self
