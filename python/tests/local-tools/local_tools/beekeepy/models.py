@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from schemas.fields.user_friendly import PublicKey
+from hiveio_api.fields.user_friendly import PublicKey
 
 if TYPE_CHECKING:
     from beekeepy.settings import InterfaceSettings

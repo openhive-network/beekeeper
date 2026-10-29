@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Final
 import pytest
 from beekeepy._generated.beekeeper_api_description import ImportKeyResponse as ImportKey
 from beekeepy._generated.beekeeper_api_description import Key as PublicKeyItem
-
-from schemas.fields.user_friendly import PrivateKey, PublicKey
+from hiveio_api.fields.user_friendly import PrivateKey, PublicKey
 
 if TYPE_CHECKING:
     from beekeepy.handle.runnable import Beekeeper
