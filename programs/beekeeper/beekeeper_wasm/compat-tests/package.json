@@ -13,5 +13,10 @@
     "@playwright/test": "catalog:playwright-toolset",
     "http-server": "catalog:playwright-toolset",
     "vitest": "^3"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hiveio/beekeeper": "file:../"
+    }
   }
 }

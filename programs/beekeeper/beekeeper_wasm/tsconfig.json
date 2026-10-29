@@ -3,7 +3,10 @@
     "incremental": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "types": [
+      "node"
+    ]
   },
   "extends": "./npm-common-config/ts-common/tsconfig.base.json",
   "include": [
