@@ -31,7 +31,7 @@ branches:
 # How this project's suites execute (#13892): one kind, stated once.
 environment:
   kind: "container"
-  image: "registry.gitlab.syncad.com/hive/beekeeper/aidev-tests@sha256:39880a5254ad56a4ce565018065badc5cc7c15649f248d5254b30ac88be65469"
+  image: "registry.gitlab.syncad.com/hive/beekeeper/aidev-tests@sha256:103942e5a52c22d59ae17c669ce13477b3075f82f1325550bc45a5ac5fa7d955"
   inputs: ["programs/beekeeper/beekeeper_wasm/pnpm-lock.yaml", "python/poetry.lock", "python/tests/local-tools/poetry.lock"]
 
 issues:
