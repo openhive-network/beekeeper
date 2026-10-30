@@ -749,14 +749,14 @@ reference = "gitlab-hive"
 
 [[package]]
 name = "hiveio-api-client-generator"
-version = "1.7.1.post20261029052111"
+version = "1.7.1.post20261029210531"
 description = ""
 optional = false
 python-versions = ">=3.14,<4"
 groups = ["generation"]
 markers = "python_version >= \"3.14\""
 files = [
-    {file = "hiveio_api_client_generator-1.7.1.post20261029052111-py3-none-any.whl", hash = "sha256:d54741411d1b28e5b1314573ada9321084ee58f091ee278b490f06e48b1c8684"},
+    {file = "hiveio_api_client_generator-1.7.1.post20261029210531-py3-none-any.whl", hash = "sha256:7f8541e2c63a61143ae9a46a6b44cea530d1e1c28164ee86af3a0515bc22a4ba"},
 ]
 
 [package.dependencies]
@@ -2581,4 +2581,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4"
-content-hash = "5bea4cbbab345ef19f6a0b9f4d4b422755da3eb5b4797713c6b69663b94719c2"
+content-hash = "793df9fa15cb4e9ae0b38fe5a82b65f025137876a50cffe788939f8b7ee94997"

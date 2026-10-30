@@ -63,7 +63,7 @@ optional = true
 
 [tool.poetry.group.generation.dependencies]
 # generation of the models of beekeeper_api (scripts/generate_beekeeper_api.py), not needed by beekeepy itself
-hiveio-api-client-generator = {version = "1.7.1.post20261029052111", source = "gitlab-hive", python = ">=3.14"}
+hiveio-api-client-generator = {version = "1.7.1.post20261029210531", source = "gitlab-hive", python = ">=3.14"}
 
 [tool.mypy]
 disallow_untyped_decorators = false
