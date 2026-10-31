@@ -7,66 +7,54 @@ from beekeepy.exceptions import BeekeepyError, CommunicationResponseT, Json, Ove
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from beekeepy._communication.url import Url
+    from hiveio_api import SchemaError
+    from hiveio_api.client import AnyUrl, Url
 
 
 class UnableToAcquireDatabaseLockError(OverseerError):
-    def retry(self) -> bool:
-        return True
+    """Node could not acquire its database lock - the request is sent again until it succeeds."""
 
 
 class UnableToAcquireForkdbLockError(OverseerError):
-    def retry(self) -> bool:
-        return True
+    """Node could not acquire its fork database lock - the request is sent again until it succeeds."""
 
 
 class NullResultError(OverseerError):
-    def retry(self) -> bool:
-        return True
+    """`result` of the response is null."""
 
 
 class ApiNotFoundError(OverseerError):
-    def retry(self) -> bool:
-        return False
-
     @property
     def api(self) -> str:
         return self.message_raw.split(":")[-1].strip()
 
 
 class JussiResponseError(OverseerError):
-    def retry(self) -> bool:
-        return True
+    """Jussi responded instead of the target service."""
 
 
 class UnparsableResponseError(OverseerError):
-    def retry(self) -> bool:
-        return True
+    """Response is not parsable - neither a JSON-RPC object nor an array of them."""
 
 
 class DifferenceBetweenAmountOfRequestsAndResponsesError(OverseerError):
-    def retry(self) -> bool:
-        return True
+    """Amount of responses differs from amount of requests of a batch."""
 
 
 class UnlockIsNotAccessibleError(OverseerError):
-    def retry(self) -> bool:
-        return False
+    """Wallet cannot be unlocked yet - it was unlocked too fast."""
 
 
 class WalletIsAlreadyUnlockedError(OverseerError):
-    def retry(self) -> bool:
-        return False
+    """Wallet is already unlocked."""
 
 
 class UnableToOpenWalletError(OverseerError):
-    def retry(self) -> bool:
-        return False
+    """Wallet cannot be opened - there is no such wallet."""
 
 
 class OverseerInvalidPasswordError(OverseerError):
-    def retry(self) -> bool:
-        return False
+    """Invalid password of the wallet - reported in a response of beekeeper (wallets raise `InvalidPasswordError`)."""
 
 
 class ErrorInResponseError(OverseerError):
@@ -90,15 +78,30 @@ class ErrorInResponseError(OverseerError):
         )
         self.__error: str | None = None
 
-    def retry(self) -> bool:
-        return False
-
     @property
     def error(self) -> str:
+        """
+        Error of the response - its `data` and `message`, searched for known errors (`DetectableError`).
+
+        Messages of the service are formatted in `message` (e.g. `Assert Exception:false: Public key STM... not found
+        in w1 wallet`), while `data` holds the exception with templates of messages and their arguments - or the details
+        of errors with a generic `message`.
+        """
         if self.__error is None:
-            result = self._extract_error_messages(response=self.__get_suitable_response())
-            self.__error = (result or [""])[0]
+            response = self.__get_suitable_response()
+            result = self._extract_error_messages(response=response)
+            error = (result or [""])[0]
+            message = self.__message_of(response)
+            self.__error = error if message is None or message in error else f"{error}\n{message}"
         return self.__error
+
+    @staticmethod
+    def __message_of(response: Json | str | None) -> str | None:
+        if not isinstance(response, dict):
+            return None
+        error = response.get("error")
+        message = error.get("message") if isinstance(error, dict) else None
+        return message if isinstance(message, str) else None
 
     def __get_suitable_response(self) -> Json | str | None:
         if isinstance(self.response, list):
@@ -109,6 +112,36 @@ class ErrorInResponseError(OverseerError):
                     return item
             return None
         return self.response
+
+
+class SchemaValidationError(OverseerError):
+    """Result of the response does not match the validation model of the called endpoint."""
+
+    def __init__(  # noqa: PLR0913
+        self,
+        url: str | AnyUrl,
+        request: CommunicationResponseT | bytes,
+        response: CommunicationResponseT | None = None,
+        whole_response: CommunicationResponseT | None = None,
+        *,
+        message: str = "",
+        request_id: int | None,
+        schema_errors: Sequence[SchemaError] = (),
+    ) -> None:
+        super().__init__(
+            url=url,
+            request=request,
+            response=response,
+            message=message,
+            request_id=request_id,
+            whole_response=whole_response,
+        )
+        self.schema_errors = list(schema_errors)
+        """Problems found by `hiveio_api.validate_schema` (`SchemaError` instances)."""
+
+
+class MissingValidationModelWarning(UserWarning):
+    """Responses of an API are not validated - it has no validation models (`SchemaValidationRules`)."""
 
 
 class GroupedErrorsError(BeekeepyError):

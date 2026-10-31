@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-from schemas._preconfigured_base_model import PreconfiguredBaseModel
-
-if TYPE_CHECKING:
-    from schemas.fields.basic import PrivateKey, PublicKey
+from hiveio_api import HiveModel
+from hiveio_api.fields.public import PublicKey  # noqa: TC002  # resolved at runtime by get_type_hints
 
 
-class KeyPair(PreconfiguredBaseModel):
+@dataclass(eq=False)
+class KeyPair(HiveModel):
+    """Public key and its private key (WIF) - pairs are equal and hashed by their private keys."""
+
     public_key: PublicKey
-    private_key: PrivateKey
+    private_key: str
 
     def __hash__(self) -> int:
         return hash(self.private_key)

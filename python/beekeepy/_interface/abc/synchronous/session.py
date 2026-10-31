@@ -6,17 +6,17 @@ from typing import TYPE_CHECKING, TypeAlias, overload
 from beekeepy._utilities.context import ContextSync
 
 if TYPE_CHECKING:
+    from hiveio_api.fields.public import PublicKey, Signature
+
+    from beekeepy._generated.beekeeper_api_description import GetInfoResponse
     from beekeepy._interface.abc.synchronous.wallet import UnlockedWallet, Wallet
-    from schemas.apis.beekeeper_api import GetInfo
-    from schemas.fields.basic import PublicKey
-    from schemas.fields.hex import Signature
 
 Password: TypeAlias = str
 
 
 class Session(ContextSync["Session"], ABC):
     @abstractmethod
-    def get_info(self) -> GetInfo: ...
+    def get_info(self) -> GetInfoResponse: ...
 
     @overload
     @abstractmethod

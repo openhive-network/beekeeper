@@ -9,6 +9,7 @@ from beekeepy._apis.beekeeper_api import (
     BeekeeperSyncApiCollection,
     SyncBeekeeperApi,
 )
+from beekeepy._communication.rules import BeekeeperRules, ErrorInResponseRules, JsonRpcRules
 from beekeepy._remote_handle.abc.batch_handle import ApiFactory, SyncBatchHandle
 from beekeepy._remote_handle.abc.handle import AbstractSyncHandle, RemoteSettingsT
 from beekeepy._remote_handle.commons import (
@@ -21,8 +22,9 @@ from beekeepy._utilities.sanitize import sanitize
 if TYPE_CHECKING:
     from typing import Self
 
-    from beekeepy._communication.abc.overseer import AbstractOverseer
-    from beekeepy._communication.url import HttpUrl
+    from hiveio_api.client import HttpUrl, ResponseCallback
+
+    from beekeepy._remote_handle.abc.batch_handle import SyncBatchOwner
     from beekeepy.exceptions import Json
 
 
@@ -30,7 +32,7 @@ class _SyncSessionBatchHandle(SyncBatchHandle[BeekeeperSyncApiCollection], SyncS
     def __init__(  # noqa: PLR0913
         self,
         url: HttpUrl,
-        overseer: AbstractOverseer,
+        owner: SyncBatchOwner,
         api: ApiFactory[Self, BeekeeperSyncApiCollection],
         *args: Any,
         session_token: str,
@@ -40,7 +42,7 @@ class _SyncSessionBatchHandle(SyncBatchHandle[BeekeeperSyncApiCollection], SyncS
     ) -> None:
         super().__init__(
             url,
-            overseer,
+            owner,
             api,
             *args,
             delay_error_on_data_access=delay_error_on_data_access,
@@ -57,7 +59,10 @@ class Beekeeper(AbstractSyncHandle[RemoteSettingsT, BeekeeperSyncApiCollection],
     """Synchronous handle for beekeeper service communication."""
 
     def _construct_api(self) -> BeekeeperSyncApiCollection:
-        return BeekeeperSyncApiCollection(owner=self)
+        return self._with_rules(BeekeeperSyncApiCollection(owner=self))
+
+    def _rules(self) -> list[ResponseCallback]:
+        return [JsonRpcRules(), BeekeeperRules(), ErrorInResponseRules()]
 
     @property
     def apis(self) -> BeekeeperSyncApiCollection:
@@ -73,7 +78,7 @@ class Beekeeper(AbstractSyncHandle[RemoteSettingsT, BeekeeperSyncApiCollection],
     def batch(self, *, delay_error_on_data_access: bool = False) -> SyncBatchHandle[BeekeeperSyncApiCollection]:
         return _SyncSessionBatchHandle(
             url=self.http_endpoint,
-            overseer=self._overseer,
+            owner=self,
             api=lambda o: BeekeeperSyncApiCollection(owner=o),
             delay_error_on_data_access=delay_error_on_data_access,
             session_token=self.session.token,

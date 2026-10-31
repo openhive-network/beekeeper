@@ -187,6 +187,8 @@ beekeepy_pre_commit_checks:
   extends: .pre_commit_checks_template
   before_script:
   - !reference [.pre_commit_checks_template, before_script]
+  # mypy checks scripts/generate_beekeeper_api.py against the generator
+  - poetry -C "${PYPROJECT_DIR}" install --with generation
   - !reference [.update_deps_for_static_analysis, script]
   variables:
     PYPROJECT_DIR: "${PYTHON_DIR}"
@@ -234,6 +236,36 @@ beekeepy_type_check_with_mypy:
   - if: '$CI_COMMIT_BRANCH'
     changes:
     - python/**/*
+
+beekeepy_generated_api_check:
+  stage: static_code_analysis
+  extends: .project_develop_configuration_template
+  variables:
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+  before_script:
+  - !reference [.configuration_template, before_script]
+  - poetry -C "${PYPROJECT_DIR}" install --with generation
+  script:
+  # models of beekeeper_api are generated from the OpenAPI definition of beekeeper and committed (validation models
+  # are used by the tests only, so they are generated into local_tools)
+  - python "${PYTHON_DIR}/scripts/generate_beekeeper_api.py"
+  - |
+    GENERATED=("${PYTHON_DIR}/beekeepy/_generated" "${PYTHON_DIR}/tests/local-tools/local_tools/beekeepy/beekeeper_api_validation.py")
+    if [[ -n "$(git status --porcelain -- "${GENERATED[@]}")" ]]; then
+      git status --porcelain -- "${GENERATED[@]}"
+      git diff -- "${GENERATED[@]}"
+      echo "Generated models of beekeeper_api are not up to date - run python/scripts/generate_beekeeper_api.py"
+      exit 1
+    fi
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    changes:
+    - python/**/*
+    - programs/beekeeper/beekeeper/documentation/api/openapi.json
+  - if: '$CI_COMMIT_BRANCH'
+    changes:
+    - python/**/*
+    - programs/beekeeper/beekeeper/documentation/api/openapi.json
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| BEEKEEPY STATIC CODE ANALYSIS |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 

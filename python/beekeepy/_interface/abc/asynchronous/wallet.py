@@ -9,8 +9,7 @@ from beekeepy._utilities.context import ContextAsync
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from schemas.fields.basic import PublicKey
-    from schemas.fields.hex import Signature
+    from hiveio_api.fields.public import PublicKey, Signature
 
 
 class Wallet(ContainsWalletName, ABC):

@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from beekeepy._communication.abc.overseer import AbstractOverseer
-from beekeepy._communication.overseers import CommonOverseer
 from beekeepy._communication.settings import CommunicationSettings
 
 if TYPE_CHECKING:
+    from hiveio_api.client import HttpUrl
+
     from beekeepy._communication.abc.communicator import (
         AbstractCommunicator,
     )
-    from beekeepy._communication.url import HttpUrl
 
 
+@dataclass
 class RemoteHandleSettings(CommunicationSettings):
-    class Defaults(CommunicationSettings.Defaults):
-        OVERSEER: ClassVar[type[AbstractOverseer]] = CommonOverseer
-
     http_endpoint: HttpUrl | None = None
     """
     Endpoint exposed by service to be connect to by handle.
@@ -27,12 +25,6 @@ class RemoteHandleSettings(CommunicationSettings):
     Defines class to be used for network handling. Can be given as class or instance.
 
     Note: If set to none, handles will use preferred communicators
-    """
-
-    overseer: type[AbstractOverseer] | AbstractOverseer = Defaults.OVERSEER
-    """
-    Defines class to be used for response validation and handling basic turbulence
-    during communication
     """
 
     def try_get_communicator_instance(
@@ -58,19 +50,3 @@ class RemoteHandleSettings(CommunicationSettings):
             return self.communicator(settings=(settings or self))
 
         return self.communicator
-
-    def get_overseer(self, *, communicator: AbstractCommunicator) -> AbstractOverseer:
-        """Obtains overseer instance, by returning it (if exists) or by creating new instance.
-
-        Args:
-            communicator: will be passed to overseer.
-
-        Notes:
-            If settings.overseer is not a type, then communicator argument is not used.
-
-        Returns:
-            Overseer
-        """
-        if isinstance(self.overseer, AbstractOverseer):
-            return self.overseer
-        return self.overseer(communicator=communicator)

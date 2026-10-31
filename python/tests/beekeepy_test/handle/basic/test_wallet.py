@@ -8,13 +8,20 @@ import pytest
 from beekeepy.exceptions import ErrorInResponseError
 
 if TYPE_CHECKING:
+    from beekeepy._generated.beekeeper_api_description import (
+        ListCreatedWalletsResponse,
+        ListWalletsResponse,
+    )
     from beekeepy.handle.runnable import Beekeeper
     from local_tools.beekeepy.models import WalletInfo
 
-    from schemas.apis.beekeeper_api import ListWallets
 
-
-def check_wallets(given: ListWallets, valid: list[str], *, unlocked: bool = True) -> None:
+def check_wallets(
+    given: ListWalletsResponse | ListCreatedWalletsResponse,
+    valid: list[str],
+    *,
+    unlocked: bool = True,
+) -> None:
     assert len(given.wallets) == len(valid)
     for given_wallet in given.wallets:
         assert given_wallet.name in valid
@@ -71,7 +78,8 @@ def test_timeout(beekeeper: Beekeeper, wallet: WalletInfo) -> None:
 
     # ASSERT
     info = beekeeper.api.get_info()
-    assert timeout - (info.timeout_time - info.now).total_seconds() <= comparison_error_max_delta
+    time_left = (info.timeout_time - info.now).total_seconds()
+    assert 0 <= timeout - time_left <= comparison_error_max_delta
     check_wallets(beekeeper.api.list_created_wallets(), [wallet.name])
 
     # ACT

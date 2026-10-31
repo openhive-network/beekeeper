@@ -42,6 +42,7 @@
       "create": {
         "properties": {
           "is_temporary": {
+            "default": false,
             "description": "If `true` the wallet exists only in memory otherwise is saved into a file.",
             "example": false,
             "type": "boolean"
@@ -76,15 +77,13 @@
             "type": "string"
           }
         },
+        "required": [
+          "password"
+        ],
         "type": "object"
       },
       "create_session": {
         "properties": {
-          "notifications_endpoint": {
-            "description": "A server attached to given session. It's used to receive notifications. Optional.",
-            "example": "127.0.0.1:8001",
-            "type": "string"
-          },
           "salt": {
             "description": "Random data that is used as an additional input so as to create a token. Optional.",
             "example": "avocado-12345",
@@ -101,6 +100,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "token"
+        ],
         "type": "object"
       },
       "decrypt_data": {
@@ -113,12 +115,14 @@
           "from_public_key": {
             "description": "A public key of creator",
             "example": "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "PublicKey"
           },
           "to_public_key": {
             "description": "A public key of receiver",
             "example": "6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "PublicKey"
           },
           "token": {
             "description": "Session's identifier",
@@ -148,6 +152,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "decrypted_content"
+        ],
         "type": "object"
       },
       "encrypt_data": {
@@ -160,18 +167,21 @@
           "from_public_key": {
             "description": "A public key of creator",
             "example": "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "PublicKey"
           },
           "nonce": {
             "description": "If nonce is given then is used for encryption otherwise current time is used",
             "example": 1234567,
             "format": "int32",
-            "type": "integer"
+            "type": "integer",
+            "x-hive-type": "Uint32t"
           },
           "to_public_key": {
             "description": "A public key of receiver",
             "example": "6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "PublicKey"
           },
           "token": {
             "description": "Session's identifier",
@@ -201,6 +211,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "encrypted_content"
+        ],
         "type": "object"
       },
       "get_info": {
@@ -221,14 +234,20 @@
           "now": {
             "description": "Current time",
             "example": "2024-04-11T11:36:12.000Z",
+            "format": "date-time",
             "type": "string"
           },
           "timeout_time": {
             "description": "Timeout time",
             "example": "2024-04-11T12:35:34.000Z",
+            "format": "date-time",
             "type": "string"
           }
         },
+        "required": [
+          "now",
+          "timeout_time"
+        ],
         "type": "object"
       },
       "get_public_keys": {
@@ -250,19 +269,18 @@
         "type": "object"
       },
       "get_public_keys_response": {
-        "items": {
-          "properties": {
-            "public_key": {
-              "description": "A public key",
-              "example": "6oR6ckA4TejTWTjatUdbcS98AKETc3rcnQ9dWxmeNiKDzfhBZa",
-              "type": "string"
-            }
-          },
-          "type": "object"
+        "properties": {
+          "keys": {
+            "description": "Public keys (sorted).",
+            "items": {
+              "$ref": "#/components/schemas/public_key_details"
+            },
+            "type": "array"
+          }
         },
-        "type": "array"
-      },
-      "get_version": {
+        "required": [
+          "keys"
+        ],
         "type": "object"
       },
       "get_version_response": {
@@ -270,9 +288,13 @@
           "version": {
             "description": "Current version",
             "example": "d2abc7e9318fce5a10c73cda8beb57f46fe37247",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "Hex"
           }
         },
+        "required": [
+          "version"
+        ],
         "type": "object"
       },
       "has_matching_private_key": {
@@ -280,7 +302,8 @@
           "public_key": {
             "description": "A public key corresponding to a private key that is stored in a wallet",
             "example": "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "PublicKey"
           },
           "token": {
             "description": "Session's identifier",
@@ -307,6 +330,9 @@
             "type": "boolean"
           }
         },
+        "required": [
+          "exists"
+        ],
         "type": "object"
       },
       "has_wallet": {
@@ -335,6 +361,9 @@
             "type": "boolean"
           }
         },
+        "required": [
+          "exists"
+        ],
         "type": "object"
       },
       "import_key": {
@@ -367,9 +396,13 @@
           "public_key": {
             "description": "A public key corresponding to WIF key",
             "example": "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "PublicKey"
           }
         },
+        "required": [
+          "public_key"
+        ],
         "type": "object"
       },
       "import_keys": {
@@ -401,12 +434,23 @@
         "type": "object"
       },
       "import_keys_response": {
-        "items": {
-          "description": "A public key corresponding to WIF key",
-          "example": "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4",
-          "type": "string"
+        "properties": {
+          "public_keys": {
+            "description": "Public keys corresponding to the imported private keys.",
+            "example": [
+              "STM6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4"
+            ],
+            "items": {
+              "type": "string",
+              "x-hive-type": "PublicKey"
+            },
+            "type": "array"
+          }
         },
-        "type": "array"
+        "required": [
+          "public_keys"
+        ],
+        "type": "object"
       },
       "is_wallet_unlocked": {
         "properties": {
@@ -429,11 +473,15 @@
       },
       "is_wallet_unlocked_response": {
         "properties": {
-          "is_locked": {
-            "description": "A `true` value if a wallet is unlocked otherwise `false`",
+          "unlocked": {
+            "description": "`true` if the wallet is unlocked in the current session.",
+            "example": true,
             "type": "boolean"
           }
         },
+        "required": [
+          "unlocked"
+        ],
         "type": "object"
       },
       "list_created_wallets": {
@@ -449,21 +497,19 @@
         "type": "object"
       },
       "list_created_wallets_response": {
-        "items": {
-          "properties": {
-            "name": {
-              "description": "A name of a wallet",
-              "example": "my_second_wallet",
-              "type": "string"
+        "properties": {
+          "wallets": {
+            "description": "List of wallets.",
+            "items": {
+              "$ref": "#/components/schemas/wallet_details"
             },
-            "unlocked": {
-              "description": "Status of a wallet",
-              "type": "boolean"
-            }
-          },
-          "type": "object"
+            "type": "array"
+          }
         },
-        "type": "array"
+        "required": [
+          "wallets"
+        ],
+        "type": "object"
       },
       "list_wallets": {
         "properties": {
@@ -479,21 +525,19 @@
         "type": "object"
       },
       "list_wallets_response": {
-        "items": {
-          "properties": {
-            "name": {
-              "description": "A name of a wallet",
-              "example": "my_second_wallet",
-              "type": "string"
+        "properties": {
+          "wallets": {
+            "description": "List of wallets.",
+            "items": {
+              "$ref": "#/components/schemas/wallet_details"
             },
-            "unlocked": {
-              "description": "Status of a wallet",
-              "type": "boolean"
-            }
-          },
-          "type": "object"
+            "type": "array"
+          }
         },
-        "type": "array"
+        "required": [
+          "wallets"
+        ],
+        "type": "object"
       },
       "lock": {
         "properties": {
@@ -555,12 +599,27 @@
       "open_response": {
         "type": "object"
       },
+      "public_key_details": {
+        "properties": {
+          "public_key": {
+            "description": "Public key (with `STM` prefix) of a private key stored in a wallet.",
+            "example": "STM6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4",
+            "type": "string",
+            "x-hive-type": "PublicKey"
+          }
+        },
+        "required": [
+          "public_key"
+        ],
+        "type": "object"
+      },
       "remove_key": {
         "properties": {
           "public_key": {
             "description": "The public key to find corresponding a private key to remove.",
             "example": "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "PublicKey"
           },
           "token": {
             "description": "Session's identifier",
@@ -576,7 +635,6 @@
         "required": [
           "token",
           "wallet_name",
-          "password",
           "public_key"
         ],
         "type": "object"
@@ -590,7 +648,8 @@
             "description": "After `N` seconds of inactivity `lock_all` is called",
             "example": 3600,
             "format": "int32",
-            "type": "integer"
+            "type": "integer",
+            "x-hive-type": "Uint32t"
           },
           "token": {
             "description": "Session's identifier",
@@ -612,12 +671,14 @@
           "public_key": {
             "description": "A public key corresponding to a private key that is stored in a wallet",
             "example": "6LLegbAgLAy28EHrffBVuANFWcFgmqRMW13wBmTExqFE9SCkg4",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "PublicKey"
           },
           "sig_digest": {
             "description": "A signature digest. Represents a whole transaction",
             "example": "9b29ba0710af3918e81d7b935556d7ab205d8a8f5ca2e2427535980c2e8bdaff",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "Sha256"
           },
           "token": {
             "description": "Session's identifier",
@@ -642,9 +703,13 @@
           "signature": {
             "description": "A signature of a transaction",
             "example": "1f74012018d7c6ee846e0b51f8ab42884f91ccf5c76327ce1282ec79290138e2691ec51c57c80f3b594ea587262244ac8ffecfa6efff4a4e15bed1fa6e46b6423a",
-            "type": "string"
+            "type": "string",
+            "x-hive-type": "Signature"
           }
         },
+        "required": [
+          "signature"
+        ],
         "type": "object"
       },
       "unlock": {
@@ -673,6 +738,25 @@
         "type": "object"
       },
       "unlock_response": {
+        "type": "object"
+      },
+      "wallet_details": {
+        "properties": {
+          "name": {
+            "description": "Name of the wallet (file name without the `.wallet` extension).",
+            "example": "my_second_wallet",
+            "type": "string"
+          },
+          "unlocked": {
+            "description": "`true` if the wallet is unlocked in the current session, otherwise `false`.",
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "unlocked"
+        ],
         "type": "object"
       }
     }
@@ -750,7 +834,7 @@
     },
     "beekeeper_api.create": {
       "post": {
-        "description": "A new wallet is created in file dir/{wallet_name}.wallet. The new wallet is unlocked after creation and is implictly opened",
+        "description": "A new wallet is created in file dir/{wallet_name}.wallet. The new wallet is unlocked after creation and is implicitly opened",
         "operationId": "create",
         "requestBody": {
           "content": {
@@ -944,16 +1028,6 @@
       "post": {
         "description": "Get current version. The version is based on git hash.",
         "operationId": "get_version",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/get_version"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "content": {

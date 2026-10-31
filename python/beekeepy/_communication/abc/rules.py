@@ -1,144 +1,159 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from enum import IntEnum
-from typing import TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, ClassVar, TypedDict, cast
+
+from beekeepy._communication.signals import Abort, Retry
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from hiveio_api.client import HttpUrl, JSONRPCRequest, RequestContext, Response
 
-    from beekeepy._communication.url import HttpUrl
-    from beekeepy.exceptions import Json, OverseerError
-
-
-class ContinueMode(IntEnum):
-    BREAK = 0
-    CONTINUE = 1
-    INF = 2
+    from beekeepy.exceptions import CommunicationResponseT, Json, OverseerError
 
 
-@dataclass(kw_only=True)
-class RulesClassifier:
-    preliminary: Sequence[type[OverseerRule]]
-    """Checks if content is parsable and is in valid state."""
+class Reaction(Enum):
+    """What happens to the request when a rule detects a problem in its response."""
 
-    infinitely_repeatable: Sequence[type[OverseerRule]]
-    """Checks if response should be acquired until approval."""
+    ABORT = "abort"
+    """The detected errors are raised."""
 
-    finitely_repeatable: Sequence[type[OverseerRule]]
-    """Checks if response is ok just settings.max_retries, after this rethrows."""
+    RETRY = "retry"
+    """The request is sent again, at most `max_retries` times - then the detected errors are raised."""
 
-    def instantiate(self, url: HttpUrl, request: Json | list[Json] | None) -> Rules:
-        return Rules(
-            preliminary=[rule_cls(url=url, request=request) for rule_cls in self.preliminary],
-            infinitely_repeatable=[rule_cls(url=url, request=request) for rule_cls in self.infinitely_repeatable],
-            finitely_repeatable=[rule_cls(url=url, request=request) for rule_cls in self.finitely_repeatable],
-        )
+    RETRY_UNLIMITED = "retry_unlimited"
+    """The request is sent again until the problem disappears (at most for `unlimited_retries_timeout` of settings)."""
 
 
-@dataclass(kw_only=True)
-class RulesExceptions:
-    preliminary: Sequence[type[OverseerError]]
-    infinitely_repeatable: Sequence[type[OverseerError]]
-    finitely_repeatable: Sequence[type[OverseerError]]
+class ErrorArguments(TypedDict):
+    """Arguments of errors detected by rules (`OverseerError`)."""
+
+    url: HttpUrl
+    request: CommunicationResponseT
+    request_id: int | None
+    response: CommunicationResponseT
+    whole_response: CommunicationResponseT
+    message: str
 
 
-@dataclass(kw_only=True, frozen=True)
-class Rules:
-    preliminary: Sequence[OverseerRule]
-    """If rules in this category detect error, retries won't be attempted."""
-
-    infinitely_repeatable: Sequence[OverseerRule]
-    """If rules in this category detect error, retries will be attempted indefinitely."""
-
-    finitely_repeatable: Sequence[OverseerRule]
-    """If rules in this category detect error, retries will be attempted up to settings.max_retries times."""
-
-    def resolved_rules(self) -> Iterator[tuple[OverseerRule, ContinueMode]]:
-        """Yields all rules in proper order with their associated ContinueMode."""
-        from beekeepy._communication.rules import ErrorInResponse
-
-        fallback_rule: tuple[OverseerRule, ContinueMode] | None = None
-        for rule, mode in (
-            *((rule, ContinueMode.INF) for rule in self.infinitely_repeatable),
-            *((rule, ContinueMode.BREAK) for rule in self.preliminary),
-            *((rule, ContinueMode.CONTINUE) for rule in self.finitely_repeatable),
-        ):
-            if type(rule) is ErrorInResponse:
-                fallback_rule = (rule, mode)
-                continue
-            yield rule, mode
-
-        assert fallback_rule is not None, "ErrorInResponse rule was not found among rules"
-        yield fallback_rule
-
-    def grouped_exceptions(self) -> RulesExceptions:
-        return RulesExceptions(
-            preliminary=[rule.expected_exception() for rule in self.preliminary],
-            infinitely_repeatable=[rule.expected_exception() for rule in self.infinitely_repeatable],
-            finitely_repeatable=[rule.expected_exception() for rule in self.finitely_repeatable],
-        )
-
-
-class OverseerRule(ABC):
-    def __init__(self, url: HttpUrl, request: Json | list[Json] | None) -> None:
-        self.url = url
-        self.request = request or {}  # if None, then this is REST request
-
-    def check(self, response: Json | list[Json] | Exception, response_raw: str) -> list[OverseerError]:
-        """Call to verify response."""
-        if isinstance(response, list):
-            return self._check_batch(parsed_response=response)
-        if isinstance(response, dict):
-            return self._check_single(parsed_response=response, whole_response=response)
-        return self._check_non_json_response(parsed_response=response, response_raw=response_raw)
-
-    def _check_batch(self, parsed_response: list[Json]) -> list[OverseerError]:
-        """Overload this method to verify response as a whole in case of array (batch).
-
-        Note: by default in case of array response calls `_check_single` for each element.
-        """
-        result: list[OverseerError] = []
-        for response in parsed_response:
-            result.extend(self._check_single(parsed_response=response, whole_response=parsed_response))
-        return result
-
-    def _check_non_json_response(self, parsed_response: Exception, response_raw: str) -> list[OverseerError]:  # noqa: ARG002
-        """Overload this method to verify non-json response."""
-        return []
+class Rule(ABC):
+    """Rule of responses - detects one kind of problem in the response of a request."""
 
     @abstractmethod
-    def _check_single(self, parsed_response: Json, whole_response: Json | list[Json]) -> list[OverseerError]:
-        """Overload this method to verify response in case of singular response."""
-
-    def _get_matching_request(self, request_id: int) -> Json:
-        """Searches for request of given id in case of array (batch) result. In case of singular request, returns it."""
-        if isinstance(self.request, list):
-            for req in self.request:
-                assert isinstance(req, dict), "All items in batch request has to be json objects"
-                if req.get("id", {}) == request_id:
-                    return req
-        assert isinstance(self.request, dict), f"self.request is not a dict, nor list, but is `{type(self.request)}`"
-        return self.request
+    def check(self, context: RequestContext) -> list[OverseerError]:
+        """Errors detected in the response of the context - e.g. one for each response of a batch."""
 
     @classmethod
     @abstractmethod
     def expected_exception(cls) -> type[OverseerError]:
-        """Overload this method to specify which exception should be raised in case of detection."""
+        """Type of errors detected by the rule."""
 
-    def _construct_exception(
-        self,
-        response: Json | list[Json] | Exception,
-        whole_response: Json | list[Json],
-        request_id: int | None,
-        message: str = "",
+    def _error(
+        self, context: RequestContext, *, response: CommunicationResponseT, request_id: int | None, message: str
     ) -> OverseerError:
+        """Error of the rule detected in the response (or one of responses of a batch) of the context."""
         return self.expected_exception()(
-            url=self.url,
-            request=self.request,
+            **self._error_arguments(context, response=response, request_id=request_id, message=message)
+        )
+
+    def _error_arguments(
+        self, context: RequestContext, *, response: CommunicationResponseT, request_id: int | None, message: str
+    ) -> ErrorArguments:
+        """Arguments of the error - for rules raising errors with additional arguments."""
+        return ErrorArguments(
+            url=context.request.url,
+            request=request_payload(context),
             request_id=request_id,
-            response=(str(response) if isinstance(response, Exception) else response),
-            whole_response=whole_response,
+            response=response,
+            whole_response=whole_response(context),
             message=message,
         )
+
+
+class ResponsesRule(Rule):
+    """
+    Rule checking each JSON-RPC response of the context - the response, or each response of a batch.
+
+    A response which is not parsable is not checked (`UnparsableResponse` detects it).
+    """
+
+    def check(self, context: RequestContext) -> list[OverseerError]:
+        return [
+            error
+            for response in jsonrpc_responses(context)
+            if (error := self._check_response(context, response)) is not None
+        ]
+
+    @abstractmethod
+    def _check_response(self, context: RequestContext, response: Json) -> OverseerError | None:
+        """Error detected in the response (one of responses of a batch), `None` when it is correct."""
+
+
+class RuleSet:
+    """
+    Callback of responses (`process_response`) checking its rules in their order.
+
+    The first rule detecting a problem decides - `Abort` or `Retry` is raised with all errors it detected (e.g. in all
+    responses of a batch). Only responses of JSON-RPC requests are checked.
+    """
+
+    RULES: ClassVar[tuple[tuple[Rule, Reaction], ...]] = ()
+
+    def __call__(self, context: RequestContext, /) -> None:
+        if not context.request.jsonrpc or context.response is None:
+            return
+        for rule, reaction in self._rules():
+            if not (errors := rule.check(context)):
+                continue
+            if reaction is Reaction.ABORT:
+                raise Abort(*errors)
+            raise Retry(*errors, unlimited=reaction is Reaction.RETRY_UNLIMITED)
+
+    def _rules(self) -> tuple[tuple[Rule, Reaction], ...]:
+        """Rules of the set with their reactions - `RULES`, override for rules of the instance."""
+        return self.RULES
+
+
+def received(context: RequestContext) -> Response:
+    """Response of the context - rules check received responses."""
+    assert context.response is not None, "Rules check received responses"
+    return context.response
+
+
+def jsonrpc_responses(context: RequestContext) -> list[Json]:
+    """JSON-RPC responses of the context - the response, or responses of a batch; empty when it is not parsable."""
+    try:
+        payload = received(context).json
+    except json.JSONDecodeError:
+        return []
+    items = payload if isinstance(payload, list) else [payload]
+    return [cast("Json", item) for item in items if isinstance(item, dict)]
+
+
+def response_id(response: Json) -> int | None:
+    """Id of the JSON-RPC response - ids of requests sent by handles are numbers."""
+    id_ = response.get("id")
+    return id_ if isinstance(id_, int) else None
+
+
+def matching_request(context: RequestContext, request_id: int | None) -> JSONRPCRequest | None:
+    """JSON-RPC call answered by the response of the given id - the call of a single request, or of a batch."""
+    calls = context.request.jsonrpc
+    if not isinstance(context.request.json, list):
+        return calls[0] if calls else None
+    return next((call for call in calls if call.id_ == request_id), None)
+
+
+def request_payload(context: RequestContext) -> Json | list[Json]:
+    """Parsed JSON-RPC request of the context - a call, or calls of a batch."""
+    return cast("Json | list[Json]", context.request.json)
+
+
+def whole_response(context: RequestContext) -> CommunicationResponseT:
+    """Parsed response of the context, its body when it is not parsable."""
+    response = received(context)
+    try:
+        return cast("Json | list[Json]", response.json)
+    except json.JSONDecodeError:
+        return response.body
