@@ -186,6 +186,15 @@ beekeeper_wasm_test:
 
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| BEEKEEPY STATIC CODE ANALYSIS |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+# The pytest family at the versions of PYTHON_TEST_TOOLS_IMAGE (common-ci-configuration's
+# docker-bake.hcl, published as pip constraints), installed into the project's environment after its
+# `poetry install`. The job fails when the constraints cannot be read.
+.beekeepy_test_tools:
+  script:
+  - !reference [.python_test_tools_constraints, script]
+  - python3 -m pip install -c "${PYTHON_TEST_TOOLS_CONSTRAINTS}" pytest pytest-asyncio pytest-xdist
+  - python3 -m pip show pytest pytest-asyncio pytest-xdist | grep -E '^(Name|Version):'
+
 beekeepy_pre_commit_checks:
   stage: static_code_analysis
   extends: .pre_commit_checks_template
@@ -194,6 +203,8 @@ beekeepy_pre_commit_checks:
   # mypy checks scripts/generate_beekeeper_api.py against the generator
   - poetry -C "${PYPROJECT_DIR}" install --with generation
   - !reference [.update_deps_for_static_analysis, script]
+  # the mypy hook checks the tests, which import pytest
+  - !reference [.beekeepy_test_tools, script]
   variables:
     PYPROJECT_DIR: "${PYTHON_DIR}"
     PRE_COMMIT_CONFIG: "${PYTHON_DIR}/.pre-commit-config.yaml"
@@ -233,6 +244,8 @@ beekeepy_type_check_with_mypy:
   before_script:
   - !reference [.type_check_with_mypy_template, before_script]
   - !reference [.update_deps_for_static_analysis, script]
+  # mypy checks the tests, which import pytest
+  - !reference [.beekeepy_test_tools, script]
   rules:
   - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     changes:
@@ -289,6 +302,7 @@ beekeepy_generated_api_check:
   - cd "${PYTHON_DIR}"
   - !reference [.project_develop_configuration_template, before_script]
   - !reference [.update_deps_for_tests, script]
+  - !reference [.beekeepy_test_tools, script]
   script:
   - if [ -z "${HIVED_HTTP_ENDPOINT}" ]; then HIVED_HTTP_ENDPOINT=""; else HIVED_HTTP_ENDPOINT="--hived-http-endpoint=${HIVED_HTTP_ENDPOINT}";
     fi
