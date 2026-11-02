@@ -5,7 +5,8 @@
 #
 # The tag is `aidev-<hash>`, the hash of the image inputs (the Dockerfile,
 # `packageManager` from package.json, pnpm-lock.yaml, pnpm-workspace.yaml,
-# .npmrc, and the digest of the emsdk image ccc names now); the registry cleanup policy keeps `aidev-*` tags. When
+# .npmrc, the digest of the emsdk image ccc names now and the pip constraints of
+# ccc's python-test-tools image); the registry cleanup policy keeps `aidev-*` tags. When
 # <repository>:aidev-<hash> is already in the registry nothing is built: the script
 # prints that image's digest.
 #
@@ -23,6 +24,19 @@ BASE_DIGEST="$(docker buildx imagetools inspect "$BASE_IMAGE" --format '{{json .
     | grep -o '"digest": *"sha256:[0-9a-f]*"' | head -1 | grep -o 'sha256:[0-9a-f]*')"
 BASE_IMAGE="${BASE_IMAGE%%@*}@${BASE_DIGEST:?cannot resolve $BASE_IMAGE}"
 
+context="$(mktemp -d)"
+trap 'rm -rf "$context"' EXIT
+
+# The pytest family is installed at ccc's versions: the pip constraints of the python-test-tools
+# image CI's jobs read them from (.python_test_tools_constraints), written by ccc's script.
+PYTHON_TEST_TOOLS_IMAGE="${PYTHON_TEST_TOOLS_IMAGE:-registry.gitlab.syncad.com/hive/common-ci-configuration/python-test-tools:develop}"
+mkdir -p "$context/ccc"
+for f in python-test-tools-constraints.py registry_auth.py; do
+    curl -fsSL "https://gitlab.syncad.com/hive/common-ci-configuration/-/raw/develop/scripts/python/$f" -o "$context/ccc/$f"
+done
+python3 "$context/ccc/python-test-tools-constraints.py" "$PYTHON_TEST_TOOLS_IMAGE" "$context/python-test-tools-constraints.txt" >&2
+rm -rf "$context/ccc"
+
 PKG=programs/beekeeper/beekeeper_wasm
 CFG=$PKG/npm-common-config/pnpm-config
 PY=python
@@ -36,6 +50,7 @@ input_hash() {
             "$PY/pyproject.toml" "$PY/poetry.lock" "$PY/tests/local-tools/pyproject.toml" "$PY/tests/local-tools/poetry.lock"
         grep '"packageManager"' "$PKG/package.json"
         echo "$BASE_IMAGE"
+        cat "$context/python-test-tools-constraints.txt"
     } | sha256sum | cut -c1-16
 }
 TAG="aidev-$(input_hash)"
@@ -62,8 +77,6 @@ echo "$REPOSITORY:$TAG is not in the registry; building it" >&2
 
 # Only the files the Dockerfile copies, symlinks resolved: the repository holds node_modules
 # and build trees.
-context="$(mktemp -d)"
-trap 'rm -rf "$context"' EXIT
 mkdir -p "$context/js" "$context/python/tests"
 cp -L "$PKG/package.json" "$PKG/pnpm-lock.yaml" "$CFG/pnpm-workspace.yaml" "$CFG/.npmrc" "$context/js/"
 cp "$PY/pyproject.toml" "$PY/poetry.lock" "$context/python/"
