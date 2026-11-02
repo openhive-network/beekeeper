@@ -48,11 +48,14 @@ emscripten and ccc's Node and pnpm; `runtime/build.sh` resolves it with
 `scripts/ccc_emscripten_image.sh` and builds on its current digest) plus the chromium build the lockfile's Playwright wants, a pnpm
 store filled from `beekeeper_wasm/pnpm-lock.yaml`, Ubuntu's g++/Boost/OpenSSL for the
 native build, and Python 3.12 with `python/poetry.lock` (dev and static-analysis
-groups) in `/opt/py`.
+groups) in `/opt/py`, plus pytest, pytest-asyncio and pytest-xdist at the versions of
+ccc's python-test-tools image (its pip constraints, which `runtime/build.sh` reads as
+CI's `.beekeepy_test_tools` does).
 
 When `beekeeper_wasm/pnpm-lock.yaml`, the npm-common-config submodule's
 `pnpm-workspace.yaml`/`.npmrc`, `packageManager`, `python/pyproject.toml`, either
-`poetry.lock` or `runtime/Dockerfile` change, or ccc moves its emsdk image (a Node bump), rebuild and re-pin **in the same commit**:
+`poetry.lock` or `runtime/Dockerfile` change, or ccc moves its emsdk image (a Node bump)
+or its python-test-tools versions, rebuild and re-pin **in the same commit**:
 
 ```bash
 .aidev/runtime/build.sh --push   # registry digest if aidev-<input hash> exists, else build + push

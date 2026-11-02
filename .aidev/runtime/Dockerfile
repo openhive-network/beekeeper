@@ -17,7 +17,9 @@
 #   /opt/py (ruff, mypy), installed by poetry 2.1.3 from a copy at /work/python so
 #   the editable local-tools path dependency resolves to the mounted workspace, and
 #   beekeepy itself (`--no-root`) is importable from /work/python through a .pth, as
-#   the subprocesses its tests start need.
+#   the subprocesses its tests start need; pytest, pytest-asyncio and pytest-xdist at
+#   ccc's versions, from the python-test-tools constraints build.sh writes into the
+#   build context (CI's .beekeepy_test_tools).
 #
 # Build and pin it with .aidev/runtime/build.sh; see .aidev/README.md.
 ARG BASE_IMAGE
@@ -54,12 +56,15 @@ RUN cd /tmp/pnpm-fetch \
     && chmod -R a+rwX /opt/pnpm-store /opt/pw-browsers
 
 COPY python/ /work/python/
+COPY python-test-tools-constraints.txt /tmp/python-test-tools-constraints.txt
 RUN python3 -m venv --without-pip /opt/poetry \
     && pip3 --python /opt/poetry/bin/python install --no-cache-dir poetry==2.1.3 \
     && python3 -m venv --without-pip /opt/py \
     && cd /work/python \
     && POETRY_CACHE_DIR=/tmp/poetry-cache /opt/poetry/bin/poetry install --no-root --no-interaction \
          --with dev,static-analysis \
+    && pip3 --python /opt/py/bin/python install --no-cache-dir -c /tmp/python-test-tools-constraints.txt \
+         pytest pytest-asyncio pytest-xdist \
     && /opt/py/bin/ruff --version && /opt/py/bin/mypy --version \
     && echo /work/python > /opt/py/lib/python3.12/site-packages/beekeepy-workspace.pth \
     && rm -rf /work /tmp/poetry-cache /opt/poetry \
