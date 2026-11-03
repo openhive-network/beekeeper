@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path  # noqa: TC003
 
-from hiveio_api.client import HttpUrl, WsUrl
+from hiveio_api.client import HttpUrl, WsUrl  # noqa: TC002
 from msgspec import field
 
 from beekeepy._executable.abc.config import Config
