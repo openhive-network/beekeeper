@@ -217,7 +217,7 @@ class HasWallet(PreconfiguredBaseModel, kw_only=True):
     """
     wallet_name: str
     """
-    A name of a wallet
+    A name of a wallet. `exists` is `false` for a name with other chars than alphanumeric and '._-@'.
     """
 
 
@@ -356,7 +356,7 @@ class Open(PreconfiguredBaseModel, kw_only=True):
     """
     wallet_name: str
     """
-    A name of a wallet
+    A name of a wallet. Only alphanumeric and '._-@' chars are allowed, as in `create`.
     """
 
 
@@ -435,7 +435,7 @@ class Unlock(PreconfiguredBaseModel, kw_only=True):
     """
     wallet_name: str
     """
-    A name of a wallet to unlock
+    A name of a wallet to unlock. Only alphanumeric and '._-@' chars are allowed, as in `create`.
     """
 
 
