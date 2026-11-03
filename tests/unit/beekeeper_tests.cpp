@@ -1727,7 +1727,7 @@ BOOST_AUTO_TEST_CASE(wallet_kdf_v1_format)
   bk.create_wallet(_token, "v1", "pass", false);
   auto priv = fc::ecc::private_key::generate();
   auto wif = priv.key_to_wif();
-  bk.import_key("v1", wif, "STM");
+  bk.import_key(_token, "v1", wif, "STM");
 
   // Stored blob is the self-describing v1 format with the provider's work factor.
   auto blob = b_mgr.read_wallet_blob("v1");
@@ -1742,11 +1742,11 @@ BOOST_AUTO_TEST_CASE(wallet_kdf_v1_format)
                       static_cast<int>(boost::filesystem::owner_read | boost::filesystem::owner_write));
 
   // Full persistence roundtrip.
-  bk.close_wallet("v1");
+  bk.close_wallet(_token, "v1");
   bk.open_wallet(_token, "v1");
-  BOOST_REQUIRE_THROW(bk.unlock("v1", "wrong"), std::exception);
-  bk.unlock("v1", "pass");
-  auto keys = bk.get_public_keys("v1");
+  BOOST_REQUIRE_THROW(bk.unlock(_token, "v1", "wrong"), std::exception);
+  bk.unlock(_token, "v1", "pass");
+  auto keys = bk.get_public_keys(_token, "v1");
   BOOST_REQUIRE_EQUAL(1u, keys.size());
   BOOST_REQUIRE_EQUAL(wif, b_mgr.crypto.key_to_wif(keys.begin()->second.first));
 
@@ -1774,12 +1774,12 @@ BOOST_AUTO_TEST_CASE(wallet_legacy_migration)
 
   // Wrong password on the legacy path is rejected and must not migrate.
   bk.open_wallet(_token, "legacy");
-  BOOST_REQUIRE_THROW(bk.unlock("legacy", "wrong-legacy-pass"), std::exception);
+  BOOST_REQUIRE_THROW(bk.unlock(_token, "legacy", "wrong-legacy-pass"), std::exception);
   BOOST_REQUIRE(!blob_has_v1_magic(b_mgr.read_wallet_blob("legacy")));
 
   // The legacy wallet unlocks with the correct password...
-  bk.unlock("legacy", "legacy-pass");
-  auto loaded = bk.get_public_keys("legacy");
+  bk.unlock(_token, "legacy", "legacy-pass");
+  auto loaded = bk.get_public_keys(_token, "legacy");
   BOOST_REQUIRE_EQUAL(1u, loaded.size());
   BOOST_REQUIRE_EQUAL(wif, b_mgr.crypto.key_to_wif(loaded.begin()->second.first));
 
@@ -1789,11 +1789,11 @@ BOOST_AUTO_TEST_CASE(wallet_legacy_migration)
 
   // The migrated wallet behaves like any other: wrong password rejected,
   // correct password recovers the same key.
-  bk.close_wallet("legacy");
+  bk.close_wallet(_token, "legacy");
   bk.open_wallet(_token, "legacy");
-  BOOST_REQUIRE_THROW(bk.unlock("legacy", "bad"), std::exception);
-  bk.unlock("legacy", "legacy-pass");
-  loaded = bk.get_public_keys("legacy");
+  BOOST_REQUIRE_THROW(bk.unlock(_token, "legacy", "bad"), std::exception);
+  bk.unlock(_token, "legacy", "legacy-pass");
+  loaded = bk.get_public_keys(_token, "legacy");
   BOOST_REQUIRE_EQUAL(wif, b_mgr.crypto.key_to_wif(loaded.begin()->second.first));
 
 } FC_LOG_AND_RETHROW() }
@@ -1807,9 +1807,9 @@ BOOST_AUTO_TEST_CASE(wallet_v1_tamper_detection)
   auto _token = bk.create_session();
 
   bk.create_wallet(_token, "tamper", "pass", false);
-  bk.import_key("tamper", fc::ecc::private_key::generate().key_to_wif(), "STM");
+  bk.import_key(_token, "tamper", fc::ecc::private_key::generate().key_to_wif(), "STM");
   auto good = b_mgr.read_wallet_blob("tamper");
-  bk.close_wallet("tamper");
+  bk.close_wallet(_token, "tamper");
 
   // Flipping a single bit anywhere — salt, IV, ciphertext or tag — must be
   // rejected. The IV and first-block probes are the ones that need the MAC:
@@ -1825,14 +1825,14 @@ BOOST_AUTO_TEST_CASE(wallet_v1_tamper_detection)
     bad[pos] = static_cast<char>(bad[pos] ^ 0x01);
     b_mgr.write_wallet_blob("tamper", bad);
     bk.open_wallet(_token, "tamper");
-    BOOST_REQUIRE_THROW(bk.unlock("tamper", "pass"), std::exception);
-    bk.close_wallet("tamper");
+    BOOST_REQUIRE_THROW(bk.unlock(_token, "tamper", "pass"), std::exception);
+    bk.close_wallet(_token, "tamper");
   }
 
   // The untampered blob still unlocks.
   b_mgr.write_wallet_blob("tamper", good);
   bk.open_wallet(_token, "tamper");
-  bk.unlock("tamper", "pass");
+  bk.unlock(_token, "tamper", "pass");
 
 } FC_LOG_AND_RETHROW() }
 
@@ -1855,7 +1855,7 @@ BOOST_AUTO_TEST_CASE(wallet_v1_salt_uniqueness)
 
   // Re-encrypting the same wallet reuses its derived key (same salt, no KDF
   // run) but always draws a fresh IV.
-  bk.import_key("salt_a", fc::ecc::private_key::generate().key_to_wif(), "STM");
+  bk.import_key(_token, "salt_a", fc::ecc::private_key::generate().key_to_wif(), "STM");
   auto blob_a2 = b_mgr.read_wallet_blob("salt_a");
   BOOST_REQUIRE(std::equal(blob_a.begin() + v1_salt_offset, blob_a.begin() + v1_salt_offset + 16,
                            blob_a2.begin() + v1_salt_offset));
@@ -1874,7 +1874,7 @@ BOOST_AUTO_TEST_CASE(wallet_v1_kdf_iteration_bounds)
 
   bk.create_wallet(_token, "bounds", "pass", false);
   auto good = b_mgr.read_wallet_blob("bounds");
-  bk.close_wallet("bounds");
+  bk.close_wallet(_token, "bounds");
 
   // Iteration counts of zero or beyond the sanity cap are rejected while the
   // header is parsed — before any KDF work is attempted, so a hostile file
@@ -1889,8 +1889,8 @@ BOOST_AUTO_TEST_CASE(wallet_v1_kdf_iteration_bounds)
     set_blob_iterations(bad, bad_iterations);
     b_mgr.write_wallet_blob("bounds", bad);
     bk.open_wallet(_token, "bounds");
-    BOOST_REQUIRE_EXCEPTION(bk.unlock("bounds", "pass"), std::exception, is_iteration_range_error);
-    bk.close_wallet("bounds");
+    BOOST_REQUIRE_EXCEPTION(bk.unlock(_token, "bounds", "pass"), std::exception, is_iteration_range_error);
+    bk.close_wallet(_token, "bounds");
   }
 
 } FC_LOG_AND_RETHROW() }
@@ -1905,17 +1905,17 @@ BOOST_AUTO_TEST_CASE(wallet_v1_header_rejections)
 
   bk.create_wallet(_token, "hdr", "pass", false);
   auto good = b_mgr.read_wallet_blob("hdr");
-  bk.close_wallet("hdr");
+  bk.close_wallet(_token, "hdr");
 
   auto expect_rejection = [&](std::vector<char> bad, const std::string& message_part)
   {
     b_mgr.write_wallet_blob("hdr", bad);
     bk.open_wallet(_token, "hdr");
-    BOOST_REQUIRE_EXCEPTION(bk.unlock("hdr", "pass"), std::exception,
+    BOOST_REQUIRE_EXCEPTION(bk.unlock(_token, "hdr", "pass"), std::exception,
       [&](const std::exception& e) {
         return std::string(e.what()).find(message_part) != std::string::npos;
       });
-    bk.close_wallet("hdr");
+    bk.close_wallet(_token, "hdr");
   };
 
   // Every unknown/invalid header field is rejected with a distinct error,
@@ -1931,7 +1931,7 @@ BOOST_AUTO_TEST_CASE(wallet_v1_header_rejections)
   // The pristine blob still unlocks after all those rejections.
   b_mgr.write_wallet_blob("hdr", good);
   bk.open_wallet(_token, "hdr");
-  bk.unlock("hdr", "pass");
+  bk.unlock(_token, "hdr", "pass");
 
 } FC_LOG_AND_RETHROW() }
 
@@ -1955,20 +1955,20 @@ BOOST_AUTO_TEST_CASE(wallet_legacy_empty_password)
   b_mgr.write_wallet_blob("legacy_empty", make_legacy_wallet_blob("", keys));
 
   bk.open_wallet(_token, "legacy_empty");
-  bk.unlock("legacy_empty", "");
-  BOOST_REQUIRE_EQUAL(1u, bk.get_public_keys("legacy_empty").size());
+  bk.unlock(_token, "legacy_empty", "");
+  BOOST_REQUIRE_EQUAL(1u, bk.get_public_keys(_token, "legacy_empty").size());
   BOOST_REQUIRE(blob_has_v1_magic(b_mgr.read_wallet_blob("legacy_empty")));
 
   // State-changing operations (each re-encrypts) still work...
-  bk.import_key("legacy_empty", fc::ecc::private_key::generate().key_to_wif(), "STM");
-  BOOST_REQUIRE_EQUAL(2u, bk.get_public_keys("legacy_empty").size());
+  bk.import_key(_token, "legacy_empty", fc::ecc::private_key::generate().key_to_wif(), "STM");
+  BOOST_REQUIRE_EQUAL(2u, bk.get_public_keys(_token, "legacy_empty").size());
 
   // ...and the migrated v1 wallet unlocks with the empty password again.
-  bk.close_wallet("legacy_empty");
+  bk.close_wallet(_token, "legacy_empty");
   bk.open_wallet(_token, "legacy_empty");
-  BOOST_REQUIRE_THROW(bk.unlock("legacy_empty", "not-empty"), std::exception);
-  bk.unlock("legacy_empty", "");
-  BOOST_REQUIRE_EQUAL(2u, bk.get_public_keys("legacy_empty").size());
+  BOOST_REQUIRE_THROW(bk.unlock(_token, "legacy_empty", "not-empty"), std::exception);
+  bk.unlock(_token, "legacy_empty", "");
+  BOOST_REQUIRE_EQUAL(2u, bk.get_public_keys(_token, "legacy_empty").size());
 
 } FC_LOG_AND_RETHROW() }
 
@@ -2066,8 +2066,8 @@ BOOST_AUTO_TEST_CASE(wallet_v1_external_fixture)
   {
     b_mgr.write_wallet_blob(name, beekeeper_minimal::hex_decode(hex));
     bk.open_wallet(_token, name);
-    bk.unlock(name, fixture_password);
-    auto keys = bk.get_public_keys(name);
+    bk.unlock(_token, name, fixture_password);
+    auto keys = bk.get_public_keys(_token, name);
     BOOST_REQUIRE_EQUAL(1u, keys.size());
     BOOST_REQUIRE_EQUAL(fixture_pub,
       b_mgr.crypto.public_key_to_string(keys.begin()->first, keys.begin()->second.second));
@@ -2091,8 +2091,8 @@ BOOST_AUTO_TEST_CASE(wallet_default_kdf_profile)
   BOOST_REQUIRE(blob_has_v1_magic(blob));
   BOOST_REQUIRE_EQUAL(beekeeper_minimal::crypto_provider_impl::default_kdf_iterations,
                       blob_iterations(blob));
-  bk.lock("prod");
-  bk.unlock("prod", "pass");
+  bk.lock(_token, "prod");
+  bk.unlock(_token, "prod", "pass");
 
   // Wallets are self-describing: one written with a different work factor
   // (the fast test profile) unlocks fine under the default provider.
@@ -2102,7 +2102,7 @@ BOOST_AUTO_TEST_CASE(wallet_default_kdf_profile)
     bk_fast.create_wallet(_token_fast, "fast", "pass2", false);
   }
   bk.open_wallet(_token, "fast");
-  bk.unlock("fast", "pass2");
+  bk.unlock(_token, "fast", "pass2");
 
 } FC_LOG_AND_RETHROW() }
 
@@ -2244,9 +2244,9 @@ BOOST_AUTO_TEST_CASE(wallet_temporary_minimal_work_factor)
   // A temporary wallet never reaches storage, so it gets the minimal work factor.
   bk.create_wallet(_token, "temp", "pass", true);
   BOOST_REQUIRE_EQUAL(1u, prims.last_iterations);
-  bk.lock("temp");
-  BOOST_REQUIRE_THROW(bk.unlock("temp", "wrong"), std::exception);
-  bk.unlock("temp", "pass");
+  bk.lock(_token, "temp");
+  BOOST_REQUIRE_THROW(bk.unlock(_token, "temp", "wrong"), std::exception);
+  bk.unlock(_token, "temp", "pass");
   BOOST_REQUIRE_EQUAL(1u, prims.last_iterations);
   BOOST_REQUIRE(!b_mgr.exists_wallet("temp"));
 

@@ -146,9 +146,9 @@ def test_api_lock_close_and_timeout_act_on_calling_session_only(
 
     beekeeper.api.unlock(wallet_name=wallet.name, password=wallet.password, token=other_session)
     beekeeper.api.set_timeout(seconds=1, token=other_session)
-    assert (
-        beekeeper.api.get_info(token=other_session).timeout_time < beekeeper.api.get_info().timeout_time
-    ), "Timeout should be set for the calling session only."
+    assert beekeeper.api.get_info(token=other_session).timeout_time < beekeeper.api.get_info().timeout_time, (
+        "Timeout should be set for the calling session only."
+    )
     time.sleep(1.5)
     assert not is_unlocked(beekeeper, wallet, other_session), "Wallet should be locked after the session timeout."
     assert is_unlocked(beekeeper, wallet), "Timeout of another session should not lock the wallet."
