@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Final
 import pytest
 from beekeepy.handle.runnable import AsyncBeekeeper
 from beekeepy.interfaces import DelayGuardBase
-from hiveio_api.client import JSONRPCRequest
+from hiveio_api_client import JSONRPCRequest
 from local_tools.beekeepy.generators import default_wallet_credentials
 from local_tools.beekeepy.models import SettingsLoggerFactory, WalletInfo
 from local_tools.beekeepy.network import async_raw_http_call

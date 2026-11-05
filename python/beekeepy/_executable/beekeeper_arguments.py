@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
-from hiveio_api.client import HttpUrl
+from hiveio_api_client import HttpUrl
 
 from beekeepy._executable.abc.arguments import Arguments
 

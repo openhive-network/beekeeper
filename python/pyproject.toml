@@ -39,9 +39,12 @@ requests = "^2.32.3"
 
 msgspec = "^0.20.0"  # configurations of executables (msgspec models of hiveio_api.validation)
 
-# The range admits only releases of develop since hive/hive!2126 - earlier .post releases of this version lack
-# the API base classes, the field types and the validation.
-hiveio-api = {version = ">=1.28.8rc3.post20261029210300,<1.28.8rc3.post99999999999999", source = "gitlab-hive", allow-prereleases = true}  # API base classes, field types, models of app_status_api, validate_schema
+# Runtime of generated API clients (hive/wax-spec-generator): API base classes, owners (`AsyncSendable`), callbacks,
+# JSON-RPC, URLs and the public lazy-import helpers (`hiveio_api_client.lazy_import`).
+hiveio-api-client = {version = ">=1.7.1.post20261105045512,<2", source = "gitlab-hive"}
+# The range admits only releases of develop since hive/hive#970 and hive/hive#978 - earlier .post releases of this
+# version do not re-export the runtime of hiveio-api-client (their API base classes are other objects).
+hiveio-api = {version = ">=1.28.8rc3.post20261105084949,<1.28.8rc3.post99999999999999", source = "gitlab-hive", allow-prereleases = true}  # field types, models of app_status_api, validate_schema
 
 [tool.poetry.group.static-analysis.dependencies]
 mypy = "*"

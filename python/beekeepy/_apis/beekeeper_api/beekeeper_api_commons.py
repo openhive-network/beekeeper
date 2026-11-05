@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Generic
 
-from hiveio_api.client import HandleT
+from hiveio_api_client import HandleT
 
 if TYPE_CHECKING:
     from beekeepy._apis.abc.session_holder import AsyncSessionHolder, SyncSessionHolder

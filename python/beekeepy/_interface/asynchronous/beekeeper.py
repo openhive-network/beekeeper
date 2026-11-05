@@ -20,7 +20,7 @@ from beekeepy.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from hiveio_api.client import HttpUrl
+    from hiveio_api_client import HttpUrl
 
     from beekeepy._communication.settings import CommunicationSettings
     from beekeepy._interface.abc.asynchronous.session import (

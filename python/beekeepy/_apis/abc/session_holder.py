@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from hiveio_api.client import AsyncSendable, SyncSendable
+from hiveio_api_client import AsyncSendable, SyncSendable
 
 from beekeepy._generated.beekeeper_api_description import CreateSessionResponse
 

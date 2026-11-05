@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from hiveio_api import SchemaError
-    from hiveio_api.client import AnyUrl, Url
+    from hiveio_api_client import AnyUrl, Url
 
 
 class UnableToAcquireDatabaseLockError(OverseerError):

@@ -4,8 +4,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final
 
-from hiveio_api.client import Url
 from hiveio_api.validation.model import PreconfiguredBaseModel
+from hiveio_api_client import Url
 
 from beekeepy._runnable_handle.settings import strtobool
 

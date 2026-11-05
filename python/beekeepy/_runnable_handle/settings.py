@@ -10,7 +10,7 @@ from beekeepy._remote_handle.settings import RemoteHandleSettings
 from beekeepy.exceptions import UnknownValueForBooleanConversionError
 
 if TYPE_CHECKING:
-    from hiveio_api.client import HttpUrl
+    from hiveio_api_client import HttpUrl
 
 
 def strtobool(value: str) -> bool:
