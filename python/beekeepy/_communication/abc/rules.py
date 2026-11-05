@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, ClassVar, TypedDict, cast
 from beekeepy._communication.signals import Abort, Retry
 
 if TYPE_CHECKING:
-    from hiveio_api.client import HttpUrl, JSONRPCRequest, RequestContext, Response
+    from hiveio_api_client import HttpUrl, JSONRPCRequest, RequestContext, Response
 
     from beekeepy.exceptions import CommunicationResponseT, Json, OverseerError
 

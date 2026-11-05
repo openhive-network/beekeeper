@@ -39,7 +39,7 @@ from beekeepy.exceptions import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from hiveio_api.client import RequestContext
+    from hiveio_api_client import RequestContext
 
     from beekeepy.exceptions import Json, OverseerError
 

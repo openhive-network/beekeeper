@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeVar, cast
 
-from hiveio_api.client import (
+from hiveio_api_client import (
     AbstractAsyncApiCollection,
     AbstractSyncApiCollection,
     AsyncCallbacks,
@@ -32,7 +32,7 @@ from beekeepy._utilities.stopwatch import Stopwatch
 from beekeepy.exceptions import CommunicationError, GroupedErrorsError
 
 if TYPE_CHECKING:
-    from hiveio_api.client import Methods, Response, ResponseCallback
+    from hiveio_api_client import Methods, Response, ResponseCallback
     from loguru import Logger
 
     from beekeepy._communication.abc.communicator import AbstractCommunicator

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from hiveio_api._utilities.smart_lazy_import import aggregate_same_import, lazy_module_factory
+from hiveio_api_client.lazy_import import aggregate_same_import, lazy_module_factory
 
 __all__ = [
     "AbstractAsyncApi",
@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from hiveio_api.client import (
+    from hiveio_api_client import (
         AbstractAsyncApi,
         AbstractAsyncApiCollection,
         AbstractSyncApi,
@@ -81,7 +81,7 @@ __getattr__ = lazy_module_factory(
         "AsyncSendable",
         "RegisteredApisT",
         "SyncSendable",
-        module="hiveio_api.client",
+        module="hiveio_api_client",
     ),
     *aggregate_same_import(
         "AbstractSyncHandle",

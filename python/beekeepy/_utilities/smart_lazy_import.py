@@ -1,8 +1,8 @@
-"""Lazy imports - moved to `hiveio_api._utilities.smart_lazy_import` (hiveio-api), its interface is re-exported here."""
+"""Lazy imports - moved to `hiveio_api_client.lazy_import` (hiveio-api-client), its interface is re-exported here."""
 
 from __future__ import annotations
 
-from hiveio_api._utilities.smart_lazy_import import (
+from hiveio_api_client.lazy_import import (
     aggregate_same_import,
     lazy_module_factory,
     smart_lazy_getattr,

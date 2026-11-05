@@ -6,7 +6,7 @@ from beekeepy._interface.settings import InterfaceSettings
 from beekeepy._utilities.settings_holder import UniqueSettingsHolder
 
 if TYPE_CHECKING:
-    from hiveio_api.client import HttpUrl
+    from hiveio_api_client import HttpUrl
 
     from beekeepy._interface.abc.asynchronous.beekeeper import (
         Beekeeper as AsynchronousBeekeeperInterface,

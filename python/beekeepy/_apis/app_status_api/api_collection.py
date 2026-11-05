@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from hiveio_api.client import AbstractAsyncApiCollection, AbstractSyncApiCollection
+from hiveio_api_client import AbstractAsyncApiCollection, AbstractSyncApiCollection
 
 if TYPE_CHECKING:
-    from hiveio_api.client import AsyncSendable, SyncSendable
+    from hiveio_api_client import AsyncSendable, SyncSendable
 
 
 class AppStatusProbeSyncApiCollection(AbstractSyncApiCollection):

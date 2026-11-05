@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 
-from hiveio_api.client import (
+from hiveio_api_client import (
     AsyncCallbacks,
     AsyncSendable,
     Callbacks,
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from types import TracebackType
     from typing import Self
 
-    from hiveio_api.client import HttpUrl, Methods
+    from hiveio_api_client import HttpUrl, Methods
 
 
 class SyncBatchOwner(Protocol):

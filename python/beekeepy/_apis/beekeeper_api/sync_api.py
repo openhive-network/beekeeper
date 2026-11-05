@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from hiveio_api.client import AbstractSyncApi, ApiArgumentsToSerialize, SyncSendable
+from hiveio_api_client import AbstractSyncApi, ApiArgumentsToSerialize, SyncSendable
 
 import beekeepy._generated.beekeeper_api_description as beekeeper_api  # noqa: TC001  # resolved at runtime by get_type_hints
 from beekeepy._apis.abc.session_holder import SyncSessionHolder

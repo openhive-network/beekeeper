@@ -8,7 +8,7 @@ from pathlib import Path
 from subprocess import SubprocessError
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
-from hiveio_api.client import HttpUrl, P2PUrl, WsUrl
+from hiveio_api_client import HttpUrl, P2PUrl, WsUrl
 from loguru import logger as default_logger
 
 from beekeepy._executable.abc.executable import ArgumentT, ConfigT, Executable
