@@ -8,32 +8,64 @@ namespace beekeeper_wasm {
 
 // ── js_callback_storage ───────────────────────────────────
 
-js_callback_storage::js_callback_storage(emscripten::val storage)
-  : save_fn_(storage["save_fn"])
-  , load_fn_(storage["load_fn"])
-  , list_dir_fn_(storage["list_dir_fn"])
-{
-}
+namespace {
 
-void js_callback_storage::save(const std::string& name, const std::vector<char>& buffer)
+emscripten::val to_js_bytes(const std::vector<char>& buffer)
 {
   auto js_uint8 = emscripten::val::global("Uint8Array").new_(buffer.size());
   auto mem_view = emscripten::val(emscripten::typed_memory_view(buffer.size(),
                     reinterpret_cast<const uint8_t*>(buffer.data())));
   js_uint8.call<void>("set", mem_view);
+  return js_uint8;
+}
 
-  save_fn_(std::string(name), js_uint8);
+std::vector<char> from_js_bytes(const emscripten::val& data)
+{
+  unsigned len = data["length"].as<unsigned>();
+  std::vector<char> buf(len);
+  emscripten::val(emscripten::typed_memory_view(len, reinterpret_cast<uint8_t*>(buf.data())))
+    .call<void>("set", data);
+  return buf;
+}
+
+} // anonymous namespace
+
+js_callback_storage::js_callback_storage(emscripten::val storage)
+  : save_fn_(storage["save_fn"])
+  , load_fn_(storage["load_fn"])
+  , list_dir_fn_(storage["list_dir_fn"])
+  , try_save_fn_(storage["try_save_fn"])
+  , try_load_fn_(storage["try_load_fn"])
+{
+}
+
+void js_callback_storage::save(const std::string& name, const std::vector<char>& buffer)
+{
+  save_fn_(std::string(name), to_js_bytes(buffer));
 }
 
 std::vector<char> js_callback_storage::load(const std::string& name)
 {
-  emscripten::val result = load_fn_(std::string(name));
+  return from_js_bytes(load_fn_(std::string(name)));
+}
 
-  unsigned len = result["length"].as<unsigned>();
-  std::vector<char> buf(len);
-  emscripten::val(emscripten::typed_memory_view(len, reinterpret_cast<uint8_t*>(buf.data())))
-    .call<void>("set", result);
-  return buf;
+bool js_callback_storage::try_save(const std::string& name, const std::vector<char>& buffer)
+{
+  if (try_save_fn_.isUndefined())
+    return wallet_storage::try_save(name, buffer);
+
+  return try_save_fn_(std::string(name), to_js_bytes(buffer)).as<bool>();
+}
+
+std::optional<std::vector<char>> js_callback_storage::try_load(const std::string& name)
+{
+  if (try_load_fn_.isUndefined())
+    return wallet_storage::try_load(name);
+
+  emscripten::val result = try_load_fn_(std::string(name));
+  if (result.isNull() || result.isUndefined())
+    return std::nullopt;
+  return from_js_bytes(result);
 }
 
 bool js_callback_storage::scan_dir(const std::string& wallet_name)
@@ -50,7 +82,13 @@ bool js_callback_storage::scan_dir(const std::string& wallet_name)
 // ── beekeeper_api ──────────────────────────────────────────
 
 beekeeper_api::beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout)
-  : crypto_(std::move(crypto))
+  : beekeeper_api(std::move(storage), std::move(crypto), unlock_timeout, 0)
+{
+}
+
+beekeeper_api::beekeeper_api(emscripten::val storage, emscripten::val crypto, uint32_t unlock_timeout,
+                             uint32_t kdf_iterations)
+  : crypto_(std::move(crypto), kdf_iterations)
   , storage_(std::move(storage))
   , bk_(crypto_, storage_, unlock_timeout)
 {
@@ -87,25 +125,25 @@ void beekeeper_api::open(const std::string& token, const std::string& wallet_nam
 void beekeeper_api::close(const std::string& token, const std::string& wallet_name)
 {
   bk_.validate_token(token);
-  bk_.close_wallet(wallet_name);
+  bk_.close_wallet(token, wallet_name);
 }
 
 void beekeeper_api::lock(const std::string& token, const std::string& wallet_name)
 {
   bk_.validate_token(token);
-  bk_.lock(wallet_name);
+  bk_.lock(token, wallet_name);
 }
 
 void beekeeper_api::lock_all(const std::string& token)
 {
   bk_.validate_token(token);
-  bk_.lock_all();
+  bk_.lock_all(token);
 }
 
 void beekeeper_api::unlock(const std::string& token, const std::string& wallet_name, const std::string& password)
 {
   bk_.validate_token(token);
-  bk_.unlock(wallet_name, password);
+  bk_.unlock(token, wallet_name, password);
 }
 
 // ── key management ─────────────────────────────────────────
@@ -113,20 +151,20 @@ void beekeeper_api::unlock(const std::string& token, const std::string& wallet_n
 std::string beekeeper_api::import_key(const std::string& token, const std::string& wallet_name, const std::string& wif_key)
 {
   bk_.validate_token(token);
-  return bk_.import_key(wallet_name, wif_key, prefix_, true);
+  return bk_.import_key(token, wallet_name, wif_key, prefix_, true);
 }
 
 void beekeeper_api::remove_key(const std::string& token, const std::string& wallet_name, const std::string& public_key)
 {
   bk_.validate_token(token);
   auto pk = crypto_.public_key_from_string(public_key, prefix_);
-  bk_.remove_key(wallet_name, pk);
+  bk_.remove_key(token, wallet_name, pk);
 }
 
 emscripten::val beekeeper_api::get_public_keys(const std::string& token, const std::string& wallet_name)
 {
   bk_.validate_token(token);
-  auto keys = bk_.get_public_keys(wallet_name);
+  auto keys = bk_.get_public_keys(token, wallet_name);
   auto arr = emscripten::val::array();
   for (auto& kv : keys)
     arr.call<void>("push", crypto_.public_key_to_string(kv.first, kv.second.second));
@@ -140,7 +178,7 @@ std::string beekeeper_api::sign_digest(const std::string& token, const std::stri
   bk_.validate_token(token);
   auto pk = crypto_.public_key_from_string(public_key, prefix_);
   auto digest = crypto_.digest_from_hex(sig_digest);
-  auto sig = bk_.sign_digest(wallet_name, digest, pk, prefix_);
+  auto sig = bk_.sign_digest(token, wallet_name, digest, pk, prefix_);
   return crypto_.signature_to_hex(sig);
 }
 
@@ -155,7 +193,7 @@ std::string beekeeper_api::encrypt_data(const std::string& token, const std::str
   auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
   // JS number (double) preserves integers exactly up to 2^53, sufficient for
   // microsecond timestamps.  Previous uint32_t silently truncated 64-bit nonces.
-  return bk_.encrypt_data(wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
+  return bk_.encrypt_data(token, wallet_name, from_pk, to_pk, content, prefix_, static_cast<uint64_t>(nonce));
 }
 
 std::string beekeeper_api::decrypt_data(const std::string& token, const std::string& wallet_name,
@@ -165,7 +203,7 @@ std::string beekeeper_api::decrypt_data(const std::string& token, const std::str
   bk_.validate_token(token);
   auto from_pk = crypto_.public_key_from_string(from_key, prefix_);
   auto to_pk = crypto_.public_key_from_string(to_key, prefix_);
-  return bk_.decrypt_data(wallet_name, from_pk, to_pk, encrypted_content, prefix_);
+  return bk_.decrypt_data(token, wallet_name, from_pk, to_pk, encrypted_content, prefix_);
 }
 
 // ── query ──────────────────────────────────────────────────
@@ -174,7 +212,7 @@ bool beekeeper_api::has_matching_private_key(const std::string& token, const std
 {
   bk_.validate_token(token);
   auto pk = crypto_.public_key_from_string(public_key, prefix_);
-  return bk_.has_private_key(wallet_name, pk);
+  return bk_.has_private_key(token, wallet_name, pk);
 }
 
 bool beekeeper_api::has_wallet(const std::string& token, const std::string& wallet_name)
@@ -188,7 +226,7 @@ beekeeper_minimal::session_info beekeeper_api::get_info(const std::string& token
   bk_.validate_token(token);
   // Timeout is enforced by the TS layer (BeekeeperLockedWallet.unlocked getter).
   // No C++ check_timeout() here — WASM does not use C++ timers.
-  return bk_.get_info();
+  return bk_.get_info(token);
 }
 
 } // namespace beekeeper_wasm

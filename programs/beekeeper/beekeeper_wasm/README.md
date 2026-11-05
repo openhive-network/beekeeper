@@ -24,6 +24,8 @@ As a an example you can check [`examples`](https://gitlab.syncad.com/hive/beekee
 
 Note: between different beekeeper instances, session names can be repeated, but not the wallet names!
 
+Wallets are unlocked per session: a session that opens a wallet another session has unlocked gets it locked, and has to unlock it with its password before it can use its keys. Locking or closing a wallet affects only the session that does it. The inactivity timeout (`unlockTimeout`) covers the whole Beekeeper instance: once it expires, the wallets of all its sessions lock.
+
 For salts, you should always use strong random values, such as `crypto.randomUUID()`. Also, remember to always use strong passwords for wallets! If you provide `undefined` as a password when creating a wallet, a strong random password will be generated for you and returned in the result.
 
 For simplicity, and as `crypto` API may not be available in all environments, we are using `Math.random()` for salt generation. As for passwords, we are using simple strings. **Do not use this approach in production!**
@@ -195,6 +197,14 @@ console.log('Decrypted message:', decrypted); // 'Hello, Hive!'
 // Clean up
 session.close();
 ```
+
+## 🔐 Wallet storage
+
+Wallets are stored encrypted with a key derived from the wallet password by PBKDF2-HMAC-SHA512 (random salt; the 600,000 iterations are recorded in the wallet data) and authenticated with HMAC-SHA256. Creating or unlocking a persistent wallet therefore takes a noticeable fraction of a second; importing keys and signing do not. Temporary and in-memory wallets use a minimal work factor, because their data never leaves memory.
+
+Wallets saved by earlier versions are still read and are converted to the current format the first time they are unlocked. The conversion is one-way: earlier versions of this package report an invalid password for a converted wallet, so do not roll an application back to an older `@hiveio/beekeeper` once users have unlocked their wallets with this one.
+
+Calls run one at a time per Beekeeper instance: asynchronous calls are queued in the order they are made. A synchronous call such as `getPublicKeys()` or `hasWallet()` made while an asynchronous call is still running throws a `BeekeeperError`; await the pending call first.
 
 ## 📖 API Reference
 

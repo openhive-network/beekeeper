@@ -20,6 +20,12 @@ ninja beekeeper
 ./programs/beekeeper/beekeeper/beekeeper --webserver-http-endpoint=127.0.0.1:5001
 ```
 
+Every API call carries the token of a session (`create_session`). Wallets are
+opened, unlocked and locked per session: a wallet unlocked in one session stays
+locked in another one until that session unlocks it with the wallet's password,
+and `lock`, `lock_all`, `close`, `set_timeout` and the unlock timeout act on the
+calling session only.
+
 ## Testing
 
 Native unit tests (Boost.Test; configure with `-DBUILD_TESTS=ON`, run from the repository root):
@@ -41,6 +47,18 @@ cd python && pytest tests/beekeepy_test
 ```
 
 For the containerised checks AIDEV runs, see [`.aidev/README.md`](.aidev/README.md).
+
+## Wallet files
+
+Wallets are stored encrypted with a key derived from the wallet password by
+PBKDF2-HMAC-SHA512 (random salt; the 600,000 iterations are recorded in the
+file) and authenticated with HMAC-SHA256. Files written by earlier versions,
+whose key was a single unsalted SHA-512 of the password, are still read and are
+converted to the current format the first time they are unlocked. The
+conversion is one-way: older beekeeper versions report an invalid password for
+a converted wallet, so keep a copy of the wallet directory if you may need to
+go back. Wallet files are written owner-only (0600), replaced atomically and
+flushed to disk.
 
 ## Dependencies
 

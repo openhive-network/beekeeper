@@ -304,9 +304,30 @@ test.describe('Wallet compatibility (cross-version)', () => {
 
       await newBk.delete();
 
-      return { oldCipher, newCipher };
+      // The first unlock converted the stored wallet to the current format: it
+      // reopens in a new instance...
+      const newBk2 = await createNew();
+      const reopened = await newBk2.createSession('compat-new-2').openWallet('w0').unlock('password');
+      const reopenedCipher = await reopened.encryptData(message, fromPub, toPub, 54321);
+      await newBk2.delete();
+
+      // ...and the conversion is one-way: the old version cannot unlock it any more.
+      // In Node it reports an invalid password; in the browser this IDBFS-based release
+      // cannot even load files written by the current storage.
+      const oldBk2 = await createOld();
+      let oldUnlocksConverted = true;
+      try {
+        await oldBk2.createSession('compat-old-2').openWallet('w0').unlock('password');
+      } catch {
+        oldUnlocksConverted = false;
+      }
+      await oldBk2.delete();
+
+      return { oldCipher, newCipher, reopenedCipher, oldUnlocksConverted };
     }, keys);
 
     expect(result.oldCipher).toBe(result.newCipher);
+    expect(result.reopenedCipher).toBe(result.newCipher);
+    expect(result.oldUnlocksConverted).toBe(false);
   });
 });

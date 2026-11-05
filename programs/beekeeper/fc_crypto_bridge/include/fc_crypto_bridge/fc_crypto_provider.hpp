@@ -14,6 +14,13 @@ public:
   digest_type sha256(const uint8_t* data, size_t len) override;
   sha512_hash sha512(const uint8_t* data, size_t len) override;
   std::array<uint8_t, 20> ripemd160(const uint8_t* data, size_t len) override;
+  digest_type hmac_sha256(const uint8_t* key, size_t key_len,
+                          const uint8_t* data, size_t data_len) override;
+
+  std::vector<uint8_t> pbkdf2_hmac_sha512(
+      const uint8_t* password, size_t password_len,
+      const uint8_t* salt, size_t salt_len,
+      uint32_t iterations, size_t dk_len) override;
 
   std::vector<uint8_t> aes256_cbc_encrypt(
       const uint8_t* key, const uint8_t* iv,
@@ -44,7 +51,9 @@ public:
 class fc_crypto_provider final : public crypto_provider_impl
 {
 public:
-  fc_crypto_provider();
+  /// @param kdf_iterations  PBKDF2 work factor for newly encrypted wallets.
+  ///                        Tests may lower it; production uses the default.
+  explicit fc_crypto_provider(uint32_t kdf_iterations = default_kdf_iterations);
 
 private:
   fc_crypto_primitives prims_;
