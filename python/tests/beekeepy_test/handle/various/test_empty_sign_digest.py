@@ -6,9 +6,10 @@ from hiveio_api_client import JSONRPCRequest
 from local_tools.beekeepy.network import raw_http_call
 
 if TYPE_CHECKING:
-    from beekeepy.handle.runnable import Beekeeper
     from local_tools.beekeepy.account_credentials import AccountCredentials
     from local_tools.beekeepy.models import WalletInfo
+
+    from beekeepy.handle.runnable import Beekeeper
 
 
 def test_empty_sign_digest(beekeeper: Beekeeper, wallet: WalletInfo, account: AccountCredentials) -> None:  # noqa: ARG001

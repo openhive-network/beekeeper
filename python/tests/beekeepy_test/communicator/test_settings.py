@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Final
 
 import pytest
+
 from beekeepy.interfaces import HttpUrl
 from beekeepy.settings import CommunicationSettings, InterfaceSettings, RemoteHandleSettings, RunnableHandleSettings
 

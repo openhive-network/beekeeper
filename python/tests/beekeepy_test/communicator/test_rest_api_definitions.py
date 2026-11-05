@@ -4,8 +4,9 @@ from dataclasses import fields, is_dataclass
 from typing import TYPE_CHECKING, get_args, get_origin, get_type_hints
 
 import pytest
-from beekeepy.settings import RemoteHandleSettings
 from local_tools.beekeepy.simple_api import InputTypeSchema, TestCaller, WitnessesVotersResponseSchema
+
+from beekeepy.settings import RemoteHandleSettings
 
 if TYPE_CHECKING:
     from hiveio_api_client import HttpUrl

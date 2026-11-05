@@ -2,17 +2,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
 
-import beekeepy.handle.remote
-import beekeepy.interfaces
 import hiveio_api_client
 import pytest
-from beekeepy.handle.remote import AppStatusProbeAsyncApiCollection, AsyncBeekeeper, RemoteHandleSettings
 from hiveio_api_client import AsyncRemoteHandle
 from local_tools.beekeepy.testing_server import run_simple_server
 
+import beekeepy.handle.remote
+import beekeepy.interfaces
+from beekeepy.handle.remote import AppStatusProbeAsyncApiCollection, AsyncBeekeeper, RemoteHandleSettings
+
 if TYPE_CHECKING:
-    from beekeepy.interfaces import HttpUrl
     from hiveio_api_client import AsyncSendable
+
+    from beekeepy.interfaces import HttpUrl
 
 HTTP_PORT: Final[int] = 8090
 APP_STATUS_RESPONSE: Final[str] = (
