@@ -37,7 +37,7 @@ psutil = "^7.0.0"
 python-dateutil = "^2.8.2"
 requests = "^2.32.3"
 
-msgspec = "^0.20.0"  # configurations of executables (msgspec models of hiveio_api.validation)
+msgspec = "^0.22.0"  # configurations of executables (msgspec models of hiveio_api.validation)
 
 # Runtime of generated API clients (hive/wax-spec-generator): API base classes, owners (`AsyncSendable`), callbacks,
 # JSON-RPC, URLs and the public lazy-import helpers (`hiveio_api_client.lazy_import`).
