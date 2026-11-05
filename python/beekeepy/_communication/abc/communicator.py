@@ -5,7 +5,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, TypeVar, cast
 
-from hiveio_api.client import (
+from hiveio_api_client import (
     AsyncCallbacks,
     Callbacks,
     Methods,
@@ -22,7 +22,7 @@ from beekeepy.exceptions import TimeoutExceededError
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
-    from hiveio_api.client import HttpUrl
+    from hiveio_api_client import HttpUrl
 
 
 T = TypeVar("T")

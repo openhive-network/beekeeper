@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from beekeepy._communication.settings import CommunicationSettings
 
 if TYPE_CHECKING:
-    from hiveio_api.client import HttpUrl
+    from hiveio_api_client import HttpUrl
 
     from beekeepy._communication.abc.communicator import (
         AbstractCommunicator,

@@ -22,7 +22,7 @@ from beekeepy._utilities.sanitize import sanitize
 if TYPE_CHECKING:
     from typing import Self
 
-    from hiveio_api.client import HttpUrl, ResponseCallback
+    from hiveio_api_client import HttpUrl, ResponseCallback
 
     from beekeepy._remote_handle.abc.batch_handle import AsyncBatchOwner
     from beekeepy.exceptions import Json

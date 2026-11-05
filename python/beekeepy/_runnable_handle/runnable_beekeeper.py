@@ -12,7 +12,7 @@ from beekeepy.exceptions import BeekeeperFailedToStartError, ExecutableError
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from hiveio_api.client import HttpUrl
+    from hiveio_api_client import HttpUrl
 
     from beekeepy._runnable_handle.match_ports import PortMatchingResult
     from beekeepy._utilities.key_pair import KeyPair

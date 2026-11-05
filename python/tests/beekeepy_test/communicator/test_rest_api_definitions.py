@@ -8,7 +8,7 @@ from beekeepy.settings import RemoteHandleSettings
 from local_tools.beekeepy.simple_api import InputTypeSchema, TestCaller, WitnessesVotersResponseSchema
 
 if TYPE_CHECKING:
-    from hiveio_api.client import HttpUrl
+    from hiveio_api_client import HttpUrl
 
 
 @pytest.fixture

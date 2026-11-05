@@ -5,7 +5,7 @@ import ssl
 from dataclasses import dataclass, field
 from typing import Final
 
-from hiveio_api.client import HttpUrl, P2PUrl, WsUrl
+from hiveio_api_client import HttpUrl, P2PUrl, WsUrl
 
 __all__ = ["PortMatchingResult", "match_ports"]
 

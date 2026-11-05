@@ -122,7 +122,7 @@ class CommunicationSettings:
     @classmethod
     def import_settings(cls, settings: str) -> Self:
         """Settings exported by `export_settings` - members not given take their defaults."""
-        from hiveio_api.client import HttpUrl
+        from hiveio_api_client import HttpUrl
 
         from beekeepy._communication.abc.communicator import AbstractCommunicator
 
@@ -137,7 +137,7 @@ class CommunicationSettings:
 
 
 def _exported(value: object) -> object:
-    from hiveio_api.client import Url
+    from hiveio_api_client import Url
 
     if isinstance(value, timedelta):
         return _duration(value)
@@ -151,7 +151,7 @@ def _exported(value: object) -> object:
 
 
 def _imported(value: object, member_type: object) -> object:
-    from hiveio_api.client import Url
+    from hiveio_api_client import Url
 
     if value is None:
         return None

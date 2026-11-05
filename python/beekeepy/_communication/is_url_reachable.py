@@ -9,7 +9,7 @@ from beekeepy.exceptions import CommunicationError
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from hiveio_api.client import HttpUrl
+    from hiveio_api_client import HttpUrl
 
     from beekeepy._communication.settings import CommunicationSettings
 

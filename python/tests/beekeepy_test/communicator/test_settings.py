@@ -123,8 +123,8 @@ def test_copy_of_settings_is_equal_and_independent() -> None:
     assert copied == settings
 
 
-def test_settings_and_remote_handles_do_not_load_msgspec() -> None:
-    # ARRANGE - in a new interpreter, nothing imported msgspec before
+def test_settings_and_remote_handles_do_not_load_configurations_of_executables() -> None:
+    # ARRANGE - in a new interpreter; msgspec itself is loaded by the API base classes of hiveio-api-client
     script = """
 import sys
 import beekeepy
@@ -136,7 +136,7 @@ from beekeepy.settings import InterfaceSettings
 settings = InterfaceSettings.import_settings(InterfaceSettings(http_endpoint=HttpUrl("127.0.0.1:1")).export_settings())
 Beekeeper(settings=settings).teardown()
 KeyPair(public_key="public", private_key="private")
-print("msgspec" in sys.modules)
+print([name for name in sys.modules if name.startswith(("beekeepy._executable", "hiveio_api.validation"))])
 """
 
     # ACT
@@ -144,4 +144,4 @@ print("msgspec" in sys.modules)
 
     # ASSERT
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "False"
+    assert result.stdout.strip() == "[]"

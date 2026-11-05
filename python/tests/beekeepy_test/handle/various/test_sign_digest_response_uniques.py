@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from hiveio_api.client import JSONRPCRequest
+from hiveio_api_client import JSONRPCRequest
 from local_tools.beekeepy.network import raw_http_call
 
 if TYPE_CHECKING:
