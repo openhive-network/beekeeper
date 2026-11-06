@@ -31,7 +31,7 @@ branches:
 # How this project's suites execute (#13892): one kind, stated once.
 environment:
   kind: "container"
-  image: "registry.gitlab.syncad.com/hive/beekeeper/aidev-tests@sha256:3bbe65771483d43bcd35e6aa094d3171171cf4dd0abb05a3bc74f2eef9f5cd28"
+  image: "registry.gitlab.syncad.com/hive/beekeeper/aidev-tests@sha256:7d2ed104e3e3d6984d6a4cecf5a462faa0be460dafe6ab8d0c17dad0f4e2d323"
   # The Dockerfile is an input too: a change to it (a tool the image installs) is
   # rebuilt and re-pinned in the same commit, like a lock file move.
   inputs: [".aidev/runtime/Dockerfile", "programs/beekeeper/beekeeper_wasm/pnpm-lock.yaml", "python/poetry.lock", "python/tests/local-tools/poetry.lock"]
