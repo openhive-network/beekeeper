@@ -2,10 +2,12 @@
 # .aidev/project.yaml). Suites run with `--network none` and the caller's uid, so
 # everything they need is in the image:
 #
-# * the CI emsdk image ccc's npm_projects template names (`EMSCRIPTEN_IMAGE`):
-#   emscripten, cmake, ninja, and ccc's Node and pnpm under nvm (as CI's
-#   `nvm use "${NODEJS_VERSION}"`). This file pins no Node version: build.sh passes
-#   that image, digest-pinned, as BASE_IMAGE (scripts/ccc_emscripten_image.sh);
+# * ccc's CI emsdk image at the tag BASE_IMAGE names below: emscripten, cmake, ninja,
+#   sccache, and ccc's Node and pnpm under nvm (as CI's `nvm use "${NODEJS_VERSION}"`).
+#   This file pins no Node version: build.sh passes that image, digest-pinned, as
+#   BASE_IMAGE. The tag is ahead of the one ccc's npm_projects template names
+#   (`EMSCRIPTEN_IMAGE`, scripts/ccc_emscripten_image.sh) for its sccache 0.19.0, whose
+#   SCCACHE_BASEDIRS compiler-cache.sh sets; build.sh notes when the two differ;
 # * the chromium build the lockfile's Playwright wants, in /opt/pw-browsers (CI's
 #   beekeeper_wasm_test runs `playwright install chromium`; the emsdk image's own
 #   pw-browsers carry a different build);
@@ -22,7 +24,7 @@
 #   build context (CI's .beekeepy_test_tools).
 #
 # Build and pin it with .aidev/runtime/build.sh; see .aidev/README.md.
-ARG BASE_IMAGE
+ARG BASE_IMAGE=registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-15
 FROM ${BASE_IMAGE}
 
 USER root
