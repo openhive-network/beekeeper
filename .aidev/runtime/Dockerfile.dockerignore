@@ -1,0 +1,11 @@
+# The build context of Dockerfile is the checkout; it reads only these files.
+*
+!programs/beekeeper/beekeeper_wasm/package.json
+!programs/beekeeper/beekeeper_wasm/pnpm-lock.yaml
+!programs/beekeeper/beekeeper_wasm/npm-common-config/pnpm-config/pnpm-workspace.yaml
+!programs/beekeeper/beekeeper_wasm/npm-common-config/pnpm-config/.npmrc
+!python/pyproject.toml
+!python/poetry.lock
+!python/tests/local-tools
+python/tests/local-tools/**/__pycache__
+python/tests/local-tools/**/*.egg-info

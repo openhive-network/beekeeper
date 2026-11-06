@@ -68,29 +68,36 @@ or why no cache was used. The step's log ends with `sccache --show-stats`.
 ## The test runtime image (`runtime/`)
 
 The suites run in a container with your uid, on the stack's internal network (see *The
-compiler cache*) or with `--network none` by hand. The image is CI's
-emsdk image at the tag `runtime/Dockerfile`'s `BASE_IMAGE` names (emscripten, sccache
-0.19.0 and ccc's Node and pnpm; `runtime/build.sh` builds on its current digest, and notes
-when ccc's npm_projects template still names an older tag as `EMSCRIPTEN_IMAGE`) plus the chromium build the lockfile's Playwright wants, a pnpm
-store filled from `beekeeper_wasm/pnpm-lock.yaml`, Ubuntu's g++/Boost/OpenSSL for the
-native build, and Python 3.12 with `python/poetry.lock` (dev and static-analysis
+compiler cache*) or with `--network none` by hand. AIDEV builds that image itself from
+`runtime/Dockerfile` on a **followed base** (`environment.build` and `environment.base`
+in `project.yaml`, `follow: true`): CI's emsdk image at the tag `base.image` names
+(emscripten, sccache 0.19.0 and ccc's Node and pnpm), on whatever digest that tag names
+when a slot runs. The Dockerfile adds the chromium build the lockfile's Playwright wants,
+a pnpm store filled from `beekeeper_wasm/pnpm-lock.yaml`, Ubuntu's g++/Boost/OpenSSL for
+the native build, and Python 3.12 with `python/poetry.lock` (dev and static-analysis
 groups) in `/opt/py`, plus pytest, pytest-asyncio and pytest-xdist at the versions of
-ccc's python-test-tools image (its pip constraints, which `runtime/build.sh` reads as
-CI's `.beekeepy_test_tools` does).
+ccc's python-test-tools image (its pip constraints, read from the registry at build time
+as CI's `.beekeepy_test_tools` does).
 
-When `beekeeper_wasm/pnpm-lock.yaml`, the npm-common-config submodule's
-`pnpm-workspace.yaml`/`.npmrc`, `packageManager`, `python/pyproject.toml`, either
-`poetry.lock` or `runtime/Dockerfile` (its emsdk tag) change, or ccc republishes that
-emsdk tag or moves its python-test-tools versions, rebuild and re-pin **in the same commit**:
+AIDEV rebuilds the image on the next run when ccc moves the emsdk tag or a file in
+`environment.inputs` changes (`runtime/Dockerfile`, `beekeeper_wasm/pnpm-lock.yaml`,
+either `poetry.lock`), and reuses its build otherwise; the slot's runtime line reads
+`… built|reused on followed base <tag>@sha256:…`. A Renovate lock bump therefore needs
+no hand rebuild and no re-pin. `environment.image` is only the seed pin AIDEV requires
+beside a followed base (the emsdk digest at adoption); suites never run in it and it
+never has to move. A failed build refuses the slot as `no-environment`, naming the error.
+
+Only the inputs decide a rebuild: a change to `python/pyproject.toml`, `packageManager`,
+the npm-common-config submodule's `pnpm-workspace.yaml`/`.npmrc`, `runtime/Dockerfile.dockerignore`
+or ccc's python-test-tools versions alone keeps the previous build; each normally comes
+with a lock file move. The build context is the checkout narrowed by
+`runtime/Dockerfile.dockerignore` to the files the Dockerfile copies: when the Dockerfile
+starts copying a file, add it there.
+
+To run a suite by hand, build the image locally as AIDEV does and run it the same way:
 
 ```bash
-.aidev/runtime/build.sh --push   # registry digest if aidev-<input hash> exists, else build + push
-# put the printed repo@sha256:<digest> into project.yaml environment.image
-```
-
-Run a suite by hand the same way AIDEV does:
-
-```bash
+.aidev/runtime/build.sh   # prints the local tag, beekeeper-aidev-tests:local
 docker run --rm --network none --user "$(id -u):$(id -g)" \
-  -v "$PWD":/work -w /work <environment.image> .aidev/run-checks.sh quick wasm build test
+  -v "$PWD":/work -w /work beekeeper-aidev-tests:local .aidev/run-checks.sh quick wasm build test
 ```
