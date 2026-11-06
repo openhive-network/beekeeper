@@ -52,12 +52,14 @@ reaching the relay and nothing else, and the relay forwards `sccache:8090` to th
 WebDAV cache and `sccache:6379` to the Redis.
 
 `compiler-cache.sh` picks the backend once per run: the WebDAV cache when its `/healthz`
-answers and the image's sccache is 0.10 or later (0.8's WebDAV client reads every entry
-of these caches as empty), else the Redis when a PING answers within 10 ms, else none.
+answers and it answers sccache's reads (a `PROPFIND` of a missing key is a 404, of
+sccache's stored `.sccache_check` key a non-collection with its size: what sccache before
+0.10 needs to read anything), else the Redis when a PING answers within 10 ms, else none.
 Through the relay first, then at the handed address (a run by hand on a network with a
 route). With no backend, or when the sccache server will not start, the builds get no
-launcher and compile cold; an unreachable cache never fails a slot. Every slot mounts the
-checkout at `/work`, so the absolute paths in the cache keys are the same on every host.
+launcher and compile cold; an unreachable cache never fails a slot. `SCCACHE_BASEDIRS` is
+the checkout, so the cache keys do not carry its absolute path: a run by hand from any
+directory shares the keys of the slots, which mount it at `/work`.
 
 `test-results/<suite>/sccache.tsv` has one row per build step: the backend and endpoint,
 sccache's compile requests, hits, misses, cache errors and write errors for that build,
@@ -67,9 +69,9 @@ or why no cache was used. The step's log ends with `sccache --show-stats`.
 
 The suites run in a container with your uid, on the stack's internal network (see *The
 compiler cache*) or with `--network none` by hand. The image is CI's
-emsdk image (the one ccc's npm_projects template names as `EMSCRIPTEN_IMAGE`:
-emscripten and ccc's Node and pnpm; `runtime/build.sh` resolves it with
-`scripts/ccc_emscripten_image.sh` and builds on its current digest) plus the chromium build the lockfile's Playwright wants, a pnpm
+emsdk image at the tag `runtime/Dockerfile`'s `BASE_IMAGE` names (emscripten, sccache
+0.19.0 and ccc's Node and pnpm; `runtime/build.sh` builds on its current digest, and notes
+when ccc's npm_projects template still names an older tag as `EMSCRIPTEN_IMAGE`) plus the chromium build the lockfile's Playwright wants, a pnpm
 store filled from `beekeeper_wasm/pnpm-lock.yaml`, Ubuntu's g++/Boost/OpenSSL for the
 native build, and Python 3.12 with `python/poetry.lock` (dev and static-analysis
 groups) in `/opt/py`, plus pytest, pytest-asyncio and pytest-xdist at the versions of
@@ -78,8 +80,8 @@ CI's `.beekeepy_test_tools` does).
 
 When `beekeeper_wasm/pnpm-lock.yaml`, the npm-common-config submodule's
 `pnpm-workspace.yaml`/`.npmrc`, `packageManager`, `python/pyproject.toml`, either
-`poetry.lock` or `runtime/Dockerfile` change, or ccc moves its emsdk image (a Node bump)
-or its python-test-tools versions, rebuild and re-pin **in the same commit**:
+`poetry.lock` or `runtime/Dockerfile` (its emsdk tag) change, or ccc republishes that
+emsdk tag or moves its python-test-tools versions, rebuild and re-pin **in the same commit**:
 
 ```bash
 .aidev/runtime/build.sh --push   # registry digest if aidev-<input hash> exists, else build + push
