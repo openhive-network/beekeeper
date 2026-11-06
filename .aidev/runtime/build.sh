@@ -5,7 +5,7 @@
 #
 # The tag is `aidev-<hash>`, the hash of the image inputs (the Dockerfile,
 # `packageManager` from package.json, pnpm-lock.yaml, pnpm-workspace.yaml,
-# .npmrc, the digest of the emsdk image ccc names now and the pip constraints of
+# .npmrc, the digest the Dockerfile's emsdk tag names now and the pip constraints of
 # ccc's python-test-tools image); the registry cleanup policy keeps `aidev-*` tags. When
 # <repository>:aidev-<hash> is already in the registry nothing is built: the script
 # prints that image's digest.
@@ -18,8 +18,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 REPOSITORY="${AIDEV_RUNTIME_REPOSITORY:-registry.gitlab.syncad.com/hive/beekeeper/aidev-tests}"
-# The base and its Node come from ccc; the image is built on the digest its tag names now.
-BASE_IMAGE="$(scripts/ccc_emscripten_image.sh)"
+# The base and its Node come from ccc, at the emsdk tag the Dockerfile's BASE_IMAGE names;
+# the image is built on the digest that tag names now.
+BASE_IMAGE="$(sed -n 's/^ARG BASE_IMAGE=//p' .aidev/runtime/Dockerfile)"
+CCC_IMAGE="$(scripts/ccc_emscripten_image.sh)"
+[ "$CCC_IMAGE" = "${BASE_IMAGE:?no ARG BASE_IMAGE default in .aidev/runtime/Dockerfile}" ] \
+    || echo "building on $BASE_IMAGE; ccc's npm_projects template names $CCC_IMAGE" >&2
 BASE_DIGEST="$(docker buildx imagetools inspect "$BASE_IMAGE" --format '{{json .Manifest}}' \
     | grep -o '"digest": *"sha256:[0-9a-f]*"' | head -1 | grep -o 'sha256:[0-9a-f]*')"
 BASE_IMAGE="${BASE_IMAGE%%@*}@${BASE_DIGEST:?cannot resolve $BASE_IMAGE}"

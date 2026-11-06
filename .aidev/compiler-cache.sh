@@ -8,17 +8,20 @@
 # reaches it through the slot stack's relay (.aidev/sccache-relay.compose.yml) as
 # http://sccache:8090/ or redis://sccache:6379, or at the handed address itself on a
 # network with a route (a run by hand). The first that answers is used:
-#   * WebDAV, when GET /healthz answers and sccache is 0.10 or later: 0.8 stats a key
-#     with PROPFIND before reading it, the site caches answer every PROPFIND as an
-#     empty collection, and 0.8 then reads every entry as empty (a cache error on
-#     every compile, never a hit);
+#   * WebDAV, when GET /healthz answers and the cache answers sccache's reads: sccache
+#     before 0.10 stats a key with PROPFIND before reading it and reads nothing unless
+#     a missing key is a 404 and a stored one a non-collection with its
+#     getcontentlength (as hive's run-checks.sh probes). The probed stored key is the
+#     one sccache writes when its server starts; a cache without it yet is taken on the
+#     404 alone;
 #   * Redis, when a PING answers within _CC_REDIS_MAX_RTT_MS (as wax's
 #     compiler-cache.sh: from another site a hit is slower than compiling).
 # Otherwise, or when the sccache server does not start, the builds get no launcher
 # and compile cold; a missing cache never fails a build.
 #
 # Keys hash the compiler, its flags and the preprocessed source, which carry absolute
-# paths: AIDEV mounts every slot's checkout at /work, so runs on any host share them.
+# paths: SCCACHE_BASEDIRS strips the checkout's (sccache 0.14 and later), so a run by
+# hand from another directory shares the keys of AIDEV's slots, which mount it at /work.
 #
 # Sets cc_launcher ("sccache" or empty), cc_backend (webdav, redis or none),
 # cc_endpoint and cc_note. compiler_cache_record STEP appends the step's sccache
@@ -26,10 +29,27 @@
 
 _CC_RELAY=sccache
 _CC_REDIS_MAX_RTT_MS=10
-_CC_WEBDAV_MIN_VERSION=0.10
+_CC_KEY_PREFIX=beekeeper
 
+_cc_propfind() {  # URL: the body of a Depth 0 PROPFIND, its status code on the last line
+    curl -s -m 3 -X PROPFIND -H 'Depth: 0' -w '\n%{http_code}' "$1" 2>/dev/null
+}
+
+# 0 when the cache answers sccache's reads, 1 when it does not answer, 2 when it answers
+# but sccache could not read from it (cc_note says why).
 _cc_webdav_answers() {  # URL
-    curl -sf -m 3 -o /dev/null "${1%/}/healthz"
+    local keys="${1%/}/$_CC_KEY_PREFIX" reply
+    curl -sf -m 3 -o /dev/null "${1%/}/healthz" || return 1
+    reply="$(_cc_propfind "$keys/.sccache-probe-missing")"
+    if [ "${reply##*$'\n'}" != 404 ]; then
+        cc_note="the WebDAV cache $1 answers PROPFIND of a missing key with ${reply##*$'\n'}, not 404, so sccache could not read from it"
+        return 2
+    fi
+    reply="$(_cc_propfind "$keys/.sccache_check")"
+    [ "${reply##*$'\n'}" = 404 ] && return 0
+    [[ "$reply" == *getcontentlength* && "$reply" != *collection* ]] && return 0
+    cc_note="the WebDAV cache $1 answers PROPFIND of a stored key without its size, so sccache could not read from it"
+    return 2
 }
 
 # The inner bash's arguments and variables, not this shell's.
@@ -45,25 +65,20 @@ _cc_redis_rtt_ms() {  # HOST PORT: the round trip of a second PING, in ms
         echo $(( (${t1//[.,]/} - ${t0//[.,]/}) / 1000 ))' _ "$1" "$2" 2>/dev/null
 }
 
-_cc_sccache_version() {
-    sccache --version 2>/dev/null | awk '{ print $2 }'
-}
-
+# A cache that answers but fails the read probe is not tried again at its other address:
+# the relay forwards to the same server.
 _cc_select_webdav() {
-    local direct="$AIDEV_SCCACHE_WEBDAV_ENDPOINT" rest path="" version url
+    local direct="$AIDEV_SCCACHE_WEBDAV_ENDPOINT" rest path="" url rc
     rest="${direct#*://}"
     [[ "$rest" == */* ]] && path="${rest#*/}"
-    version="$(_cc_sccache_version)"
-    if [ "$(printf '%s\n' "$_CC_WEBDAV_MIN_VERSION" "$version" | sort -V | head -1)" != "$_CC_WEBDAV_MIN_VERSION" ]; then
-        cc_note="sccache ${version:-missing} cannot read the WebDAV cache ($direct), $_CC_WEBDAV_MIN_VERSION or later can"
-        return 1
-    fi
     for url in "http://$_CC_RELAY:8090/$path" "$direct"; do
-        if _cc_webdav_answers "$url"; then
-            export SCCACHE_WEBDAV_ENDPOINT="$url" SCCACHE_WEBDAV_KEY_PREFIX=beekeeper
+        rc=0; _cc_webdav_answers "$url" || rc=$?
+        if [ "$rc" -eq 0 ]; then
+            export SCCACHE_WEBDAV_ENDPOINT="$url" SCCACHE_WEBDAV_KEY_PREFIX="$_CC_KEY_PREFIX"
             cc_backend=webdav cc_endpoint="$url"
             return 0
         fi
+        [ "$rc" -eq 1 ] || return 1
     done
     cc_note="the WebDAV cache $direct answers neither through the relay nor directly"
     return 1
@@ -97,7 +112,7 @@ compiler_cache_select() {
     fi
     # The server must outlive the Playwright suite between the WASM and native builds;
     # a server that dies later costs a cold compile, not a failed one.
-    export SCCACHE_IDLE_TIMEOUT=0 SCCACHE_IGNORE_SERVER_IO_ERROR=1
+    export SCCACHE_IDLE_TIMEOUT=0 SCCACHE_IGNORE_SERVER_IO_ERROR=1 SCCACHE_BASEDIRS="$PWD"
     if ! sccache --start-server >&2; then
         cc_note="sccache did not start with the $cc_backend cache $cc_endpoint"
         cc_backend=none cc_endpoint=""
