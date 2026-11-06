@@ -29,11 +29,17 @@ branches:
   handoff_history: "linear"
 
 # How this project's suites execute (#13892): one kind, stated once.
+# Every suite runs in an image AIDEV builds itself from .aidev/runtime/Dockerfile on
+# the followed base: ccc's emsdk image (emscripten, sccache 0.19.0, ccc's Node and
+# pnpm). A change to the Dockerfile or to an `inputs` file, or ccc moving the tag,
+# rebuilds it on the next run; nothing is re-pinned. `image` is only the seed pin AIDEV
+# requires beside a followed base (the base's digest at adoption); suites never run in
+# it. See "The test runtime image" in .aidev/README.md.
 environment:
   kind: "container"
-  image: "registry.gitlab.syncad.com/hive/beekeeper/aidev-tests@sha256:7d2ed104e3e3d6984d6a4cecf5a462faa0be460dafe6ab8d0c17dad0f4e2d323"
-  # The Dockerfile is an input too: a change to it (a tool the image installs) is
-  # rebuilt and re-pinned in the same commit, like a lock file move.
+  image: "registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk@sha256:02348ddbc766177ec89b7f8c7318b116f7a6800d47e568207d22a41d423e2c5f"
+  build: {dockerfile: ".aidev/runtime/Dockerfile", context: "."}
+  base: {image: "registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-15", follow: true}
   inputs: [".aidev/runtime/Dockerfile", "programs/beekeeper/beekeeper_wasm/pnpm-lock.yaml", "python/poetry.lock", "python/tests/local-tools/poetry.lock"]
 
 # The native and WASM builds compile through sccache with the site's cache AIDEV hands
