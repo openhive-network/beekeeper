@@ -27,6 +27,9 @@
 #   py-format  ruff format --check (CI's beekeepy_formatting_with_ruff_check)
 #   py-lint    ruff check (the ruff hook of CI's beekeepy_pre_commit_checks)
 #   py-types   mypy (CI's beekeepy_type_check_with_mypy)
+# `wasm` and `native` compile through sccache with the site's cache when one answers
+# (.aidev/compiler-cache.sh), recording the backend and each build's hits and misses
+# in $out/sccache.tsv.
 # The step functions below are only called through step(), which shellcheck can't see.
 # shellcheck disable=SC2317
 set -uo pipefail
@@ -62,6 +65,15 @@ if [ "$needs_node" -eq 1 ]; then
     fi
 fi
 
+needs_compiler=0
+for s in "$@"; do case "$s" in wasm|native) needs_compiler=1 ;; esac; done
+if [ "$needs_compiler" -eq 1 ]; then
+    # shellcheck source=.aidev/compiler-cache.sh disable=SC1091
+    source .aidev/compiler-cache.sh
+    compiler_cache_select
+    echo "sccache: ${cc_backend}${cc_endpoint:+ at $cc_endpoint}${cc_note:+ ($cc_note)}" >&2
+fi
+
 status=0
 step() {
     local name="$1"; shift
@@ -76,9 +88,14 @@ step() {
     fi
 }
 
+# A fresh build tree, so cmake takes the launcher from the environment.
 wasm_build() {
     rm -rf "$pkg/src/build"
-    ./scripts/build_wasm_beekeeper.sh 1 "$root"
+    local rc=0
+    CMAKE_C_COMPILER_LAUNCHER="$cc_launcher" CMAKE_CXX_COMPILER_LAUNCHER="$cc_launcher" \
+        ./scripts/build_wasm_beekeeper.sh 1 "$root" || rc=$?
+    compiler_cache_record wasm
+    return "$rc"
 }
 
 ts_build() {
@@ -106,8 +123,14 @@ playwright_tests() {
 # PACKAGES_TO_CHECK.
 py_pkgs=(python/tests/ python/beekeepy/)
 
+# The launcher is set even when empty: build/ may be configured from an earlier run.
 native_build() {
-    cmake -S "$root" -B build -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON && ninja -C build -j"$(nproc)"
+    local rc=0
+    cmake -S "$root" -B build -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON \
+        -DCMAKE_C_COMPILER_LAUNCHER="$cc_launcher" -DCMAKE_CXX_COMPILER_LAUNCHER="$cc_launcher" \
+        && ninja -C build -j"$(nproc)" || rc=$?
+    compiler_cache_record native
+    return "$rc"
 }
 
 native_tests() {
@@ -153,5 +176,6 @@ for s in "$@"; do
         *) echo "unknown step: $s" >&2; exit 2 ;;
     esac
 done
+[ "$needs_compiler" -eq 0 ] || compiler_cache_stop
 junit_write_cases "$out/junit.xml" "$suite" "$cases"
 exit "$status"
