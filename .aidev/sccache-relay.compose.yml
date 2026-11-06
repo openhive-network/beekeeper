@@ -1,0 +1,41 @@
+# The one service the slots' stack starts: a relay to the site's sccache cache AIDEV
+# hands the stack's compose environment (aidev docs/operations/sccache-cache.md), so a
+# suite reaches a WebDAV cache as http://sccache:8090/ and CI's Redis as
+# redis://sccache:6379. The suite container joins the stack's `default` network,
+# which is internal: it reaches the relay and nothing else, as offline as
+# `--network none` otherwise; only the relay is also on `upstream`. socat accepts a
+# connection whether or not the cache behind it answers, so .aidev/compiler-cache.sh
+# probes the cache through it and builds without the cache when it does not answer.
+# Modelled on hive's and wax's .aidev/sccache-relay.compose.yml.
+services:
+  sccache:
+    image: alpine/socat:1.8.0.3@sha256:beb4a68d9e4fe6b0f21ea774a0fde6c31f580dde6368939ed70100c5385b015e
+    init: true
+    entrypoint: ["/bin/sh", "-c"]
+    # $$ is a literal $ to compose: the shell expands these, not the compose file.
+    command:
+      - |
+        webdav="$${AIDEV_SCCACHE_WEBDAV_ENDPOINT#*://}"; webdav="$${webdav%%/*}"
+        if [ -n "$$webdav" ]; then
+            case "$$webdav" in *:*) ;; *) webdav="$$webdav:80" ;; esac
+            socat TCP-LISTEN:8090,fork,reuseaddr "TCP:$$webdav" &
+        fi
+        if [ -n "$$AIDEV_SCCACHE_REDIS_HOSTPORT" ]; then
+            socat TCP-LISTEN:6379,fork,reuseaddr "TCP:$$AIDEV_SCCACHE_REDIS_HOSTPORT" &
+        fi
+        touch /tmp/relay-started
+        exec sleep infinity
+    environment:
+      AIDEV_SCCACHE_WEBDAV_ENDPOINT: ${AIDEV_SCCACHE_WEBDAV_ENDPOINT:-}
+      AIDEV_SCCACHE_REDIS_HOSTPORT: ${AIDEV_SCCACHE_REDIS_HOSTPORT:-}
+    networks: [default, upstream]
+    healthcheck:
+      test: ["CMD-SHELL", "test -e /tmp/relay-started"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+networks:
+  default:
+    internal: true
+  upstream: {}

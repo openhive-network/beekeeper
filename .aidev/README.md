@@ -40,9 +40,33 @@ three beekeepy communicator test files that need a live Hive node (CI passes
 `beekeeper_native_check_static_linking` (the image links OpenSSL dynamically), the
 pre-commit hooks other than ruff/mypy, and packaging/publishing.
 
+## The compiler cache
+
+`wasm` and `native` compile through sccache (`CMAKE_C_COMPILER_LAUNCHER` /
+`CMAKE_CXX_COMPILER_LAUNCHER`; sccache handles emcc too) with the site's cache AIDEV
+hands every slot (aidev `docs/operations/sccache-cache.md`): a WebDAV cache in Jefferson
+and Poland (`AIDEV_SCCACHE_WEBDAV_ENDPOINT`), CI's Redis in Alleghany
+(`AIDEV_SCCACHE_REDIS`). The slot's stack (`sandbox:` in `project.yaml`) is one relay,
+`sccache-relay.compose.yml`: the suite container sits on the stack's internal network,
+reaching the relay and nothing else, and the relay forwards `sccache:8090` to the
+WebDAV cache and `sccache:6379` to the Redis.
+
+`compiler-cache.sh` picks the backend once per run: the WebDAV cache when its `/healthz`
+answers and the image's sccache is 0.10 or later (0.8's WebDAV client reads every entry
+of these caches as empty), else the Redis when a PING answers within 10 ms, else none.
+Through the relay first, then at the handed address (a run by hand on a network with a
+route). With no backend, or when the sccache server will not start, the builds get no
+launcher and compile cold; an unreachable cache never fails a slot. Every slot mounts the
+checkout at `/work`, so the absolute paths in the cache keys are the same on every host.
+
+`test-results/<suite>/sccache.tsv` has one row per build step: the backend and endpoint,
+sccache's compile requests, hits, misses, cache errors and write errors for that build,
+or why no cache was used. The step's log ends with `sccache --show-stats`.
+
 ## The test runtime image (`runtime/`)
 
-The suites run in a container with `--network none` and your uid. The image is CI's
+The suites run in a container with your uid, on the stack's internal network (see *The
+compiler cache*) or with `--network none` by hand. The image is CI's
 emsdk image (the one ccc's npm_projects template names as `EMSCRIPTEN_IMAGE`:
 emscripten and ccc's Node and pnpm; `runtime/build.sh` resolves it with
 `scripts/ccc_emscripten_image.sh` and builds on its current digest) plus the chromium build the lockfile's Playwright wants, a pnpm
