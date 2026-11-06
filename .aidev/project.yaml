@@ -32,7 +32,20 @@ branches:
 environment:
   kind: "container"
   image: "registry.gitlab.syncad.com/hive/beekeeper/aidev-tests@sha256:3bbe65771483d43bcd35e6aa094d3171171cf4dd0abb05a3bc74f2eef9f5cd28"
-  inputs: ["programs/beekeeper/beekeeper_wasm/pnpm-lock.yaml", "python/poetry.lock", "python/tests/local-tools/poetry.lock"]
+  # The Dockerfile is an input too: a change to it (a tool the image installs) is
+  # rebuilt and re-pinned in the same commit, like a lock file move.
+  inputs: [".aidev/runtime/Dockerfile", "programs/beekeeper/beekeeper_wasm/pnpm-lock.yaml", "python/poetry.lock", "python/tests/local-tools/poetry.lock"]
+
+# The native and WASM builds compile through sccache with the site's cache AIDEV hands
+# the stack, reached through this one-service stack: a relay on an internal network,
+# which keeps the suites as offline as --network none otherwise. When no cache
+# answers, the builds run cold (.aidev/compiler-cache.sh). See "The compiler cache"
+# in .aidev/README.md.
+sandbox:
+  compose: ".aidev/sccache-relay.compose.yml"
+  services: [sccache]
+  resource_class: light
+  readiness_timeout: 60
 
 issues:
   intake_label: todo
