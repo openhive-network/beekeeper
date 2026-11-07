@@ -346,78 +346,99 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
   test('Should return timeout_time reflecting custom unlockTimeout', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      // The inactivity timer starts when the instance is created, so its expiry lies within
+      // unlockTimeout of the window measured around creation, however long creation takes.
+      const beforeCreateMs = Date.now();
       const bk = await provider.default({ unlockTimeout: 10 });
       const session = bk.createSession("my.salt");
       const info = session.getInfo();
-
-      const diffSeconds = (info.timeoutTime.getTime() - info.now.getTime()) / 1000;
+      const afterInfoMs = Date.now();
 
       await bk.delete();
 
-      return diffSeconds;
+      return {
+        beforeCreateMs,
+        afterInfoMs,
+        timeoutMs: info.timeoutTime.getTime()
+      };
     });
 
-    // Should be roughly 10 seconds (allow ±2s tolerance for execution time)
-    expect(retVal).toBeGreaterThanOrEqual(8);
-    expect(retVal).toBeLessThanOrEqual(12);
+    expect(retVal.timeoutMs).toBeGreaterThanOrEqual(retVal.beforeCreateMs + 10_000);
+    expect(retVal.timeoutMs).toBeLessThanOrEqual(retVal.afterInfoMs + 10_000);
   });
 
+  // The inactivity timer starts with the instance and wallet creation does not refresh it,
+  // so these tests freeze the clock (withFrozenClock): lock state then follows the timeout
+  // logic instead of how long creation and the KDF take on the host.
   test('Should auto-lock wallets after timeout expires', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session = bk.createSession("my.salt");
       const { wallet } = await session.createWallet('w0', 'mypassword');
 
       await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
 
+      // Refreshes the timeout
       const keysBefore = wallet.getPublicKeys();
 
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(2000 - 1);
+      const unlockedBeforeTimeout = session.listWallets()[0].unlocked !== undefined;
 
       // After timeout, accessing wallet.unlocked auto-locks and returns undefined
-      const walletRef = session.listWallets()[0];
-      const isLocked = walletRef.unlocked === undefined;
+      advance(1);
+      const lockedAtTimeout = session.listWallets()[0].unlocked === undefined;
 
       await bk.delete();
 
       return {
         keysBefore: keysBefore.length,
-        isLocked
+        unlockedBeforeTimeout,
+        lockedAtTimeout
       };
-    });
+    }));
 
-    expect(retVal.keysBefore).toBe(1);
-    expect(retVal.isLocked).toBe(true);
+    expect(retVal).toStrictEqual({
+      keysBefore: 1,
+      unlockedBeforeTimeout: true,
+      lockedAtTimeout: true
+    });
   });
 
   test('Should refresh timeout on wallet operations', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 5 });
       const session = bk.createSession("my.salt");
       const { wallet } = await session.createWallet('w0', 'mypassword');
 
       await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
 
-      // Wait 3 seconds (within 5s timeout)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(3000);
 
       // Perform an operation to refresh timeout
-      await wallet.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
+      const refreshingKey = await wallet.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
 
-      // Wait another 3 seconds (6s total, but only 3s since last operation)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // 6s since the first import, but only 3s since the refresh
+      advance(3000);
+      const unlockedAfterRefresh = session.listWallets()[0].unlocked !== undefined;
 
-      // Wallet should still be unlocked since timeout was refreshed
-      const walletRef = session.listWallets()[0];
-      const keys = walletRef.unlocked?.getPublicKeys();
+      // The refreshed timeout still expires 5s after the refresh
+      advance(2000);
+      const lockedAtRefreshedTimeout = session.listWallets()[0].unlocked === undefined;
 
       await bk.delete();
 
-      return keys?.length;
-    });
+      return {
+        refreshingKeyImported: typeof refreshingKey === 'string',
+        unlockedAfterRefresh,
+        lockedAtRefreshedTimeout
+      };
+    }));
 
-    expect(retVal).toBe(2);
+    expect(retVal).toStrictEqual({
+      refreshingKeyImported: true,
+      unlockedAfterRefresh: true,
+      lockedAtRefreshedTimeout: true
+    });
   });
 
   test('Should throw when using a closed session', async ({ beekeeperTest }) => {
@@ -431,7 +452,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
   });
 
   test('Should throw timeout error when using stale unlocked wallet reference', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session = bk.createSession("my.salt");
       const { wallet } = await session.createWallet('w0', 'mypassword');
@@ -439,8 +460,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       // Hold a direct reference to the unlocked wallet
       const staleRef = wallet;
 
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(3000);
 
       // Using the stale reference should throw a timeout error
       let threwTimeout = false;
@@ -453,13 +473,13 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       await bk.delete();
 
       return threwTimeout;
-    });
+    }));
 
     expect(retVal).toBe(true);
   });
 
   test('Should not throw timeout error on unlock (unlock refreshes timeout)', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session = bk.createSession("my.salt");
       const { wallet } = await session.createWallet('w0', 'mypassword');
@@ -467,8 +487,7 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
       wallet.lock();
 
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(3000);
 
       // Unlock should not throw — it refreshes the timeout
       const walletRef = session.listWallets()[0];
@@ -478,19 +497,18 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       await bk.delete();
 
       return keys.length;
-    });
+    }));
 
     expect(retVal).toBe(1);
   });
 
   test('Should not throw timeout error on hasWallet after timeout', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session = bk.createSession("my.salt");
       await session.createWallet('w0', 'mypassword');
 
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(3000);
 
       // hasWallet should work regardless of timeout state
       const exists = session.hasWallet('w0');
@@ -499,20 +517,19 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       await bk.delete();
 
       return { exists, notExists };
-    });
+    }));
 
     expect(retVal.exists).toBe(true);
     expect(retVal.notExists).toBe(false);
   });
 
   test('Should not throw timeout error on lockAll after timeout', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session = bk.createSession("my.salt");
       await session.createWallet('w0', 'mypassword');
 
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(3000);
 
       // lockAll should work without throwing timeout error
       const wallets = session.lockAll();
@@ -520,19 +537,18 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       await bk.delete();
 
       return wallets.length;
-    });
+    }));
 
     expect(retVal).toBe(1);
   });
 
   test('Should not throw timeout error on createSession after timeout', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session1 = bk.createSession("salt1");
       await session1.createWallet('w0', 'mypassword');
 
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(3000);
 
       // Creating a new session should not throw timeout error
       const session2 = bk.createSession("salt2");
@@ -540,25 +556,24 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       await bk.delete();
 
       return session2 !== undefined;
-    });
+    }));
 
     expect(retVal).toBe(true);
   });
 
   test('Should not throw timeout error on delete after timeout', async ({ beekeeperTest }) => {
-    await beekeeperTest.dynamic(async ({ provider }) => {
+    await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session = bk.createSession("my.salt");
       await session.createWallet('w0', 'mypassword');
 
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(3000);
 
       // delete should work without throwing timeout error
       await bk.delete();
 
       return true;
-    });
+    }));
   });
 
   // --- wallet persistence across re-initialization ---

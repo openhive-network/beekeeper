@@ -72,3 +72,20 @@ globalThis.createBeekeeperWithStorage = async function createBeekeeperWithStorag
 };
 
 export {};
+
+/**
+ * Runs fn with Date.now() frozen; it moves only when fn calls advance(ms).
+ * The WASM build decides the inactivity timeout from Date.now() alone, so tests
+ * using this see lock state follow the timeout logic, not the host's speed.
+ */
+globalThis.withFrozenClock = async function withFrozenClock(fn) {
+  const realNow = Date.now;
+  let nowMs = realNow();
+  Date.now = () => nowMs;
+
+  try {
+    return await fn((ms) => { nowMs += ms; });
+  } finally {
+    Date.now = realNow;
+  }
+};
