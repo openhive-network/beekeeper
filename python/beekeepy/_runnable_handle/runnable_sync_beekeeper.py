@@ -26,6 +26,7 @@ class Beekeeper(RunnableBeekeeper, RemoteBeekeeperTemplate[RunnableSettingsT]):
     def _setup_ports(self, ports: PortMatchingResult) -> None:
         with self.update_settings() as settings:
             self._write_ports(settings, ports)
+        self.http_endpoint = settings.ensured_http_endpoint
 
 
 BeekeeperTemplate = Beekeeper

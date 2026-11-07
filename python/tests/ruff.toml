@@ -1,0 +1,5 @@
+extend = "../pyproject.toml"
+
+[lint.isort]
+# Match verification's import grouping when Ruff discovers the configuration.
+known-third-party = ["beekeepy"]

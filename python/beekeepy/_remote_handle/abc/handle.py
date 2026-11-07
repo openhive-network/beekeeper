@@ -67,22 +67,23 @@ class AbstractHandle(UniqueSettingsHolder[RemoteSettingsT], ABC, Generic[RemoteS
             communicator: communicator class to use for communication
         """
         super().__init__(*args, settings=settings, **kwargs)
+        self.__http_endpoint = self.settings.http_endpoint
         self.__logger = self.__configure_logger(logger)
         self.__communicator = self.settings.try_get_communicator_instance() or self._get_recommended_communicator()
         self.__api = self._construct_api()
 
     @property
-    def http_endpoint(self) -> HttpUrl:  # TODO: RESOLVE APPROPRIATE SETTING HANDLE
+    def http_endpoint(self) -> HttpUrl:
         """Return endpoint where handle is connected to."""
-        assert self.settings.http_endpoint is not None, "Http endpoint shouldn't be None"
-        return self.settings.http_endpoint
+        if self.__http_endpoint is None:
+            raise ValueError("Http endpoint is not set")
+        return self.__http_endpoint
 
     @http_endpoint.setter
     def http_endpoint(self, value: HttpUrl) -> None:
         """Set http endpoint."""
         self.logger.debug(f"setting http endpoint to: {value.as_string()}")
-        with self.update_settings() as settings:
-            settings.http_endpoint = value
+        self.__http_endpoint = value
 
     @property
     def apis(self) -> ApiT:
