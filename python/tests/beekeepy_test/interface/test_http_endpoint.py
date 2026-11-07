@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 import psutil
 import pytest
-
 from beekeepy import AsyncBeekeeper, Beekeeper
 from beekeepy.interfaces import HttpUrl
 from beekeepy.settings import InterfaceSettings
