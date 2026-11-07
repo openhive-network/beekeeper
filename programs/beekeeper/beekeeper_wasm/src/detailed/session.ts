@@ -39,10 +39,15 @@ export class BeekeeperSession implements IBeekeeperSession {
     if (isTemporary === undefined)
       isTemporary = this.api.isInMemory;
 
+    // As in unlock(): the wallets that timed out stay locked, and the created wallet
+    // starts its timeout once the KDF is done, not before it.
+    if (this.api.isTimedOut())
+      this.api.lockAllSessions();
     const returnedPassword: string = await this.api.runAsync(
       () => this.api.api.create(this.token, name, password ?? "", isTemporary),
       `wallet '${name}' creation`
     );
+    this.api.refreshTimeout();
     if (typeof password !== 'string')
       password = returnedPassword;
 
