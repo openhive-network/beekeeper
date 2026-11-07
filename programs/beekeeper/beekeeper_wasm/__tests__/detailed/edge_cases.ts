@@ -516,20 +516,20 @@ test.describe('Edge cases: high-level factory API', () => {
   // --- listWallets reflects timeout auto-lock ---
 
   test('Should auto-lock wallets in listWallets after timeout expires', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session = bk.createSession("my.salt");
 
       await session.createWallet('w0', 'pass0');
       await session.createWallet('w1', 'pass1');
 
+      advance(2000 - 1);
       const before = session.listWallets().map(w => ({
         name: w.name,
         isUnlocked: w.unlocked !== undefined
       }));
 
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(1);
 
       const after = session.listWallets().map(w => ({
         name: w.name,
@@ -539,7 +539,7 @@ test.describe('Edge cases: high-level factory API', () => {
       await bk.delete();
 
       return { before, after };
-    });
+    }));
 
     expect(retVal.before).toStrictEqual([
       { name: 'w0', isUnlocked: true },
@@ -635,7 +635,7 @@ test.describe('Edge cases: high-level factory API', () => {
   });
 
   test('Should lock the wallets of every session when the instance timeout expires', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session1 = bk.createSession("salt1");
       const session2 = bk.createSession("salt2");
@@ -643,7 +643,7 @@ test.describe('Edge cases: high-level factory API', () => {
       await session1.createWallet('w0', 'pass');
       await session2.openWallet('w0').unlock('pass');
 
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(2000);
 
       // Reading the state of session1's wallet after the timeout locks session2's wallet too
       const lockedInSession1 = session1.listWallets()[0].unlocked === undefined;
@@ -657,19 +657,19 @@ test.describe('Edge cases: high-level factory API', () => {
       await bk.delete();
 
       return { lockedInSession1, lockedInSession2 };
-    });
+    }));
 
     expect(retVal).toStrictEqual({ lockedInSession1: true, lockedInSession2: true });
   });
 
   test('Should start the timeout of a created wallet after an idle period without reviving timed-out wallets', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session = bk.createSession("salt1");
 
       const { wallet: timedOut } = await session.createWallet('w0', 'pass');
 
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(2000);
 
       const { wallet } = await session.createWallet('w1', 'pass1');
       const publicKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
@@ -684,13 +684,13 @@ test.describe('Edge cases: high-level factory API', () => {
       await bk.delete();
 
       return { publicKey, timedOutRefused };
-    });
+    }));
 
     expect(retVal).toStrictEqual({ publicKey: 'STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh', timedOutRefused: true });
   });
 
   test('Should keep timed-out wallets locked after a later unlock attempt', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+    const retVal = await beekeeperTest.dynamic(({ provider }) => withFrozenClock(async (advance) => {
       const bk = await provider.default({ unlockTimeout: 2 });
       const session1 = bk.createSession("salt1");
       const session2 = bk.createSession("salt2");
@@ -699,7 +699,7 @@ test.describe('Edge cases: high-level factory API', () => {
       const publicKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
       await session1.createWallet('w1', 'pass1');
 
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      advance(2000);
 
       let wrongPasswordRefused = false;
       try {
@@ -719,7 +719,7 @@ test.describe('Edge cases: high-level factory API', () => {
       await bk.delete();
 
       return { wrongPasswordRefused, signRefused };
-    });
+    }));
 
     expect(retVal).toStrictEqual({ wrongPasswordRefused: true, signRefused: true });
   });
