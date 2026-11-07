@@ -14,6 +14,14 @@ struct wallet_storage
   /// Persist a wallet blob at the given path.
   virtual void save(const std::string& path, const std::vector<char>& buffer) = 0;
 
+  /// Like save(), but the blob must also survive a power loss once this returns
+  /// (used after a password change, when the old password is about to be
+  /// forgotten). Storages without a cheaper non-durable mode keep the default.
+  virtual void save_durable(const std::string& path, const std::vector<char>& buffer)
+  {
+    save(path, buffer);
+  }
+
   /// Retrieve a previously-persisted wallet blob. Throws if not found.
   virtual std::vector<char> load(const std::string& path) = 0;
 

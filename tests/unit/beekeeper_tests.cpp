@@ -2059,6 +2059,29 @@ struct failing_save_storage final : public beekeeper_minimal::wallet_storage
   bool scan_dir(const std::string& wallet_name) override { return inner.scan_dir(wallet_name); }
 };
 
+/// Storage wrapper that counts plain and durable saves.
+struct save_counting_storage final : public beekeeper_minimal::wallet_storage
+{
+  beekeeper_minimal::wallet_storage& inner;
+  size_t saves = 0;
+  size_t durable_saves = 0;
+
+  explicit save_counting_storage(beekeeper_minimal::wallet_storage& s) : inner(s) {}
+
+  void save(const std::string& path, const std::vector<char>& buffer) override
+  {
+    ++saves;
+    inner.save(path, buffer);
+  }
+  void save_durable(const std::string& path, const std::vector<char>& buffer) override
+  {
+    ++durable_saves;
+    inner.save_durable(path, buffer);
+  }
+  std::vector<char> load(const std::string& path) override { return inner.load(path); }
+  bool scan_dir(const std::string& wallet_name) override { return inner.scan_dir(wallet_name); }
+};
+
 } // anonymous namespace
 
 BOOST_AUTO_TEST_CASE(wallet_legacy_migration_storage_failure)
@@ -2491,6 +2514,37 @@ BOOST_AUTO_TEST_CASE(wallet_change_password_storage_failure)
   w.open();
   w.unlock("pass");
   BOOST_REQUIRE_EQUAL(1u, w.get_keys().size());
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_change_password_saves_durably)
+{ try {
+  // A password change is flushed to disk before it is reported done; key
+  // imports and removals keep the cheaper plain save.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  save_counting_storage storage(*b_mgr.storage);
+  beekeeper_minimal::wallet w(b_mgr.crypto, &storage, "change_durable");
+  w.create("pass");
+  w.import_key(fc::ecc::private_key::generate().key_to_wif(), "STM");
+  BOOST_REQUIRE_EQUAL(0u, storage.durable_saves);
+
+  storage.saves = 0;
+  w.change_password("pass", "new-pass");
+  BOOST_REQUIRE_EQUAL(1u, storage.durable_saves);
+  BOOST_REQUIRE_EQUAL(0u, storage.saves);
+
+  w.remove_key(w.get_keys().begin()->first);
+  BOOST_REQUIRE_EQUAL(1u, storage.durable_saves);
+  BOOST_REQUIRE_EQUAL(1u, storage.saves);
+
+  // The durable path wrote a file the new password opens.
+  w.lock();
+  w.open();
+  BOOST_REQUIRE_THROW(w.unlock("pass"), std::exception);
+  w.unlock("new-pass");
+  BOOST_REQUIRE(w.get_keys().empty());
 
 } FC_LOG_AND_RETHROW() }
 

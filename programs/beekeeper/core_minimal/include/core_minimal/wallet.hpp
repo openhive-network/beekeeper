@@ -80,8 +80,9 @@ public:
                                                 const public_key_type& public_key) const;
 
 private:
-  /// Re-encrypt keys_ with `key` (fresh IV, no KDF) and persist. Throws if the save fails.
-  void encrypt_and_save(const wallet_key& key);
+  /// Re-encrypt keys_ with `key` (fresh IV, no KDF) and persist, through
+  /// wallet_storage::save_durable() when `durable`. Throws if the save fails.
+  void encrypt_and_save(const wallet_key& key, bool durable = false);
 
   /// Persist `keys` encrypted with `key` unless the stored wallet changed since it was
   /// opened here. Never throws for storage failures; returns whether it was saved.

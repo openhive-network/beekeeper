@@ -47,6 +47,11 @@ void file_storage::save(const std::string& name, const std::vector<char>& buffer
   write_wallet_file(name, buffer, false);
 }
 
+void file_storage::save_durable(const std::string& name, const std::vector<char>& buffer)
+{
+  write_wallet_file(name, buffer, true);
+}
+
 bool file_storage::try_save(const std::string& name, const std::vector<char>& buffer)
 {
   try

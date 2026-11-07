@@ -63,12 +63,18 @@ bool equal_secrets(const std::string& a, const std::string& b)
 
 } // anonymous namespace
 
-void wallet::encrypt_and_save(const wallet_key& key)
+void wallet::encrypt_and_save(const wallet_key& key, bool durable)
 {
   auto cipher_keys = crypto_.encrypt_wallet_keys(key, keys_);
 
   if (storage_)
-    storage_->save(name_, to_wallet_file(cipher_keys));
+  {
+    auto buffer = to_wallet_file(cipher_keys);
+    if (durable)
+      storage_->save_durable(name_, buffer);
+    else
+      storage_->save(name_, buffer);
+  }
 
   // Assign only after a successful save, so the in-memory blob never gets
   // ahead of the stored one when save throws.
@@ -197,9 +203,10 @@ void wallet::change_password(const std::string& password, const std::string& new
     throw std::runtime_error("New password is too long, maximum length is " + std::to_string(max_password_length));
 
   // The saved file and the in-memory state switch to the new password only
-  // together: a failed save leaves both on the current one.
+  // together: a failed save leaves both on the current one. The save is
+  // durable, as the caller stops using the old password once this returns.
   auto key = crypto_.derive_wallet_key(new_password, key_.iterations);
-  encrypt_and_save(key);
+  encrypt_and_save(key, true);
 
   key_ = std::move(key);
   password_ = new_password;
