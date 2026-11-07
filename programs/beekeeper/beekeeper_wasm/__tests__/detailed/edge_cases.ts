@@ -313,6 +313,31 @@ test.describe('Edge cases: high-level factory API', () => {
     })).rejects.toThrow();
   });
 
+  test('Should refuse signDigest with an empty digest', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+      const { wallet } = await session.createWallet('w0', 'pass');
+
+      const pubKey = await wallet.importKey('5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n');
+
+      const errors: string[] = [];
+      for (const digest of ['', new Uint8Array(0)]) {
+        try {
+          await wallet.signDigest(pubKey, digest);
+          errors.push('accepted');
+        } catch (error) {
+          errors.push((error as Error).message);
+        }
+      }
+
+      return errors;
+    });
+
+    expect(retVal).toHaveLength(2);
+    for (const message of retVal)
+      expect(message).toMatch(/expected 64 hex chars for digest/);
+  });
+
   test('Should throw when calling importKey on a locked wallet', async ({ beekeeperTest }) => {
     await expect(beekeeperTest(async ({ beekeeper }) => {
       const session = beekeeper.createSession("my.salt");

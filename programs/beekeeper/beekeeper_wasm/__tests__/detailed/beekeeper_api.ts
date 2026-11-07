@@ -754,6 +754,32 @@ test.describe('WASM beekeeper_api tests for Node.js', () => {
     }, WALLET_OPTIONS_NODE, walletNames, keys)).rejects.toThrow(/expected 64 hex chars for digest/);
   });
 
+  test('Should refuse an empty or wrong-length sig_digest', async ({ beekeeperWasmTest }) => {
+    const retVal = await beekeeperWasmTest(async ({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE, walletNames, keys) => {
+      const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
+
+      await api.create_with_password(api.implicitSessionToken, walletNames[9], 'pass');
+      const key = await api.importKey(api.implicitSessionToken, walletNames[9], keys[3][0]);
+
+      const validDigest = '390f34297cfcb8fa4b37353431ecbab05b8dc0c9c15fb9ca1a3d510c52177542';
+      const errors: Record<string, string> = {};
+      for (const [name, digest] of Object.entries({ empty: '', short: validDigest.slice(2), long: validDigest + 'ab' })) {
+        try {
+          await api.signDigest(api.implicitSessionToken, digest, key);
+          errors[name] = 'accepted';
+        } catch (error) {
+          errors[name] = (error as Error).message;
+        }
+      }
+
+      return errors;
+    }, WALLET_OPTIONS_NODE, walletNames, keys);
+
+    expect(retVal.empty).toMatch(/expected 64 hex chars for digest/);
+    expect(retVal.short).toMatch(/expected 64 hex chars for digest/);
+    expect(retVal.long).toMatch(/expected 64 hex chars for digest/);
+  });
+
   test('Should throw when opening a wallet with empty name', async ({ beekeeperWasmTest }) => {
     await expect(beekeeperWasmTest(({ provider, BeekeeperInstanceHelper }, WALLET_OPTIONS_NODE) => {
       const api = new BeekeeperInstanceHelper(provider, WALLET_OPTIONS_NODE);
