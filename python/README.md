@@ -1,22 +1,47 @@
 # Beekeepy
 
-A high-level Python interface for interacting with a Beekeeper instance.
+A high-level Python interface for interacting with a Beekeeper instance - secure Hive key management and transaction signing without a full blockchain node.
+
+[![PyPI version](https://img.shields.io/pypi/v/hiveio-beekeepy.svg)](https://pypi.org/project/hiveio-beekeepy/)
+[![CI](https://gitlab.syncad.com/hive/beekeeper/badges/master/pipeline.svg)](https://gitlab.syncad.com/hive/beekeeper/-/pipelines)
 
 ---
 
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Features](#features)
-3. [Object-Oriented Interface](#object-oriented-interface)
-4. [Error Handling](#error-handling)
-5. [Beekeeper Instance Management](#beekeeper-instance-management)
-6. [Notes on Configuration](#notes-on-configuration)
-7. [Environment Variables](#environment-variables)
+2. [Installation](#installation)
+3. [Features](#features)
+4. [Object-Oriented Interface](#object-oriented-interface)
+5. [Error Handling](#error-handling)
+6. [Beekeeper Instance Management](#beekeeper-instance-management)
+7. [Notes on Configuration](#notes-on-configuration)
+8. [Environment Variables](#environment-variables)
+9. [Related Packages](#related-packages)
 
 ## Introduction
 
 Beekeepy is a Python library designed to offer a high-level object-oriented interface for interacting with a Beekeeper instance. Whether you want to start your own Beekeeper instance or connect to an existing one, Beekeepy simplifies the process while providing robust error handling and IDE integration through comprehensive type hinting.
+
+For building bots and automation on Hive (WAX + Beekeeper + WorkerBee), see [Building agents on developers.hive.io](https://developers.hive.io/quickstart/#quickstart-building-agents).
+
+TypeScript / JavaScript consumers should use [`@hiveio/beekeeper`](https://www.npmjs.com/package/@hiveio/beekeeper) - see its [README](https://gitlab.syncad.com/hive/beekeeper/-/blob/master/programs/beekeeper/beekeeper_wasm/README.md).
+
+## Installation
+
+Requires Python 3.12 or newer on Linux (the embedded Beekeeper binary is Linux-only).
+
+The package is published to [PyPI](https://pypi.org/project/hiveio-beekeepy/) as `hiveio-beekeepy` and imported as `beekeepy`:
+
+```bash
+pip install hiveio-beekeepy
+```
+
+Development builds, and the dependencies that are published only there (e.g. `hiveio-api-client`), are in the Hive GitLab package registry:
+
+```bash
+pip install --extra-index-url https://gitlab.syncad.com/api/v4/groups/136/-/packages/pypi/simple hiveio-beekeepy
+```
 
 ## Features
 
@@ -117,3 +142,14 @@ Defaults of settings (`beekeepy.settings`) can be given by environment variables
 | `HIVEIO_INITIALIZATION_TIMEOUT`                    | `initialization_timeout` | `BEEKEEPY_INITIALIZATION_TIMEOUT`                 |
 
 Former names are still read, with `DeprecationWarning`, when the variable of the new name is not set. Each of them now sets the setting of its name - formerly the `HELPY_COMMUNICATION_*` variables set wrong settings (e.g. `HELPY_COMMUNICATION_MAX_RETRIES` set the timeout).
+
+## Related Packages
+
+| Package                                                                | Role                                                |
+|------------------------------------------------------------------------|-----------------------------------------------------|
+| [`@hiveio/beekeeper`](https://www.npmjs.com/package/@hiveio/beekeeper) | Beekeeper for TypeScript / JavaScript (WASM)        |
+| [`hiveio-wax`](https://pypi.org/project/hiveio-wax/)                   | Hive protocol and transaction building (Python)     |
+| [`@hiveio/wax`](https://www.npmjs.com/package/@hiveio/wax)             | Hive protocol and transaction building (TypeScript) |
+| [`@hiveio/workerbee`](https://www.npmjs.com/package/@hiveio/workerbee) | Observing and automating Hive (TypeScript)          |
+
+How they fit together: [Building agents on developers.hive.io](https://developers.hive.io/quickstart/#quickstart-building-agents).
