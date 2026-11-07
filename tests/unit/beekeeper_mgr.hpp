@@ -13,9 +13,8 @@ namespace test_utils
 {
   struct beekeeper_mgr
   {
-    /// Low PBKDF2 work factor so the suite stays fast — import_keys alone
-    /// re-encrypts the wallet 1000 times against a 10 s budget. The production
-    /// default is exercised separately by the wallet_default_kdf_profile test.
+    /// Low PBKDF2 work factor so the suite stays fast. The production default
+    /// is exercised separately by the wallet_default_kdf_profile test.
     static constexpr uint32_t test_kdf_iterations = 1024;
 
     boost::filesystem::path dir;

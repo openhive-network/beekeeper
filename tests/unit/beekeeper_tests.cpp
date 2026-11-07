@@ -1223,50 +1223,6 @@ BOOST_AUTO_TEST_CASE(encrypt_decrypt_data_with_many_keys)
   } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE(import_keys)
-{
-  try
-  {
-    test_utils::beekeeper_mgr b_mgr;
-    b_mgr.remove_wallets();
-
-    auto _prefix = "STM";
-
-    auto bk = b_mgr.create_beekeeper();
-    auto _token = bk.create_session();
-
-    const std::string _wallet_name = "wallet-0";
-
-    bk.create_wallet( _token, _wallet_name, "", false );
-
-    // core_minimal saves to disk after each key (no batch mode), so use fewer keys
-    const size_t _nr_keys = 1'000;
-    std::vector<std::string> _keys( _nr_keys );
-
-    for( size_t i = 0; i < _nr_keys; ++i )
-    {
-      auto _priv = fc::ecc::private_key::generate();
-      _keys[i] = _priv.key_to_wif();
-    }
-
-    auto _start = std::chrono::high_resolution_clock::now();
-
-    for( const auto& wif : _keys )
-      bk.import_key( _token, _wallet_name, wif, _prefix );
-
-    auto _duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() - _start );
-    auto  _time = _duration.count();
-
-    BOOST_REQUIRE_LT( _time, 10000 );
-
-    BOOST_TEST_MESSAGE( std::to_string( _time ) + " [ms]" );
-
-    auto _public_keys = bk.get_public_keys( _token, _wallet_name );
-    BOOST_REQUIRE_EQUAL( _public_keys.size(), _nr_keys );
-
-  } FC_LOG_AND_RETHROW()
-}
-
 BOOST_AUTO_TEST_CASE(has_wallet)
 {
   try
@@ -2217,11 +2173,12 @@ BOOST_AUTO_TEST_CASE(wallet_default_kdf_profile)
 
 namespace {
 
-/// fc primitives that count PBKDF2 runs and remember the last work factor.
+/// fc primitives that count PBKDF2 runs and AES encryptions, and remember the last work factor.
 struct counting_primitives final : public beekeeper_minimal::crypto_primitives
 {
   beekeeper_minimal::fc_crypto_primitives inner;
   size_t   kdf_runs = 0;
+  size_t   aes_encryptions = 0;
   uint32_t last_iterations = 0;
 
   beekeeper_minimal::digest_type sha256(const uint8_t* data, size_t len) override { return inner.sha256(data, len); }
@@ -2243,6 +2200,7 @@ struct counting_primitives final : public beekeeper_minimal::crypto_primitives
   std::vector<uint8_t> aes256_cbc_encrypt(const uint8_t* key, const uint8_t* iv,
                                           const uint8_t* data, size_t len) override
   {
+    ++aes_encryptions;
     return inner.aes256_cbc_encrypt(key, iv, data, len);
   }
   std::vector<uint8_t> aes256_cbc_decrypt(const uint8_t* key, const uint8_t* iv,
@@ -2337,6 +2295,50 @@ BOOST_AUTO_TEST_CASE(wallet_kdf_runs_once_per_unlock)
   BOOST_REQUIRE(blob_has_v1_magic(b_mgr.read_wallet_blob("kdf_legacy")));
   legacy.import_key(fc::ecc::private_key::generate().key_to_wif(), "STM");
   BOOST_REQUIRE_EQUAL(1u, prims.kdf_runs);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(import_keys)
+{ try {
+  // Bulk import cost is bounded by counting the work each import_key does
+  // instead of timing it, so a busy host cannot fail the test: one plain save
+  // and one encryption of the wallet per key, no fsync and no KDF run.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  size_t _syncs = 0;
+  beekeeper::file_storage _files( b_mgr.dir, [&_syncs]( int ){ ++_syncs; return 0; } );
+  save_counting_storage _storage( _files );
+  counting_primitives _prims;
+  beekeeper_minimal::crypto_provider_impl _crypto( _prims, test_utils::beekeeper_mgr::test_kdf_iterations );
+  beekeeper_minimal::beekeeper bk( _crypto, _storage, 900 );
+  auto _token = bk.create_session();
+
+  const std::string _wallet_name = "wallet-0";
+  bk.create_wallet( _token, _wallet_name, "", false );
+
+  const size_t _nr_keys = 1'000;
+  std::vector<std::string> _keys( _nr_keys );
+  for( auto& wif : _keys )
+    wif = fc::ecc::private_key::generate().key_to_wif();
+
+  _storage.saves = _storage.durable_saves = _syncs = 0;
+  _prims.kdf_runs = _prims.aes_encryptions = 0;
+
+  auto _start = std::chrono::steady_clock::now();
+  for( const auto& wif : _keys )
+    bk.import_key( _token, _wallet_name, wif, "STM" );
+  auto _time = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::steady_clock::now() - _start ).count();
+  BOOST_TEST_MESSAGE( std::to_string( _time ) + " [ms]" );
+
+  BOOST_REQUIRE_EQUAL( _storage.saves, _nr_keys );
+  BOOST_REQUIRE_EQUAL( _storage.durable_saves, 0u );
+  BOOST_REQUIRE_EQUAL( _syncs, 0u );
+  BOOST_REQUIRE_EQUAL( _prims.aes_encryptions, _nr_keys );
+  BOOST_REQUIRE_EQUAL( _prims.kdf_runs, 0u );
+
+  auto _public_keys = bk.get_public_keys( _token, _wallet_name );
+  BOOST_REQUIRE_EQUAL( _public_keys.size(), _nr_keys );
 
 } FC_LOG_AND_RETHROW() }
 
