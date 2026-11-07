@@ -6,6 +6,7 @@
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
+#include <utility>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -16,7 +17,12 @@ namespace bfs = boost::filesystem;
 namespace beekeeper {
 
 file_storage::file_storage(const boost::filesystem::path& wallet_dir)
-  : wallet_dir_(wallet_dir)
+  : file_storage(wallet_dir, ::fsync)
+{
+}
+
+file_storage::file_storage(const boost::filesystem::path& wallet_dir, sync_function sync)
+  : wallet_dir_(wallet_dir), sync_(std::move(sync))
 {
 }
 
@@ -94,7 +100,7 @@ void file_storage::write_wallet_file(const std::string& name, const std::vector<
     if (written)
       done += static_cast<size_t>(n);
   }
-  written = written && (!durable || ::fsync(fd) == 0);
+  written = written && (!durable || sync_(fd) == 0);
   written = ::close(fd) == 0 && written;
   if (!written)
   {
@@ -114,7 +120,7 @@ void file_storage::write_wallet_file(const std::string& name, const std::vector<
     int dir_fd = ::open(wallet_dir_.string().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (dir_fd >= 0)
     {
-      ::fsync(dir_fd);
+      sync_(dir_fd);
       ::close(dir_fd);
     }
   }

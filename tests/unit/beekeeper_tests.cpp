@@ -2428,6 +2428,37 @@ BOOST_AUTO_TEST_CASE(file_storage_save_replaces_planted_temp_file)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(file_storage_save_durable_flushes_to_disk)
+{ try {
+  // A durable save flushes the wallet file and the wallet directory, a plain
+  // save flushes nothing; a failed flush fails the save and keeps the old file.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  unsigned syncs = 0;
+  int sync_result = 0;
+  beekeeper::file_storage storage(b_mgr.dir, [&](int) { ++syncs; return sync_result; });
+  const std::vector<char> content{ '"', 'a', 'b', '"' };
+  const std::vector<char> other_content{ '"', 'c', '"' };
+
+  storage.save("flushed", content);
+  BOOST_REQUIRE_EQUAL(0u, syncs);
+
+  storage.save_durable("flushed", other_content);
+  BOOST_REQUIRE_EQUAL(2u, syncs);
+  BOOST_REQUIRE(storage.load("flushed") == other_content);
+
+  syncs = 0;
+  BOOST_REQUIRE(storage.try_save("flushed", content));
+  BOOST_REQUIRE_EQUAL(2u, syncs);
+
+  sync_result = -1;
+  BOOST_REQUIRE_THROW(storage.save_durable("flushed", other_content), std::exception);
+  BOOST_REQUIRE(storage.load("flushed") == content);
+  BOOST_REQUIRE(!boost::filesystem::exists(b_mgr.dir / "flushed.wallet.tmp"));
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(wallet_change_password)
 { try {
   // The wallet is re-encrypted with the new password and stays unlocked in every
