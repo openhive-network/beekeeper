@@ -123,12 +123,31 @@ playwright_tests() {
 # PACKAGES_TO_CHECK.
 py_pkgs=(python/tests/ python/beekeepy/)
 
+# One compiler per CPU, but no more than the container's memory limit holds at
+# ~1.5 GiB per fc/Boost translation unit: the limit is sized from cached runs, and
+# a cache miss on a many-core host otherwise starts nproc compilers into it and
+# gets them OOM-killed.
+native_jobs() {
+    local jobs limit fit
+    jobs="$(nproc)"
+    limit="$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null)"
+    case "$limit" in
+        ''|*[!0-9]*) ;;   # "max" or unreadable: no limit
+        *) fit=$(( limit / (1536 * 1024 * 1024) ))
+           [ "$fit" -lt 1 ] && fit=1
+           [ "$fit" -lt "$jobs" ] && jobs="$fit" ;;
+    esac
+    echo "$jobs"
+}
+
 # The launcher is set even when empty: build/ may be configured from an earlier run.
 native_build() {
-    local rc=0
+    local rc=0 jobs
+    jobs="$(native_jobs)"
+    echo "ninja: $jobs jobs ($(nproc) CPUs)"
     cmake -S "$root" -B build -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON \
         -DCMAKE_C_COMPILER_LAUNCHER="$cc_launcher" -DCMAKE_CXX_COMPILER_LAUNCHER="$cc_launcher" \
-        && ninja -C build -j"$(nproc)" || rc=$?
+        && ninja -C build -j"$jobs" || rc=$?
     compiler_cache_record native
     return "$rc"
 }
