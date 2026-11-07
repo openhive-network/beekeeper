@@ -21,13 +21,20 @@ if TYPE_CHECKING:
 _REQUEST_TIMEOUT: Final[timedelta] = timedelta(seconds=60)
 
 
+def _with_request_timeout(settings: InterfaceSettings) -> InterfaceSettings:
+    """Raise the request timeout of given settings, unless they set one other than the default."""
+    if settings.timeout == InterfaceSettings().timeout:
+        settings.timeout = _REQUEST_TIMEOUT
+    return settings
+
+
 @pytest.fixture
 def settings(working_directory: Path) -> SettingsFactory:
     @wraps(settings)
     def _factory(settings_update: InterfaceSettings | None = None) -> InterfaceSettings:
         amount_of_beekeepers_in_working_directory = len([x for x in working_directory.glob("Beekeeper*") if x.is_dir()])
         working_dir = working_directory / f"Beekeeper{amount_of_beekeepers_in_working_directory}"
-        result = settings_update or InterfaceSettings(timeout=_REQUEST_TIMEOUT)
+        result = _with_request_timeout(settings_update or InterfaceSettings())
         result.working_directory = working_dir
         return result
 
