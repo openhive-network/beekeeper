@@ -2384,5 +2384,115 @@ BOOST_AUTO_TEST_CASE(file_storage_save_replaces_planted_temp_file)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(wallet_change_password)
+{ try {
+  // The wallet is re-encrypted with the new password and stays unlocked in every
+  // session that unlocked it; unlocking it later takes the new password.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  auto _prefix = "STM";
+  const std::string _wallet_name = "wallet-0";
+  const std::string _password = "avocado";
+  const std::string _new_password = "banana";
+
+  {
+    auto bk = b_mgr.create_beekeeper();
+    auto _owner = bk.create_session();
+    auto _other = bk.create_session();
+    auto _locked = bk.create_session();
+    auto _stranger = bk.create_session();
+
+    bk.create_wallet( _owner, _wallet_name, _password, false );
+    bk.import_key( _owner, _wallet_name, "5JNHfZYKGaomSFvd4NUdQ9qMcEAC43kujbfjueTHpVapX1Kzq2n", _prefix );
+    bk.open_wallet( _other, _wallet_name );
+    bk.unlock( _other, _wallet_name, _password );
+    bk.open_wallet( _locked, _wallet_name );
+    auto _blob = b_mgr.read_wallet_blob( _wallet_name );
+
+    BOOST_REQUIRE_THROW( bk.change_password( _owner, _wallet_name, "wrong", _new_password ), std::exception );
+    BOOST_REQUIRE_THROW( bk.change_password( _owner, _wallet_name, _password, "" ), std::exception );
+    BOOST_REQUIRE_THROW( bk.change_password( _owner, _wallet_name, _password, std::string( beekeeper_minimal::max_password_length + 1, 'x' ) ), std::exception );
+    BOOST_REQUIRE_THROW( bk.change_password( _locked, _wallet_name, _password, _new_password ), std::exception );
+    BOOST_REQUIRE_THROW( bk.change_password( _stranger, _wallet_name, _password, _new_password ), std::exception );
+    BOOST_REQUIRE( b_mgr.read_wallet_blob( _wallet_name ) == _blob );
+
+    bk.change_password( _owner, _wallet_name, _password, _new_password );
+
+    auto _new_blob = b_mgr.read_wallet_blob( _wallet_name );
+    BOOST_REQUIRE( _new_blob != _blob );
+    BOOST_REQUIRE_EQUAL( test_utils::beekeeper_mgr::test_kdf_iterations, blob_iterations( _new_blob ) );
+    BOOST_REQUIRE_EQUAL( bk.get_public_keys( _owner, _wallet_name ).size(), 1u );
+    BOOST_REQUIRE_EQUAL( bk.get_public_keys( _other, _wallet_name ).size(), 1u );
+
+    // A session unlocking it now (the keys are in memory) needs the new password too
+    BOOST_REQUIRE_THROW( bk.unlock( _locked, _wallet_name, _password ), std::exception );
+    bk.unlock( _locked, _wallet_name, _new_password );
+
+    // The new password is the current one for further changes
+    BOOST_REQUIRE_THROW( bk.change_password( _other, _wallet_name, _password, "cherry" ), std::exception );
+    bk.change_password( _other, _wallet_name, _new_password, std::string( beekeeper_minimal::max_password_length, 'x' ) );
+    bk.change_password( _other, _wallet_name, std::string( beekeeper_minimal::max_password_length, 'x' ), _new_password );
+  }
+
+  // Loaded from the file again, the wallet opens only with the new password
+  auto bk = b_mgr.create_beekeeper();
+  auto _token = bk.create_session();
+  bk.open_wallet( _token, _wallet_name );
+  BOOST_REQUIRE_THROW( bk.unlock( _token, _wallet_name, _password ), std::exception );
+  bk.unlock( _token, _wallet_name, _new_password );
+  BOOST_REQUIRE_EQUAL( bk.get_public_keys( _token, _wallet_name ).size(), 1u );
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_change_password_keeps_work_factor)
+{ try {
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  counting_primitives prims;
+  beekeeper_minimal::crypto_provider_impl crypto(prims, test_utils::beekeeper_mgr::test_kdf_iterations);
+  beekeeper_minimal::beekeeper bk(crypto, *b_mgr.storage, 900);
+  auto _token = bk.create_session();
+
+  bk.create_wallet(_token, "temp", "pass", true);
+  prims.kdf_runs = 0;
+  bk.change_password(_token, "temp", "pass", "new-pass");
+  BOOST_REQUIRE_EQUAL(1u, prims.kdf_runs);
+  BOOST_REQUIRE_EQUAL(1u, prims.last_iterations);
+  bk.lock(_token, "temp");
+  bk.unlock(_token, "temp", "new-pass");
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(wallet_change_password_storage_failure)
+{ try {
+  // A password change that cannot be saved fails and changes nothing: the
+  // wallet and its file both keep the current password.
+  test_utils::beekeeper_mgr b_mgr;
+  b_mgr.remove_wallets();
+
+  failing_save_storage storage(*b_mgr.storage);
+  storage.fail_save = false;
+  beekeeper_minimal::wallet w(b_mgr.crypto, &storage, "change_ro");
+  w.create("pass");
+  w.import_key(fc::ecc::private_key::generate().key_to_wif(), "STM");
+  auto blob = b_mgr.read_wallet_blob("change_ro");
+
+  storage.fail_save = true;
+  BOOST_REQUIRE_THROW(w.change_password("pass", "new-pass"), std::exception);
+  BOOST_REQUIRE(!w.is_locked());
+  w.check_password("pass");
+  BOOST_REQUIRE_THROW(w.check_password("new-pass"), std::exception);
+  BOOST_REQUIRE(b_mgr.read_wallet_blob("change_ro") == blob);
+
+  storage.fail_save = false;
+  w.lock();
+  w.open();
+  w.unlock("pass");
+  BOOST_REQUIRE_EQUAL(1u, w.get_keys().size());
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
 #endif

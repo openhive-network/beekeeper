@@ -46,6 +46,9 @@ class UnlockedWallet(Wallet, ContextAsync["UnlockedWallet"], ABC):
     async def lock(self) -> None: ...
 
     @abstractmethod
+    async def change_password(self, *, password: str, new_password: str) -> None: ...
+
+    @abstractmethod
     async def sign_digest(self, *, sig_digest: str, key: str) -> Signature: ...
 
     @abstractmethod

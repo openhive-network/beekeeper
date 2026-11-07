@@ -10,6 +10,33 @@ from hiveio_api.fields.public import Hex, HiveDateTime, PublicKey, Sha256, Signa
 
 
 @dataclass(kw_only=True)
+class ChangePassword(HiveModel):
+    """The ChangePassword model."""
+
+    new_password: str
+    """
+    The new plaintext password. It cannot be empty and its maximum length is 128.
+    """
+    password: str
+    """
+    The current plaintext password of the wallet
+    """
+    token: str
+    """
+    Session's identifier
+    """
+    wallet_name: str
+    """
+    A name of a wallet whose password is changed. The wallet must be unlocked in the current session.
+    """
+
+
+@dataclass(kw_only=True)
+class ChangePasswordResponse(HiveModel):
+    """The ChangePasswordResponse model."""
+
+
+@dataclass(kw_only=True)
 class Close(HiveModel):
     """The Close model."""
 
@@ -571,6 +598,11 @@ class UnlockResponse(HiveModel):
 
 beekeeper_api_description = {
     "beekeeper_api": {
+        "change_password": {
+            "params": ChangePassword,
+            "result": ChangePasswordResponse,
+            "description": "Changes the password of an unlocked wallet: the current password is verified, then the wallet is re-encrypted with the new password and saved. The wallet stays unlocked; it has to be unlocked with the new password afterwards.",
+        },
         "close": {"params": Close, "result": CloseResponse, "description": "Closing implicitly locks the wallet"},
         "close_session": {
             "params": CloseSession,

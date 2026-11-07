@@ -380,6 +380,18 @@ void beekeeper::unlock(const std::string& token, const std::string& wallet_name,
   again->second.wallets[wallet_name] = true;
 }
 
+void beekeeper::change_password(const std::string& token, const std::string& wallet_name,
+                                const std::string& password, const std::string& new_password)
+{
+  auto& session = get_session(token);
+  refresh_timeout(session);
+
+  auto* w = session_wallet(session, wallet_name);
+  if (!w)
+    throw std::runtime_error("Wallet is locked: " + wallet_name);
+  w->change_password(password, new_password);
+}
+
 // ── key operations ──────────────────────────────────────────
 
 std::string beekeeper::import_key(const std::string& token,

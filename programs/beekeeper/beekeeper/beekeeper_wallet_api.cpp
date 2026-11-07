@@ -73,6 +73,7 @@ class beekeeper_api_impl
       (lock_all)
       (lock)
       (unlock)
+      (change_password)
       (import_key)
       (import_keys)
       (remove_key)
@@ -211,6 +212,36 @@ DEFINE_API_IMPL( beekeeper_api_impl, unlock )
     FC_ASSERT(false, "unlock is not accessible");
 
   return unlock_return();
+}
+
+DEFINE_API_IMPL( beekeeper_api_impl, change_password )
+{
+  std::unique_lock guard( _mtx_handler->get_mutex() );
+
+  _bk.validate_token( args.token );
+
+  // Checking the old password shares the throttle of unlock (and its error), so
+  // switching between the two endpoints does not speed up guessing a password.
+  if( !ex_api.unlock_allowed() )
+    FC_ASSERT(false, "unlock is not accessible");
+
+  try
+  {
+    _bk.change_password( args.token, args.wallet_name, args.password, args.new_password );
+  }
+  catch( const std::exception& e )
+  {
+    const std::string msg = e.what();
+    if( msg.find( "Invalid password" ) != std::string::npos )
+    {
+      ex_api.was_error();
+      throw_api_error( "Invalid password for wallet: " + args.wallet_name );
+    }
+
+    throw_api_error( msg );
+  }
+
+  return change_password_return();
 }
 
 DEFINE_API_IMPL( beekeeper_api_impl, import_key )
@@ -548,6 +579,7 @@ DEFINE_LOCKLESS_APIS( beekeeper_wallet_api,
   (lock_all)
   (lock)
   (unlock)
+  (change_password)
   (import_key)
   (import_keys)
   (remove_key)

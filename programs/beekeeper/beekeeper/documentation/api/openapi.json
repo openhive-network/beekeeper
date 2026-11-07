@@ -1,6 +1,40 @@
 {
   "components": {
     "schemas": {
+      "change_password": {
+        "properties": {
+          "new_password": {
+            "description": "The new plaintext password. It cannot be empty and its maximum length is 128.",
+            "example": "PW5KH6nBQRxLwmzsPv6ZKWgGRbJ3F1CQqaBDjRF6sJB6xTqmK9Zea",
+            "type": "string"
+          },
+          "password": {
+            "description": "The current plaintext password of the wallet",
+            "example": "PW5JViFn5gd4rt6ohk7DQMgHzQN6Z9FuMRfKoE5Ysk25mkjy5AY1b",
+            "type": "string"
+          },
+          "token": {
+            "description": "Session's identifier",
+            "example": "c8e3a065a469f3d88de46c69c46b2bfc8fe0aa5f1414748788c4a1c9a6a0f913",
+            "type": "string"
+          },
+          "wallet_name": {
+            "description": "A name of a wallet whose password is changed. The wallet must be unlocked in the current session.",
+            "example": "my_second_wallet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "wallet_name",
+          "password",
+          "new_password"
+        ],
+        "type": "object"
+      },
+      "change_password_response": {
+        "type": "object"
+      },
       "close": {
         "properties": {
           "token": {
@@ -768,6 +802,38 @@
   },
   "openapi": "3.0.3",
   "paths": {
+    "beekeeper_api.change_password": {
+      "post": {
+        "description": "Changes the password of an unlocked wallet: the current password is verified, then the wallet is re-encrypted with the new password and saved. The wallet stays unlocked; it has to be unlocked with the new password afterwards.",
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/change_password"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/change_password_response"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        },
+        "summary": "Change the password of a wallet",
+        "tags": [
+          "wallets"
+        ]
+      }
+    },
     "beekeeper_api.close": {
       "post": {
         "description": "Closing implicitly locks the wallet",
