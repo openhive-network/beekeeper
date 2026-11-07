@@ -6,6 +6,7 @@ from beekeepy.exceptions import (
     BeekeeperExecutableError,
     BeekeeperFailedToStartError,
     BeekeeperHandleError,
+    BeekeeperPreProcessingError,
     BeekeepyError,
     CommunicationError,
     CommunicationResponseT,
@@ -59,7 +60,7 @@ class WalletIsLockedError(BeekeepyError):
         super().__init__(f"Wallet `{wallet_name}` is locked.")
 
 
-class NotPositiveTimeError(BeekeepyError):
+class NotPositiveTimeError(BeekeeperPreProcessingError):
     """Raises when given time value was 0 or negative."""
 
     def __init__(self, time: int) -> None:
@@ -71,7 +72,7 @@ class NotPositiveTimeError(BeekeepyError):
         super().__init__(f"Given time value is not positive: `{time}`.")
 
 
-class TimeTooBigError(BeekeepyError):
+class TimeTooBigError(BeekeeperPreProcessingError):
     """Raises when given time value was 2^32 or higher."""
 
     MAX_VALUE: Final[int] = 2**32

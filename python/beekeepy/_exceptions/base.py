@@ -23,6 +23,10 @@ class BeekeepyError(BaseOfAllExceptions, ABC):
         return self.__cause__
 
 
+class BeekeeperPreProcessingError(BeekeepyError, ABC):
+    """Base class for input validation errors raised before sending a request."""
+
+
 class BeekeeperExecutableError(BeekeepyError, ABC):
     """Base class for exceptions related to starting/closing beekeeper executable."""
 
@@ -64,7 +68,7 @@ class DetectableError(ContextSync[None], BeekeeperInterfaceError, ABC):
         return super()._handle_exception(ex, tb)
 
 
-class SchemaDetectableError(DetectableError, ABC):
+class SchemaDetectableError(DetectableError, BeekeeperPreProcessingError, ABC):
     """Base class for errors that bases on schema exceptions."""
 
     def __init__(self, arg_name: str, arg_value: str) -> None:
