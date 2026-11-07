@@ -115,6 +115,86 @@ test.describe('Edge cases: high-level factory API', () => {
     expect(retVal.keysAfterUnlock).toStrictEqual(['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']);
   });
 
+  // --- changePassword ---
+
+  test('Should change the password of an unlocked wallet and keep it unlocked', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      const { wallet } = await session.createWallet('w0', 'old_password');
+      await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      await wallet.changePassword('old_password', 'new_password');
+      const keysAfterChange = wallet.getPublicKeys();
+
+      // Closing unloads the wallet, so the next unlock reads it back from storage
+      wallet.close();
+      const locked = session.openWallet('w0');
+
+      let oldPasswordRefused = false;
+      try { await locked.unlock('old_password'); } catch { oldPasswordRefused = true; }
+
+      const unlocked = await locked.unlock('new_password');
+      return { keysAfterChange, oldPasswordRefused, keys: unlocked.getPublicKeys() };
+    });
+
+    expect(retVal).toStrictEqual({
+      keysAfterChange: ['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh'],
+      oldPasswordRefused: true,
+      keys: ['STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh']
+    });
+  });
+
+  test('Should refuse to change the password when the current password is wrong', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      const { wallet } = await session.createWallet('w0', 'old_password');
+
+      let error = '';
+      try { await wallet.changePassword('wrong_password', 'new_password'); } catch (e) { error = (e as Error).message; }
+
+      const locked = wallet.lock();
+      await locked.unlock('old_password');
+      return { error, unlocked: locked.unlocked !== undefined };
+    });
+
+    expect(retVal.error).toMatch(/Invalid password/);
+    expect(retVal.unlocked).toBe(true);
+  });
+
+  test('Should refuse an empty or too long new password', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      const { wallet } = await session.createWallet('w0', 'old_password');
+
+      const errors: string[] = [];
+      for (const newPassword of ['', 'x'.repeat(129)])
+        try { await wallet.changePassword('old_password', newPassword); } catch (e) { errors.push((e as Error).message); }
+
+      const locked = wallet.lock();
+      await locked.unlock('old_password');
+      return { errors, unlocked: locked.unlocked !== undefined };
+    });
+
+    expect(retVal.errors).toHaveLength(2);
+    expect(retVal.errors[0]).toMatch(/New password cannot be empty/);
+    expect(retVal.errors[1]).toMatch(/New password is too long, maximum length is 128/);
+    expect(retVal.unlocked).toBe(true);
+  });
+
+  test('Should throw when calling changePassword on a locked wallet', async ({ beekeeperTest }) => {
+    await expect(beekeeperTest(async ({ beekeeper }) => {
+      const session = beekeeper.createSession("my.salt");
+
+      const { wallet } = await session.createWallet('w0', 'old_password');
+      wallet.lock();
+
+      await wallet.changePassword('old_password', 'new_password');
+    })).rejects.toThrow(/Wallet is locked/);
+  });
+
   // --- wrong password must throw, not crash WASM ---
 
   // Regression test: SubtleCrypto.decrypt() rejects on wrong-password (bad PKCS#7 padding).

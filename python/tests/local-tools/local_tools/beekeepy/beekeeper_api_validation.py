@@ -8,6 +8,29 @@ from hiveio_api.validation.model import PreconfiguredBaseModel
 from msgspec import UNSET, UnsetType
 
 
+class ChangePassword(PreconfiguredBaseModel, kw_only=True):
+    new_password: str
+    """
+    The new plaintext password. It cannot be empty and its maximum length is 128.
+    """
+    password: str
+    """
+    The current plaintext password of the wallet
+    """
+    token: str
+    """
+    Session's identifier
+    """
+    wallet_name: str
+    """
+    A name of a wallet whose password is changed. The wallet must be unlocked in the current session.
+    """
+
+
+class ChangePasswordResponse(PreconfiguredBaseModel, kw_only=True):
+    pass
+
+
 class Close(PreconfiguredBaseModel, kw_only=True):
     token: str
     """
@@ -445,6 +468,11 @@ class UnlockResponse(PreconfiguredBaseModel, kw_only=True):
 
 beekeeper_api_description = {
     "beekeeper_api": {
+        "change_password": {
+            "params": ChangePassword,
+            "result": ChangePasswordResponse,
+            "description": "Changes the password of an unlocked wallet: the current password is verified, then the wallet is re-encrypted with the new password and saved. The wallet stays unlocked; it has to be unlocked with the new password afterwards.",
+        },
         "close": {"params": Close, "result": CloseResponse, "description": "Closing implicitly locks the wallet"},
         "close_session": {
             "params": CloseSession,
@@ -557,6 +585,7 @@ beekeeper_api_description = {
 
 
 ENDPOINT_RESULTS = {
+    "change_password": (ChangePasswordResponse, False),
     "close": (CloseResponse, False),
     "close_session": (CloseSessionResponse, False),
     "create": (CreateResponse, False),

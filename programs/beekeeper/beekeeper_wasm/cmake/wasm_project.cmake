@@ -73,7 +73,9 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     "*wallet::import_key*"
     "*wallet::remove_key*"
     "*wallet::check_password*"
+    "*wallet::change_password*"
     "*beekeeper::unlock*"
+    "*beekeeper::change_password*"
     "*beekeeper::create_wallet*"
     "*beekeeper::gen_password*"
     "*beekeeper::import_key*"
@@ -83,6 +85,7 @@ function( DEFINE_WASM_TARGET wasm_target_basename )
     # beekeeper_api — embind entry points (only those that transitively call async crypto)
     "*beekeeper_api::create*"
     "*beekeeper_api::unlock*"
+    "*beekeeper_api::change_password*"
     "*beekeeper_api::import_key*"
     "*beekeeper_api::remove_key*"
     "*beekeeper_api::sign_digest*"

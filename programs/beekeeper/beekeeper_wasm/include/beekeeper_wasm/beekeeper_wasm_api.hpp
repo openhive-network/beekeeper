@@ -69,6 +69,7 @@ public:
   void lock(const std::string& token, const std::string& wallet_name);
   void lock_all(const std::string& token);
   void unlock(const std::string& token, const std::string& wallet_name, const std::string& password);
+  void change_password(const std::string& token, const std::string& wallet_name, const std::string& password, const std::string& new_password);
 
   // ── key management ───────────────────────────────────────
 
