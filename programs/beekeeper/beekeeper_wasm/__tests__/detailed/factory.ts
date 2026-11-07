@@ -436,8 +436,6 @@ test.describe('Beekeeper factory tests for Node.js', () => {
       const session = bk.createSession("my.salt");
       const { wallet } = await session.createWallet('w0', 'mypassword');
 
-      await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
-
       // Hold a direct reference to the unlocked wallet
       const staleRef = wallet;
 
