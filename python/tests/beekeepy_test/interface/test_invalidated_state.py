@@ -44,6 +44,8 @@ def test_invalidated_by_closing_beekeeper(beekeepy_interfaces: tuple[Beekeeper, 
 def test_invalidated_by_closing_session(beekeepy_interfaces: tuple[Beekeeper, Session, Wallet]) -> None:
     # ARRANGE
     bk, session, wallet = beekeepy_interfaces
+    # beekeeper exits when its last session is closed - this one keeps it serving `bk.session` below
+    bk.create_session()
 
     # ACT
     session.close_session()

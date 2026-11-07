@@ -1,5 +1,6 @@
 #include <core_minimal/beekeeper.hpp>
 
+#include <algorithm>
 #include <ctime>
 #include <stdexcept>
 
@@ -112,7 +113,10 @@ void beekeeper::set_timeout(const std::string& token, uint32_t seconds)
 void beekeeper::refresh_timeout(session_state& session)
 {
   if (session.timeout.count() > 0)
+  {
     session.timeout_time.store((clock::now() + session.timeout).time_since_epoch().count());
+    session.timeout_wall_time.store(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now() + session.timeout));
+  }
 }
 
 void beekeeper::check_timeout()
@@ -126,18 +130,6 @@ void beekeeper::check_timeout()
   }
 }
 
-std::chrono::seconds beekeeper::get_remaining_seconds(const session_state& session) const
-{
-  if (session.timeout.count() == 0)
-    return std::chrono::seconds::max();
-
-  auto remaining = clock::time_point(clock::duration(session.timeout_time.load())) - clock::now();
-  if (remaining.count() <= 0)
-    return std::chrono::seconds(0);
-
-  return std::chrono::duration_cast<std::chrono::seconds>(remaining);
-}
-
 session_info beekeeper::get_info(const std::string& token) const
 {
   const auto& session = get_session(token);
@@ -147,16 +139,14 @@ session_info beekeeper::get_info(const std::string& token) const
   char buf[32];
   format_iso8601(buf, now_t);
 
-  auto remaining = get_remaining_seconds(session);
   std::string timeout_str;
-  if (remaining == std::chrono::seconds::max())
+  if (session.timeout.count() == 0)
   {
     timeout_str = "9999-12-31T23:59:59";
   }
   else
   {
-    auto timeout_tp = now + remaining;
-    auto timeout_t = std::chrono::system_clock::to_time_t(timeout_tp);
+    auto timeout_t = std::max(now_t, session.timeout_wall_time.load());
     char tbuf[32];
     format_iso8601(tbuf, timeout_t);
     timeout_str = std::string(tbuf);

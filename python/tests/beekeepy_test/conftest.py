@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import pytest
 from beekeepy.settings import InterfaceSettings
@@ -14,6 +15,11 @@ if TYPE_CHECKING:
     from local_tools.beekeepy.models import SettingsFactory, SettingsLoggerFactory
     from loguru import Logger
 
+# Each wallet created (or unlocked) in a beekeeper runs its PBKDF2 at the production work factor (600k iterations):
+# about 0.3 s of a core, which a saturated host stretched past the 5 s default. The timeout of a request guards against
+# a hung beekeeper here, no test measures a request with it.
+_REQUEST_TIMEOUT: Final[timedelta] = timedelta(seconds=60)
+
 
 @pytest.fixture
 def settings(working_directory: Path) -> SettingsFactory:
@@ -21,7 +27,7 @@ def settings(working_directory: Path) -> SettingsFactory:
     def _factory(settings_update: InterfaceSettings | None = None) -> InterfaceSettings:
         amount_of_beekeepers_in_working_directory = len([x for x in working_directory.glob("Beekeeper*") if x.is_dir()])
         working_dir = working_directory / f"Beekeeper{amount_of_beekeepers_in_working_directory}"
-        result = settings_update or InterfaceSettings()
+        result = settings_update or InterfaceSettings(timeout=_REQUEST_TIMEOUT)
         result.working_directory = working_dir
         return result
 

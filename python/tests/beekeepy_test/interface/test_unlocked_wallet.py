@@ -126,8 +126,10 @@ def test_encrypting_with_key_not_in_wallet(settings: SettingsFactory) -> None:
     # ARRANGE
     with Beekeeper.factory(settings=settings()) as bk, bk.create_session() as session:
         wallet = session.create_wallet(name=generate_wallet_name(), password=generate_wallet_password())
-        key = wallet.import_key(private_key=AccountCredentials.create().private_key)
-        key_not_in_wallet = AccountCredentials.create().public_key
+        # two independent `create()` calls draw the same pair one time in 100
+        account_in_wallet, account_not_in_wallet = AccountCredentials.create_multiple(2)
+        key = wallet.import_key(private_key=account_in_wallet.private_key)
+        key_not_in_wallet = account_not_in_wallet.public_key
 
         # ACT & ASSERT
         with pytest.raises(NotExistingKeyError):
