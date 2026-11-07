@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from local_tools.beekeepy.testing_server import run_simple_server
-
 from beekeepy.handle.remote import AsyncBeekeeper, AsyncBeekeeperTemplate, Beekeeper, RemoteHandleSettings
 from beekeepy.interfaces import HttpUrl
+from local_tools.beekeepy.testing_server import run_simple_server
 
 
 @pytest.mark.parametrize("handle_cls", [Beekeeper, AsyncBeekeeper])
