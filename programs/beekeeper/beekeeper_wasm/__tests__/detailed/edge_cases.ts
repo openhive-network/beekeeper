@@ -662,6 +662,33 @@ test.describe('Edge cases: high-level factory API', () => {
     expect(retVal).toStrictEqual({ lockedInSession1: true, lockedInSession2: true });
   });
 
+  test('Should start the timeout of a created wallet after an idle period without reviving timed-out wallets', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const bk = await provider.default({ unlockTimeout: 2 });
+      const session = bk.createSession("salt1");
+
+      const { wallet: timedOut } = await session.createWallet('w0', 'pass');
+
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const { wallet } = await session.createWallet('w1', 'pass1');
+      const publicKey = await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+      let timedOutRefused = false;
+      try {
+        timedOut.getPublicKeys();
+      } catch {
+        timedOutRefused = true;
+      }
+
+      await bk.delete();
+
+      return { publicKey, timedOutRefused };
+    });
+
+    expect(retVal).toStrictEqual({ publicKey: 'STM5RqVBAVNp5ufMCetQtvLGLJo7unX9nyCBMMrTXRWQ9i1Zzzizh', timedOutRefused: true });
+  });
+
   test('Should keep timed-out wallets locked after a later unlock attempt', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
       const bk = await provider.default({ unlockTimeout: 2 });
