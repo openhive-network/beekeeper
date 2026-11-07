@@ -63,12 +63,44 @@ def test_api_change_password_with_invalid_password(beekeeper: Beekeeper, wallet:
         beekeeper.api.change_password(
             wallet_name=wallet.name, password=generate_wallet_password(4), new_password=new_password
         )
-    with pytest.raises(UnlockIsNotAccessibleError):
-        beekeeper.api.change_password(wallet_name=wallet.name, password=wallet.password, new_password=new_password)
 
     time.sleep(WALLET_UNLOCK_INTERVAL)
     beekeeper.api.lock(wallet_name=wallet.name)
+    with pytest.raises(OverseerInvalidPasswordError):
+        beekeeper.api.unlock(wallet_name=wallet.name, password=new_password)
+    time.sleep(WALLET_UNLOCK_INTERVAL)
     beekeeper.api.unlock(wallet_name=wallet.name, password=wallet.password)
+
+
+def test_api_change_password_is_throttled_after_invalid_password(beekeeper: Beekeeper, wallet: WalletInfo) -> None:
+    """Test test_api_change_password_is_throttled_after_invalid_password will refuse a retry within the interval."""
+    # ARRANGE
+    new_password = generate_wallet_password(6)
+    unlock_interval = beekeeper.config.unlock_interval / 1000
+
+    # ACT
+    failed_call_sent = time.monotonic()
+    with pytest.raises(OverseerInvalidPasswordError):
+        beekeeper.api.change_password(
+            wallet_name=wallet.name, password=generate_wallet_password(7), new_password=new_password
+        )
+    retry_refused = False
+    try:
+        beekeeper.api.change_password(wallet_name=wallet.name, password=wallet.password, new_password=new_password)
+    except UnlockIsNotAccessibleError:
+        retry_refused = True
+    retry_done = time.monotonic()
+
+    # ASSERT
+    # The daemon starts the interval while handling the failed call and checks it while handling the retry:
+    # on a loaded host the retry may arrive after the interval, but an accepted one never arrives earlier.
+    if retry_refused:
+        time.sleep(WALLET_UNLOCK_INTERVAL)
+        beekeeper.api.change_password(wallet_name=wallet.name, password=wallet.password, new_password=new_password)
+    else:
+        assert retry_done - failed_call_sent >= unlock_interval, "Retry within the interval should be refused."
+    beekeeper.api.lock(wallet_name=wallet.name)
+    beekeeper.api.unlock(wallet_name=wallet.name, password=new_password)
 
 
 def test_api_change_password_of_locked_wallet(beekeeper: Beekeeper, wallet: WalletInfo) -> None:
