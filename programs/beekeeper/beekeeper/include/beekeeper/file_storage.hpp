@@ -22,6 +22,9 @@ public:
   std::vector<char> load(const std::string& name) override;
   bool scan_dir(const std::string& wallet_name) override;
 
+  /// Like save(), but also flushes the file and the wallet directory to disk.
+  void save_durable(const std::string& name, const std::vector<char>& buffer) override;
+
   /// Used for the rewrite of a legacy wallet on unlock; unlike save() it also
   /// flushes the file to disk, as nobody asked for that rewrite.
   bool try_save(const std::string& name, const std::vector<char>& buffer) override;
