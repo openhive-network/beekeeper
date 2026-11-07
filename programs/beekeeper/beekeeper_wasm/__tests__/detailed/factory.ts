@@ -346,78 +346,115 @@ test.describe('Beekeeper factory tests for Node.js', () => {
 
   test('Should return timeout_time reflecting custom unlockTimeout', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      // The inactivity timer starts when the instance is created, so its expiry lies within
+      // unlockTimeout of the window measured around creation, however long creation takes.
+      const beforeCreateMs = Date.now();
       const bk = await provider.default({ unlockTimeout: 10 });
       const session = bk.createSession("my.salt");
       const info = session.getInfo();
-
-      const diffSeconds = (info.timeoutTime.getTime() - info.now.getTime()) / 1000;
-
-      await bk.delete();
-
-      return diffSeconds;
-    });
-
-    // Should be roughly 10 seconds (allow ±2s tolerance for execution time)
-    expect(retVal).toBeGreaterThanOrEqual(8);
-    expect(retVal).toBeLessThanOrEqual(12);
-  });
-
-  test('Should auto-lock wallets after timeout expires', async ({ beekeeperTest }) => {
-    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
-      const bk = await provider.default({ unlockTimeout: 2 });
-      const session = bk.createSession("my.salt");
-      const { wallet } = await session.createWallet('w0', 'mypassword');
-
-      await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
-
-      const keysBefore = wallet.getPublicKeys();
-
-      // Wait for timeout to expire
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // After timeout, accessing wallet.unlocked auto-locks and returns undefined
-      const walletRef = session.listWallets()[0];
-      const isLocked = walletRef.unlocked === undefined;
+      const afterInfoMs = Date.now();
 
       await bk.delete();
 
       return {
-        keysBefore: keysBefore.length,
-        isLocked
+        beforeCreateMs,
+        afterInfoMs,
+        timeoutMs: info.timeoutTime.getTime()
       };
     });
 
-    expect(retVal.keysBefore).toBe(1);
-    expect(retVal.isLocked).toBe(true);
+    expect(retVal.timeoutMs).toBeGreaterThanOrEqual(retVal.beforeCreateMs + 10_000);
+    expect(retVal.timeoutMs).toBeLessThanOrEqual(retVal.afterInfoMs + 10_000);
+  });
+
+  // The WASM build enforces the inactivity timeout in TypeScript from Date.now(), so the
+  // auto-lock tests stub it with a frozen clock that only moves when the test advances it:
+  // the lock state then depends on the timeout logic, not on how fast the host runs.
+  test('Should auto-lock wallets after timeout expires', async ({ beekeeperTest }) => {
+    const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
+      const realNow = Date.now;
+      let fakeNowMs = realNow();
+      Date.now = () => fakeNowMs;
+
+      try {
+        const bk = await provider.default({ unlockTimeout: 2 });
+        const session = bk.createSession("my.salt");
+        const { wallet } = await session.createWallet('w0', 'mypassword');
+
+        await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+
+        // Refreshes the timeout
+        const keysBefore = wallet.getPublicKeys();
+
+        fakeNowMs += 2000 - 1;
+        const unlockedBeforeTimeout = session.listWallets()[0].unlocked !== undefined;
+
+        // After timeout, accessing wallet.unlocked auto-locks and returns undefined
+        fakeNowMs += 1;
+        const lockedAtTimeout = session.listWallets()[0].unlocked === undefined;
+
+        await bk.delete();
+
+        return {
+          keysBefore: keysBefore.length,
+          unlockedBeforeTimeout,
+          lockedAtTimeout
+        };
+      } finally {
+        Date.now = realNow;
+      }
+    });
+
+    expect(retVal).toStrictEqual({
+      keysBefore: 1,
+      unlockedBeforeTimeout: true,
+      lockedAtTimeout: true
+    });
   });
 
   test('Should refresh timeout on wallet operations', async ({ beekeeperTest }) => {
     const retVal = await beekeeperTest.dynamic(async ({ provider }) => {
-      const bk = await provider.default({ unlockTimeout: 5 });
-      const session = bk.createSession("my.salt");
-      const { wallet } = await session.createWallet('w0', 'mypassword');
+      const realNow = Date.now;
+      let fakeNowMs = realNow();
+      Date.now = () => fakeNowMs;
 
-      await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
+      try {
+        const bk = await provider.default({ unlockTimeout: 5 });
+        const session = bk.createSession("my.salt");
+        const { wallet } = await session.createWallet('w0', 'mypassword');
 
-      // Wait 3 seconds (within 5s timeout)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+        await wallet.importKey('5JkFnXrLM2ap9t3AmAxBJvQHF7xSKtnTrCTginQCkhzU5S7ecPT');
 
-      // Perform an operation to refresh timeout
-      await wallet.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
+        fakeNowMs += 3000;
 
-      // Wait another 3 seconds (6s total, but only 3s since last operation)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+        // Perform an operation to refresh timeout
+        const refreshingKey = await wallet.importKey('5KGKYWMXReJewfj5M29APNMqGEu173DzvHv5TeJAg9SkjUeQV78');
 
-      // Wallet should still be unlocked since timeout was refreshed
-      const walletRef = session.listWallets()[0];
-      const keys = walletRef.unlocked?.getPublicKeys();
+        // 6s since the first import, but only 3s since the refresh
+        fakeNowMs += 3000;
+        const unlockedAfterRefresh = session.listWallets()[0].unlocked !== undefined;
 
-      await bk.delete();
+        // The refreshed timeout still expires 5s after the refresh
+        fakeNowMs += 2000;
+        const lockedAtRefreshedTimeout = session.listWallets()[0].unlocked === undefined;
 
-      return keys?.length;
+        await bk.delete();
+
+        return {
+          refreshingKeyImported: typeof refreshingKey === 'string',
+          unlockedAfterRefresh,
+          lockedAtRefreshedTimeout
+        };
+      } finally {
+        Date.now = realNow;
+      }
     });
 
-    expect(retVal).toBe(2);
+    expect(retVal).toStrictEqual({
+      refreshingKeyImported: true,
+      unlockedAfterRefresh: true,
+      lockedAtRefreshedTimeout: true
+    });
   });
 
   test('Should throw when using a closed session', async ({ beekeeperTest }) => {
