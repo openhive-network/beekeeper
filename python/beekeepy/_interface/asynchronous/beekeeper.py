@@ -78,8 +78,14 @@ class Beekeeper(BeekeeperInterface, StateInvalidator):
         self.__default_session = None
         self._get_instance()._clear_session()
 
+    @property
+    def http_endpoint(self) -> HttpUrl:
+        return self.__instance.http_endpoint
+
     def pack(self) -> PackedAsyncBeekeeper:
-        return PackedAsyncBeekeeper(settings=self.settings, unpack_factory=Beekeeper._remote_factory)
+        settings = self.settings
+        settings.http_endpoint = self.http_endpoint
+        return PackedAsyncBeekeeper(settings=settings, unpack_factory=Beekeeper._remote_factory)
 
     @classmethod
     async def _factory(cls, *, settings: InterfaceSettings | None = None) -> BeekeeperInterface:
