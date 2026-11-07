@@ -4,6 +4,8 @@
 
 #include <boost/filesystem/path.hpp>
 
+#include <functional>
+
 namespace beekeeper {
 
 /// Implements wallet_storage using Boost.Filesystem.
@@ -11,7 +13,12 @@ namespace beekeeper {
 class file_storage final : public beekeeper_minimal::wallet_storage
 {
 public:
+  /// Flushes a file descriptor to disk; returns 0 on success, like fsync(2).
+  using sync_function = std::function<int(int)>;
+
   explicit file_storage(const boost::filesystem::path& wallet_dir);
+  /// Uses `sync` instead of fsync(2) to flush wallet files and the wallet directory.
+  file_storage(const boost::filesystem::path& wallet_dir, sync_function sync);
 
   /// Wallet names consist of ASCII letters, digits and '.', '_', '-', '@', so {name}.wallet
   /// always names a file directly in the wallet directory. save() and load() refuse other
@@ -34,6 +41,7 @@ public:
 
 private:
   boost::filesystem::path wallet_dir_;
+  sync_function sync_;
 
   boost::filesystem::path wallet_path(const std::string& name) const;
   void write_wallet_file(const std::string& name, const std::vector<char>& buffer, bool durable);
