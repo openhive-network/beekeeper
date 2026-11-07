@@ -34,14 +34,10 @@ Requires Python 3.12 or newer on Linux (the embedded Beekeeper binary is Linux-o
 The package is published to [PyPI](https://pypi.org/project/hiveio-beekeepy/) as `hiveio-beekeepy` and imported as `beekeepy`:
 
 ```bash
-pip install hiveio-beekeepy
-```
-
-Development builds, and the dependencies that are published only there (e.g. `hiveio-api-client`), are in the Hive GitLab package registry:
-
-```bash
 pip install --extra-index-url https://gitlab.syncad.com/api/v4/groups/136/-/packages/pypi/simple hiveio-beekeepy
 ```
+
+The extra index is required: the dependencies `hiveio-api-client` and `hiveio-api` (in the versions beekeepy requires) are published only in the Hive GitLab package registry, so a plain `pip install hiveio-beekeepy` cannot resolve them. The same registry also hosts development builds of `hiveio-beekeepy`.
 
 ## Features
 
