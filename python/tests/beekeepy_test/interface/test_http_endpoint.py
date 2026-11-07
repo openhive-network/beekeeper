@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import psutil
 import pytest
-from beekeepy import Beekeeper
+from beekeepy import AsyncBeekeeper, Beekeeper
 from beekeepy.interfaces import HttpUrl
 from beekeepy.settings import InterfaceSettings
 
@@ -41,3 +41,32 @@ def test_local_beekeeper_listens_on_loopback_by_default(settings: SettingsFactor
     with Beekeeper.factory(settings=settings()) as bk:
         # ASSERT
         assert listening_address(bk.http_endpoint) == "127.0.0.1"
+
+
+def test_packed_beekeeper_preserves_active_endpoint(settings: SettingsFactory) -> None:
+    with Beekeeper.factory(settings=settings()) as bk:
+        endpoint = bk.http_endpoint
+        assert endpoint.port != 0
+        with bk.update_settings() as updated:
+            assert isinstance(updated, InterfaceSettings)
+            updated.http_endpoint = HttpUrl("127.0.0.1:1")
+        assert bk.http_endpoint == endpoint
+        with bk.pack().unpack() as remote:
+            assert remote.http_endpoint == endpoint
+            info = remote.create_session().get_info()
+            assert info.timeout_time > info.now
+
+
+async def test_async_packed_beekeeper_preserves_active_endpoint(settings: SettingsFactory) -> None:
+    async with await AsyncBeekeeper.factory(settings=settings()) as bk:
+        endpoint = bk.http_endpoint
+        assert endpoint.port != 0
+        with bk.update_settings() as updated:
+            assert isinstance(updated, InterfaceSettings)
+            updated.http_endpoint = HttpUrl("127.0.0.1:1")
+        assert bk.http_endpoint == endpoint
+        async with await bk.pack().unpack() as remote:
+            assert remote.http_endpoint == endpoint
+            session = await remote.create_session()
+            info = await session.get_info()
+            assert info.timeout_time > info.now
