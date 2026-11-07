@@ -48,6 +48,9 @@ class UnlockedWallet(Wallet, ContextSync["UnlockedWallet"], ABC):
     def lock(self) -> None: ...
 
     @abstractmethod
+    def change_password(self, *, password: str, new_password: str) -> None: ...
+
+    @abstractmethod
     def sign_digest(self, *, sig_digest: str, key: str) -> Signature: ...
 
     @abstractmethod

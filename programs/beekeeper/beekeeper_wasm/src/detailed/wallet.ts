@@ -39,6 +39,14 @@ export class BeekeeperUnlockedWallet implements IBeekeeperUnlockedWallet {
     return this.locked;
   }
 
+  public async changePassword(password: string, newPassword: string): Promise<void> {
+    this.api.throwIfTimedOutAndRefresh();
+    await this.api.runAsync(
+      () => this.api.api.change_password(this.session.token, this.locked.name, password, newPassword),
+      `changing password of wallet '${this.locked.name}'`
+    );
+  }
+
   public async importKey(wifKey: string): Promise<TPublicKey> {
     this.api.throwIfTimedOutAndRefresh();
     return await this.api.runAsync(

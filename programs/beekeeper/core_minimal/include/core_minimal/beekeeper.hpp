@@ -98,6 +98,12 @@ public:
   /// session unlocked only the password is checked; its keys in memory stay.
   void unlock(const std::string& token, const std::string& wallet_name, const std::string& password);
 
+  /// Change the password of a wallet the session unlocked; it stays unlocked.
+  /// The wallet is re-encrypted for every session: sessions that unlocked it
+  /// keep their unlock, later unlocks need the new password.
+  void change_password(const std::string& token, const std::string& wallet_name,
+                       const std::string& password, const std::string& new_password);
+
   // ── key operations ─────────────────────────────────────────
   // The wallet must be open and unlocked in the calling session.
 

@@ -3,6 +3,7 @@
 
 #include <cctype>
 #include <stdexcept>
+#include <string>
 
 namespace beekeeper_minimal {
 
@@ -62,9 +63,9 @@ bool equal_secrets(const std::string& a, const std::string& b)
 
 } // anonymous namespace
 
-void wallet::encrypt_and_save()
+void wallet::encrypt_and_save(const wallet_key& key)
 {
-  auto cipher_keys = crypto_.encrypt_wallet_keys(key_, keys_);
+  auto cipher_keys = crypto_.encrypt_wallet_keys(key, keys_);
 
   if (storage_)
     storage_->save(name_, to_wallet_file(cipher_keys));
@@ -104,7 +105,7 @@ void wallet::create(const std::string& password, uint32_t kdf_iterations)
   password_ = password;
   unlocked_ = true;
   keys_.clear();
-  encrypt_and_save();
+  encrypt_and_save(key_);
 }
 
 void wallet::open()
@@ -183,6 +184,28 @@ void wallet::check_password(const std::string& password) const
   crypto_.validate_password(password, wallet_data_.cipher_keys);
 }
 
+void wallet::change_password(const std::string& password, const std::string& new_password)
+{
+  if (is_locked())
+    throw std::runtime_error("Wallet is locked: " + name_);
+
+  check_password(password);
+
+  if (new_password.empty())
+    throw std::runtime_error("New password cannot be empty");
+  if (new_password.size() > max_password_length)
+    throw std::runtime_error("New password is too long, maximum length is " + std::to_string(max_password_length));
+
+  // The saved file and the in-memory state switch to the new password only
+  // together: a failed save leaves both on the current one.
+  auto key = crypto_.derive_wallet_key(new_password, key_.iterations);
+  encrypt_and_save(key);
+
+  key_ = std::move(key);
+  password_ = new_password;
+  dirty_ = false;
+}
+
 // ── key management ───────────────────────────────────────────
 
 std::string wallet::import_key(const std::string& wif_key, const std::string& prefix, bool flush)
@@ -207,7 +230,7 @@ std::string wallet::import_key(const std::string& wif_key, const std::string& pr
 
   if (flush && dirty_)
   {
-    encrypt_and_save();
+    encrypt_and_save(key_);
     dirty_ = false;
   }
   return pub_str;
@@ -223,7 +246,7 @@ void wallet::remove_key(const public_key_type& public_key)
     throw std::runtime_error("Key not in wallet");
 
   keys_.erase(it);
-  encrypt_and_save();
+  encrypt_and_save(key_);
 }
 
 const keys_map& wallet::get_keys() const

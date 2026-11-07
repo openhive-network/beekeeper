@@ -8,6 +8,9 @@
 
 namespace beekeeper_minimal {
 
+/// Longest password change_password() accepts.
+constexpr size_t max_password_length = 128;
+
 /// A single wallet: password-based AES encryption of private keys.
 /// All persistence is delegated to wallet_storage hooks.
 /// All crypto is delegated to crypto_provider hooks.
@@ -44,6 +47,13 @@ public:
   /// While unlocked this compares against the password held in memory (no KDF run).
   void     check_password(const std::string& password) const;
 
+  /// Re-encrypt the unlocked wallet with `new_password` (fresh salt, same work
+  /// factor) and persist it; the wallet stays unlocked.  Throws if the wallet is
+  /// locked, `password` is not its current password, `new_password` is empty or
+  /// longer than max_password_length, or the save fails (the wallet then keeps
+  /// its current password).
+  void     change_password(const std::string& password, const std::string& new_password);
+
   // ── key management (wallet must be unlocked) ───────────────
 
   /// Import a WIF-encoded private key. Returns the public key string (with prefix).
@@ -70,8 +80,8 @@ public:
                                                 const public_key_type& public_key) const;
 
 private:
-  /// Re-encrypt keys_ with key_ (fresh IV, no KDF) and persist. Throws if the save fails.
-  void encrypt_and_save();
+  /// Re-encrypt keys_ with `key` (fresh IV, no KDF) and persist. Throws if the save fails.
+  void encrypt_and_save(const wallet_key& key);
 
   /// Persist `keys` encrypted with `key` unless the stored wallet changed since it was
   /// opened here. Never throws for storage failures; returns whether it was saved.

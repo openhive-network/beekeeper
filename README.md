@@ -48,7 +48,10 @@ Every API call carries the token of a session (`create_session`). Wallets are
 opened, unlocked and locked per session: a wallet unlocked in one session stays
 locked in another one until that session unlocks it with the wallet's password,
 and `lock`, `lock_all`, `close`, `set_timeout` and the unlock timeout act on the
-calling session only.
+calling session only. `change_password` (a wallet the session unlocked, its current
+password and a new non-empty one of at most 128 characters) re-encrypts the wallet
+itself: sessions that have it unlocked keep it unlocked, every later unlock needs the
+new password.
 
 ## Testing
 

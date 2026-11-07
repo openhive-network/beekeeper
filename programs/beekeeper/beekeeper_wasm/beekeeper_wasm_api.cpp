@@ -146,6 +146,12 @@ void beekeeper_api::unlock(const std::string& token, const std::string& wallet_n
   bk_.unlock(token, wallet_name, password);
 }
 
+void beekeeper_api::change_password(const std::string& token, const std::string& wallet_name, const std::string& password, const std::string& new_password)
+{
+  bk_.validate_token(token);
+  bk_.change_password(token, wallet_name, password, new_password);
+}
+
 // ── key management ─────────────────────────────────────────
 
 std::string beekeeper_api::import_key(const std::string& token, const std::string& wallet_name, const std::string& wif_key)
