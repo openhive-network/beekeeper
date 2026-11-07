@@ -5,6 +5,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Final
 
 import pytest
+from local_tools.beekeepy.account_credentials import AccountCredentials
+from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
+
 from beekeepy import AsyncBeekeeper, Beekeeper
 from beekeepy._interface.validators import (
     validate_account_names,
@@ -20,14 +23,13 @@ from beekeepy.exceptions import (
     InvalidSchemaPublicKeyError,
     NotExistingKeyError,
 )
-from local_tools.beekeepy.account_credentials import AccountCredentials
-from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from beekeepy.exceptions import SchemaDetectableError
     from local_tools.beekeepy.models import SettingsFactory
+
+    from beekeepy.exceptions import SchemaDetectableError
 
 NOT_HEX_DIGEST: Final[str] = "not a hex digest"
 
