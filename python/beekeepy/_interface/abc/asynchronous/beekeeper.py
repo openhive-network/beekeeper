@@ -25,8 +25,8 @@ class Beekeeper(ContextAsync["Beekeeper"], ContextSettingsUpdater[CommunicationS
         return cast("InterfaceSettings", self._get_copy_of_settings())
 
     @property
-    def http_endpoint(self) -> HttpUrl:
-        return self.settings.ensured_http_endpoint
+    @abstractmethod
+    def http_endpoint(self) -> HttpUrl: ...
 
     @property
     @abstractmethod

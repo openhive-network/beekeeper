@@ -15,10 +15,10 @@ Beekeeper provides secure key management and transaction signing without requiri
 Python (3.12+, Linux - the package embeds the native daemon):
 
 ```bash
-pip install hiveio-beekeepy
+pip install --extra-index-url https://gitlab.syncad.com/api/v4/groups/136/-/packages/pypi/simple hiveio-beekeepy
 ```
 
-Development builds of `hiveio-beekeepy`, and the dependencies published only there, are in the Hive GitLab package registry: add `--extra-index-url https://gitlab.syncad.com/api/v4/groups/136/-/packages/pypi/simple`.
+The extra index is required: `hiveio-api-client` and `hiveio-api`, dependencies of `hiveio-beekeepy`, are published only in the Hive GitLab package registry (in the versions it requires), which also hosts development builds of `hiveio-beekeepy`.
 
 TypeScript / JavaScript (Node.js 20+ or browsers):
 
