@@ -5,9 +5,10 @@ import threading
 from typing import TYPE_CHECKING, Final
 
 import pytest
+from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
+
 from beekeepy import AsyncBeekeeper, Beekeeper
 from beekeepy.exceptions import InvalidPasswordError
-from local_tools.beekeepy.generators import generate_wallet_name, generate_wallet_password
 
 if TYPE_CHECKING:
     from local_tools.beekeepy.models import SettingsFactory
