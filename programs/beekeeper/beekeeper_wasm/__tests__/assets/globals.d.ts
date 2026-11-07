@@ -36,4 +36,5 @@ declare global {
   function createBeekeeperWasmTestFor (env: TEnvType): Promise<IBeekeeperWasmGlobals>;
   function createIdbStorage (dbName: string): Promise<IIdbStorage>;
   function createBeekeeperWithStorage (storage: IStorageCallbacks, options?: { unlockTimeout?: number; inMemory?: boolean }): Promise<IBeekeeperInstance>;
+  function withFrozenClock<R> (fn: (advance: (ms: number) => void) => Promise<R>): Promise<R>;
 }
