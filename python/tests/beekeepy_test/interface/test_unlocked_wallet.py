@@ -13,6 +13,7 @@ from beekeepy._interface.validators import (
     validate_public_keys,
 )
 from beekeepy.exceptions import (
+    BeekeeperPreProcessingError,
     InvalidAccountNameError,
     InvalidSchemaHexError,
     InvalidSchemaPrivateKeyError,
@@ -38,8 +39,9 @@ def test_digest_is_validated_before_signing(settings: SettingsFactory) -> None:
         key = wallet.import_key(private_key=AccountCredentials.create().private_key)
 
         # ACT & ASSERT
-        with pytest.raises(InvalidSchemaHexError):
+        with pytest.raises(BeekeeperPreProcessingError) as caught:
             wallet.sign_digest(sig_digest=NOT_HEX_DIGEST, key=key)
+        assert isinstance(caught.value, InvalidSchemaHexError)
 
 
 async def test_digest_is_validated_before_signing_by_async_wallet(settings: SettingsFactory) -> None:
@@ -49,8 +51,9 @@ async def test_digest_is_validated_before_signing_by_async_wallet(settings: Sett
         key = await wallet.import_key(private_key=AccountCredentials.create().private_key)
 
         # ACT & ASSERT
-        with pytest.raises(InvalidSchemaHexError):
+        with pytest.raises(BeekeeperPreProcessingError) as caught:
             await wallet.sign_digest(sig_digest=NOT_HEX_DIGEST, key=key)
+        assert isinstance(caught.value, InvalidSchemaHexError)
 
 
 INVALID_PRIVATE_KEY: Final[str] = "invalid"
