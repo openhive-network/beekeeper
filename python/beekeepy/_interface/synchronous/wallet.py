@@ -104,6 +104,16 @@ class UnlockedWallet(UnlockedWalletInterface, Wallet):
         self._beekeeper.api.lock(wallet_name=self.name, token=self.session_token)
 
     @wallet_unlocked
+    def change_password(self, *, password: str, new_password: str) -> None:
+        first_try = True
+        while first_try or self._guard.error_occured():
+            first_try = False
+            with self._guard, InvalidPasswordError(wallet_name=self.name):
+                self._beekeeper.api.change_password(
+                    wallet_name=self.name, password=password, new_password=new_password, token=self.session_token
+                )
+
+    @wallet_unlocked
     def sign_digest(self, *, sig_digest: str, key: str) -> Signature:
         validate_public_keys(key=key)
         validate_digest(sig_digest=sig_digest)

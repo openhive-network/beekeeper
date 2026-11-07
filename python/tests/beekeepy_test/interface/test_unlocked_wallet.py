@@ -15,6 +15,7 @@ from beekeepy._interface.validators import (
 from beekeepy.exceptions import (
     BeekeeperPreProcessingError,
     InvalidAccountNameError,
+    InvalidPasswordError,
     InvalidSchemaHexError,
     InvalidSchemaPrivateKeyError,
     InvalidSchemaPublicKeyError,
@@ -157,3 +158,47 @@ async def test_lock_time_of_async_wallet_is_timeout_time_of_session(settings: Se
         # ASSERT
         assert isinstance(lock_time, datetime)
         assert lock_time == (await session.get_info()).timeout_time
+
+
+def test_changing_password_of_wallet(settings: SettingsFactory) -> None:
+    # ARRANGE
+    password = generate_wallet_password()
+    new_password = generate_wallet_password(1)
+    with Beekeeper.factory(settings=settings()) as bk, bk.create_session() as session:
+        wallet = session.create_wallet(name=generate_wallet_name(), password=password)
+        key = wallet.import_key(private_key=AccountCredentials.create().private_key)
+
+        # ACT
+        with pytest.raises(InvalidPasswordError):
+            wallet.change_password(password=new_password, new_password=new_password)
+        wallet.change_password(password=password, new_password=new_password)
+
+        # ASSERT
+        assert wallet.is_unlocked(), "wallet stays unlocked"
+        wallet.lock()
+        locked = session.open_wallet(name=wallet.name)
+        with pytest.raises(InvalidPasswordError):
+            locked.unlock(password=password)
+        assert locked.unlock(password=new_password).public_keys == [key]
+
+
+async def test_changing_password_of_async_wallet(settings: SettingsFactory) -> None:
+    # ARRANGE
+    password = generate_wallet_password()
+    new_password = generate_wallet_password(1)
+    async with await AsyncBeekeeper.factory(settings=settings()) as bk, await bk.create_session() as session:
+        wallet = await session.create_wallet(name=generate_wallet_name(), password=password)
+        key = await wallet.import_key(private_key=AccountCredentials.create().private_key)
+
+        # ACT
+        with pytest.raises(InvalidPasswordError):
+            await wallet.change_password(password=new_password, new_password=new_password)
+        await wallet.change_password(password=password, new_password=new_password)
+
+        # ASSERT
+        assert await wallet.is_unlocked(), "wallet stays unlocked"
+        await wallet.lock()
+        locked = await session.open_wallet(name=wallet.name)
+        with pytest.raises(InvalidPasswordError):
+            await locked.unlock(password=password)
+        assert await (await locked.unlock(password=new_password)).public_keys == [key]

@@ -32,6 +32,7 @@ EMSCRIPTEN_BINDINGS(beekeeper_api_instance) {
 
     .function("create(token, wallet_name, password, is_temporary)", &beekeeper_api::create)
     .function("unlock(token, wallet_name, password)", &beekeeper_api::unlock)
+    .function("change_password(token, wallet_name, password, new_password)", &beekeeper_api::change_password)
     .function("open(token, wallet_name)", &beekeeper_api::open)
     .function("close(token, wallet_name)", &beekeeper_api::close)
     .function("lock_all(token)", &beekeeper_api::lock_all)

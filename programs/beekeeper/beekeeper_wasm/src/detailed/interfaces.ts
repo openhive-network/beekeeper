@@ -104,6 +104,16 @@ export interface IBeekeeperUnlockedWallet extends IWallet {
   lock(): IBeekeeperWallet;
 
   /**
+   * Changes the password of this wallet and saves it encrypted with the new password. The wallet stays unlocked
+   *
+   * @param {string} password current password of the wallet
+   * @param {string} newPassword new password of the wallet: not empty and at most 128 characters long
+   *
+   * @throws {BeekeeperError} if the current password is invalid, the new one is refused or on any beekeeper API-related error (error parsing response, invalid input, timeout error etc.)
+   */
+  changePassword(password: string, newPassword: string): Promise<void>;
+
+  /**
    * Imports given private key to this wallet and returns the associated public key for further use
    *
    * @param {string} wifKey private key in WIF format to import
