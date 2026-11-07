@@ -391,6 +391,27 @@ BOOST_AUTO_TEST_CASE(wallet_manager_info)
   } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(wallet_manager_info_timeout_time_is_stable)
+{
+  try {
+    test_utils::beekeeper_mgr b_mgr;
+    b_mgr.remove_wallets();
+
+    auto bk = b_mgr.create_beekeeper();
+    auto _token = bk.create_session();
+
+    // Sampled across more than a second, the samples pass every fraction of a second, so a
+    // deadline derived from now + remaining seconds would show two values.
+    const auto _timeout_time = bk.get_info( _token ).timeout_time;
+    for( int i = 0; i < 12; ++i )
+    {
+      std::this_thread::sleep_for( std::chrono::milliseconds(100) );
+      BOOST_REQUIRE_EQUAL( bk.get_info( _token ).timeout_time, _timeout_time );
+    }
+
+  } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE(wallet_manager_close)
 {
   try {

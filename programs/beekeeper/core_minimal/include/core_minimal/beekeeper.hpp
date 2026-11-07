@@ -173,13 +173,16 @@ private:
     /// decrypting refresh it, and the daemon runs those concurrently under a
     /// shared lock.
     std::atomic<clock::rep> timeout_time{clock::time_point::max().time_since_epoch().count()};
+
+    /// The same deadline on the system clock, taken together with timeout_time, so that
+    /// get_info reports one value until the next refresh instead of now + remaining.
+    std::atomic<std::time_t> timeout_wall_time{0};
   };
 
   session_state& get_session(const std::string& token);
   const session_state& get_session(const std::string& token) const;
 
   void refresh_timeout(session_state& session);
-  std::chrono::seconds get_remaining_seconds(const session_state& session) const;
 
   void lock_session_wallets(session_state& session);
 

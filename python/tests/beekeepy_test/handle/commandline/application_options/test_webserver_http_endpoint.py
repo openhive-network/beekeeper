@@ -29,16 +29,11 @@ def check_webserver_http_endpoint(*, webserver_http_endpoint: HttpUrl) -> None:
     assert validate_json(resp_json["result"], "beekeeper_api.create_session") == []
 
 
-@pytest.mark.parametrize(
-    "webserver_http_endpoint",
-    [
-        HttpUrl(f"0.0.0.0:{get_port()}", protocol="http"),
-        HttpUrl(f"127.0.0.1:{get_port()}", protocol="http"),
-    ],
-)
-def test_webserver_http_endpoint(beekeeper_not_started: Beekeeper, webserver_http_endpoint: HttpUrl) -> None:
+@pytest.mark.parametrize("endpoint_pattern", ["0.0.0.0:{port}", "127.0.0.1:{port}"])
+def test_webserver_http_endpoint(beekeeper_not_started: Beekeeper, endpoint_pattern: str) -> None:
     """Test will check command line flag --webserver_http_endpoint."""
     # ARRANGE & ACT
+    webserver_http_endpoint = HttpUrl(endpoint_pattern.format(port=get_port()), protocol="http")
     beekeeper_not_started.run(
         additional_cli_arguments=BeekeeperArguments(webserver_http_endpoint=webserver_http_endpoint)
     )
