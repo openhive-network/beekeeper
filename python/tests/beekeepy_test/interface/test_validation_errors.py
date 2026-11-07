@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-
 from beekeepy import AsyncBeekeeper, Beekeeper
 from beekeepy.exceptions import (
     BeekeeperInterfaceError,
