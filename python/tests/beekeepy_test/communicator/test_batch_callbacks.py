@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import timedelta
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, TypedDict
 
 import pytest
 from beekeepy.communication import ErrorInResponseRules, JsonRpcRules
@@ -26,6 +26,7 @@ from beekeepy.handle.remote import (
     SyncSendable,
 )
 from hiveio_api import HiveModel
+from hiveio_api_client import ClassFilterInterface, compiled_validation_mask_of
 from local_tools.beekeepy.testing_server import run_simple_server
 
 if TYPE_CHECKING:
@@ -87,8 +88,14 @@ def settings(url: HttpUrl) -> RemoteHandleSettings:
     return RemoteHandleSettings(http_endpoint=url, max_retries=0, period_between_retries=timedelta(0))
 
 
+class NumberFilter(TypedDict, total=False):
+    """Schema filter of `Number` - a validation mask of its fields."""
+
+    value: bool
+
+
 @dataclass(kw_only=True)
-class Number(HiveModel):
+class Number(HiveModel, ClassFilterInterface[NumberFilter]):
     value: int
 
 
@@ -378,3 +385,58 @@ async def test_whole_batch_of_async_handle_is_sent_again_while_its_responses_are
     # ASSERT
     assert len(sent) == 1 + MAX_RETRIES
     assert len(set(sent)) == 1, "the same batch is sent each time"
+
+
+class MaskRecorder:
+    """Callback of responses recording compiled validation masks of the given endpoint - as seen by validators."""
+
+    def __init__(self, jsonrpc_method: str) -> None:
+        self.__method = jsonrpc_method
+        self.seen: list[object | None] = []
+
+    def __call__(self, _context: RequestContext, /) -> None:
+        self.seen.append(compiled_validation_mask_of(self.__method))
+
+
+def test_batch_gives_validation_masks_of_endpoints_of_its_handle_to_validators() -> None:
+    # ARRANGE
+    recorder = MaskRecorder("sync_number_api.number")
+
+    # ACT
+    with run_simple_server(RESPONSES) as url:
+        handle = SyncNumberHandle(settings=settings(url))
+        handle.apis.number.number.set_validation_mask({"value": True})
+        try:
+            with handle.batch() as batch:
+                batch.api.callbacks.process_response.append(recorder)
+                batch.api.number.number()
+                batch.api.number.number()
+        finally:
+            handle.teardown()
+
+    # ASSERT
+    assert batch.api.number.number.validation_mask == {"value": True}, "the batch has masks of its handle"
+    assert recorder.seen == [{"value": True}], "callbacks of the batch are called once"
+    assert compiled_validation_mask_of("sync_number_api.number") is None, "masks are given only while sending"
+
+
+async def test_masks_changed_in_batch_of_async_handle_stay_in_the_batch() -> None:
+    # ARRANGE
+    recorder = MaskRecorder("async_number_api.number")
+
+    # ACT
+    with run_simple_server(RESPONSES) as url:
+        handle = AsyncNumberHandle(settings=settings(url))
+        handle.apis.number.number.set_validation_mask({"value": True})
+        try:
+            async with await handle.batch() as batch:
+                batch.api.callbacks.process_response.append(recorder)
+                batch.api.number.number.set_validation_mask(None)
+                await batch.api.number.number()
+                await batch.api.number.number()
+        finally:
+            await handle.async_teardown()
+
+    # ASSERT
+    assert recorder.seen == [None]
+    assert handle.apis.number.number.validation_mask == {"value": True}
