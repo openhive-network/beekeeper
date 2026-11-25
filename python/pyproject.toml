@@ -41,10 +41,10 @@ msgspec = "^0.20.0"  # configurations of executables (msgspec models of hiveio_a
 
 # Runtime of generated API clients (hive/wax-spec-generator): API base classes, owners (`AsyncSendable`), callbacks,
 # JSON-RPC, URLs and the public lazy-import helpers (`hiveio_api_client.lazy_import`).
-hiveio-api-client = {version = ">=1.7.1.post20261105045512,<2", source = "gitlab-hive"}
-# The range admits only releases of develop since hive/hive#970 and hive/hive#978 - earlier .post releases of this
-# version do not re-export the runtime of hiveio-api-client (their API base classes are other objects).
-hiveio-api = {version = ">=1.28.8rc3.post20261105084949,<1.28.8rc3.post99999999999999", source = "gitlab-hive", allow-prereleases = true}  # field types, models of app_status_api, validate_schema
+# Validation masks of endpoints (`compiled_validation_masks` of batches) - builds of hive/wax-spec-generator!44.
+hiveio-api-client = {version = "1.7.1.dev20261125144617+unstable", source = "gitlab-hive"}
+# Clients compiling validation masks - the build of hive/hive!2195 (with the hiveio-api-client above).
+hiveio-api = {version = "1.28.8rc3.dev20261125144737", source = "gitlab-hive", allow-prereleases = true}  # field types, models of app_status_api, validate_schema
 
 [tool.poetry.group.static-analysis.dependencies]
 mypy = "*"
