@@ -13,9 +13,13 @@ from hiveio_api_client import (
     JSONRPCResult,
     SyncSendable,
     build_response,
+    compiled_validation_masks,
+    copy_validation_masks,
+    current_compiled_validation_masks,
 )
 
 from beekeepy import exceptions
+from beekeepy._remote_handle.abc.handle import AbstractHandle
 from beekeepy._utilities.context import ContextAsync, ContextSync, EnterReturnT
 
 if TYPE_CHECKING:
@@ -158,6 +162,9 @@ class _BatchHandle(ContextSync[EnterReturnT], ContextAsync[EnterReturnT], ABC, G
     The request of the batch is sent with callbacks of the API collection of the owner (with its rules), then with
     callbacks of all calls of the batch (of the API collection of the batch, its APIs and endpoints) - each callback
     once, as for a single request.
+
+    Endpoints of the batch have the validation masks of endpoints of the owner (`set_validation_mask`, changed for the
+    batch only); the masks of the calls are given to validators of the request of the batch (e.g. schema validation).
     """
 
     def __init__(
@@ -173,6 +180,8 @@ class _BatchHandle(ContextSync[EnterReturnT], ContextAsync[EnterReturnT], ABC, G
         self._delay_error_on_data_access = delay_error_on_data_access
 
         self.__batch: list[_BatchRequestResponseItem] = []
+        self.__validation_masks: dict[str, object] = {}
+        """Compiled validation masks of the calls of the batch - by JSON-RPC methods of their endpoints."""
 
         self.__is_testnet: bool = is_testnet
 
@@ -195,19 +204,29 @@ class _BatchHandle(ContextSync[EnterReturnT], ContextAsync[EnterReturnT], ABC, G
 
         delayed_result = _DelayedResponseWrapper(url=self._url, request=data, expected_type=expect_type)
         self.__batch.append(_BatchRequestResponseItem(request=data, delayed_result=delayed_result))
+        self.__validation_masks.update(current_compiled_validation_masks())  # of the endpoint of the call
         return DummyResponse(result=delayed_result)  # type: ignore[return-value]
+
+    def _inherit_validation_masks(self, owner: object, api: object) -> None:
+        """Give the API of the batch the validation masks of the API collection of the owner (a handle of beekeepy)."""
+        if isinstance(owner, AbstractHandle):
+            copy_validation_masks(owner.apis, api)
 
     def __sync_evaluate(self) -> None:
         query = self.__prepare_request()
 
         with _PostRequestManager(self) as mgr:
-            mgr.set_responses(self._send_query(query))
+            with compiled_validation_masks(self.__validation_masks):
+                responses = self._send_query(query)
+            mgr.set_responses(responses)
 
     async def __async_evaluate(self) -> None:
         query = self.__prepare_request()
 
         with _PostRequestManager(self) as mgr:
-            mgr.set_responses(await self._async_send_query(query))
+            with compiled_validation_masks(self.__validation_masks):
+                responses = await self._async_send_query(query)
+            mgr.set_responses(responses)
 
     def _send_query(self, query: str) -> exceptions.Json | list[exceptions.Json]:  # noqa: ARG002
         raise AssertionError("Synchronous batch requires synchronous handle")
@@ -277,6 +296,7 @@ class SyncBatchHandle(_BatchHandle["SyncBatchHandle"], SyncSendable, Generic[Api
         self.__callbacks: list[Callbacks] = []
         """Callbacks of calls of the batch."""
         self.api: ApiT = api(self)
+        self._inherit_validation_masks(owner, self.api)
 
     def _send(
         self,
@@ -316,6 +336,7 @@ class AsyncBatchHandle(_BatchHandle["AsyncBatchHandle"], AsyncSendable, Generic[
         self.__callbacks: list[AsyncCallbacks] = []
         """Callbacks of calls of the batch."""
         self.api: ApiT = api(self)
+        self._inherit_validation_masks(owner, self.api)
 
     async def _async_send(
         self,
